@@ -1,0 +1,5 @@
+{
+  "name": "ManglarNet - Conexión Pedagógica",
+  "description": "A robust, centralized, and scalable application, ManglarNet, designed to replace spreadsheet-based systems with a single source of truth, built on a data-first philosophy with a React frontend.",
+  "requestFramePermissions": []
+}
