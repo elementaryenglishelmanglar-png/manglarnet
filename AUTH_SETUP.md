@@ -52,6 +52,29 @@ Esta guía explica cómo configurar la autenticación con Google OAuth en Supaba
    - **Client Secret (for Google OAuth)**: El Client Secret que copiaste de GCP
 6. Haz clic en **Save**
 
+### 2.1. Configurar URLs de Redirección en Supabase
+
+**IMPORTANTE**: Después de configurar Google OAuth, debes configurar las URLs de redirección permitidas:
+
+1. En Supabase Dashboard, ve a **Authentication > URL Configuration**
+2. En **Site URL**, configura tu URL de producción:
+   ```
+   https://manglarnet-conexion-pedagogica-qhiec31mt-frikianders-projects.vercel.app
+   ```
+   (O tu dominio personalizado si lo tienes configurado)
+
+3. En **Redirect URLs**, agrega todas las URLs donde tu app puede estar:
+   ```
+   http://localhost:3000
+   https://manglarnet-conexion-pedagogica-qhiec31mt-frikianders-projects.vercel.app
+   https://*.vercel.app
+   ```
+   (Agrega también tu dominio personalizado si lo tienes)
+
+4. Haz clic en **Save**
+
+**Nota**: Sin estas URLs configuradas, después de autenticarte con Google verás un error de conexión.
+
 ### 3. Ejecutar Migración de Base de Datos
 
 Ejecuta la migración SQL para crear la tabla de usuarios autorizados:

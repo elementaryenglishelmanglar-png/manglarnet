@@ -17,17 +17,27 @@ CREATE INDEX IF NOT EXISTS idx_authorized_users_email ON authorized_users(email)
 ALTER TABLE authorized_users ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Only authenticated users can read authorized_users
-CREATE POLICY "Users can read authorized_users" ON authorized_users
+-- Using 'TO authenticated' and 'USING (true)' for more reliable access during auth flow
+CREATE POLICY "Authenticated users can read authorized_users" ON authorized_users
   FOR SELECT
-  USING (auth.role() = 'authenticated');
+  TO authenticated
+  USING (true);
 
 -- Policy: Only directivos can insert/update/delete authorized_users
 CREATE POLICY "Directivos can manage authorized_users" ON authorized_users
   FOR ALL
+  TO authenticated
   USING (
     EXISTS (
       SELECT 1 FROM authorized_users au
-      WHERE au.email = auth.jwt() ->> 'email'
+      WHERE au.email = (auth.jwt() ->> 'email')
+      AND au.role = 'directivo'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM authorized_users au
+      WHERE au.email = (auth.jwt() ->> 'email')
       AND au.role = 'directivo'
     )
   );
@@ -36,7 +46,8 @@ CREATE POLICY "Directivos can manage authorized_users" ON authorized_users
 INSERT INTO authorized_users (email, role) VALUES
   ('elementaryenglish.elmanglar@gmail.com', 'coordinador'),
   ('coordinacionprimariaciem@gmail.com', 'coordinador'),
-  ('ysabelzamora.elmanglar@gmail.com', 'coordinador')
+  ('ysabelzamora.elmanglar@gmail.com', 'coordinador'),
+  ('vargas199511@gmail.com', 'coordinador')
 ON CONFLICT (email) DO NOTHING;
 
 -- Function to update updated_at timestamp

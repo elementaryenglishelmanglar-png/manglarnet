@@ -8,6 +8,22 @@ import { AuthorizedUsersView } from './components/AuthorizedUsersView';
 import { marked } from 'marked';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import {
+  alumnosService,
+  docentesService,
+  clasesService,
+  planificacionesService,
+  horariosService,
+  minutasService,
+  notificacionesService,
+  type Alumno as AlumnoDB,
+  type Docente as DocenteDB,
+  type Clase as ClaseDB,
+  type Planificacion as PlanificacionDB,
+  type Horario as HorarioDB,
+  type MinutaEvaluacion as MinutaEvaluacionDB,
+  type Notification as NotificationDB
+} from './services/supabaseDataService';
 
 
 // --- DATABASE SCHEMA TYPES ---
@@ -1485,14 +1501,25 @@ const PlanningView: React.FC<{
         setIsReadOnlyModal(false);
     };
 
-    const handleSavePlan = (planData: Planificacion) => {
-        const planExists = planificaciones.some(p => p.id_planificacion === planData.id_planificacion);
-        if (planExists) {
-            setPlanificaciones(prev => prev.map(p => p.id_planificacion === planData.id_planificacion ? planData : p));
-        } else {
-            setPlanificaciones(prev => [...prev, planData]);
+    const handleSavePlan = async (planData: Planificacion) => {
+        try {
+            const planExists = planificaciones.some(p => p.id_planificacion === planData.id_planificacion);
+            if (planExists) {
+                // Update existing plan
+                const { id_planificacion, fecha_creacion, updated_at, ...updateData } = planData;
+                await planificacionesService.update(id_planificacion, updateData);
+                setPlanificaciones(prev => prev.map(p => p.id_planificacion === planData.id_planificacion ? planData : p));
+            } else {
+                // Create new plan
+                const { id_planificacion, fecha_creacion, updated_at, ...newPlan } = planData;
+                const created = await planificacionesService.create(newPlan);
+                setPlanificaciones(prev => [...prev, created]);
+            }
+            handleCloseModal();
+        } catch (error: any) {
+            console.error('Error saving plan:', error);
+            alert('Error al guardar la planificación: ' + (error.message || 'Error desconocido'));
         }
-        handleCloseModal();
     };
     
     const handleGetAiSuggestions = async (plan: Planificacion) => {
@@ -2746,51 +2773,22 @@ const EvaluationView: React.FC<{
 
 // --- MAIN APP COMPONENT ---
 
-// Helper functions for localStorage persistence
-const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
-  try {
-    const item = localStorage.getItem(key);
-    if (item) {
-      return JSON.parse(item);
-    }
-  } catch (error) {
-    console.error(`Error loading ${key} from localStorage:`, error);
-  }
-  return defaultValue;
-};
-
-const saveToStorage = <T,>(key: string, value: T): void => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error(`Error saving ${key} to localStorage:`, error);
-  }
-};
-
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
   const [activeView, setActiveView] = useState('dashboard');
   
-  // Data states with localStorage persistence
-  const [alumnos, setAlumnos] = useState<Alumno[]>(() => loadFromStorage('manglarnet_alumnos', mockAlumnosData));
-  const [docentes, setDocentes] = useState<Docente[]>(() => loadFromStorage('manglarnet_docentes', mockDocentes));
-  const [clases, setClases] = useState<Clase[]>(() => loadFromStorage('manglarnet_clases', mockClases));
-  const [planificaciones, setPlanificaciones] = useState<Planificacion[]>(() => loadFromStorage('manglarnet_planificaciones', mockPlanificaciones));
-  const [schedules, setSchedules] = useState<WeeklySchedules>(() => {
-        const initialSchedules: WeeklySchedules = {};
-        const grades = Array.from(new Set(mockAlumnosData.map(a => a.salon)));
-        grades.forEach(grade => {
-            initialSchedules[grade] = {
-                1: mockHorarios.filter(h => {
-                    const clase = mockClases.find(c => c.id_clase === h.id_clase);
-                    return clase?.grado_asignado === grade;
-                })
-            };
-        });
-        return initialSchedules;
-  });
-  const [notifications, setNotifications] = useState<Notification[]>(() => loadFromStorage('manglarnet_notifications', mockNotifications));
-  const [minutas, setMinutas] = useState<MinutaEvaluacion[]>(() => loadFromStorage('manglarnet_minutas', []));
+  // Data states - loaded from Supabase
+  const [alumnos, setAlumnos] = useState<Alumno[]>([]);
+  const [docentes, setDocentes] = useState<Docente[]>([]);
+  const [clases, setClases] = useState<Clase[]>([]);
+  const [planificaciones, setPlanificaciones] = useState<Planificacion[]>([]);
+  const [schedules, setSchedules] = useState<WeeklySchedules>({});
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [minutas, setMinutas] = useState<MinutaEvaluacion[]>([]);
+
+  // Loading states
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
 
   // View-specific states
   const [selectedStudent, setSelectedStudent] = useState<Alumno | null>(null);
@@ -2798,30 +2796,161 @@ const App: React.FC = () => {
   const [editingStudent, setEditingStudent] = useState<Alumno | null>(null);
   const [navParams, setNavParams] = useState<any>(null);
 
-  // Persist data to localStorage when it changes
-  useEffect(() => {
-    saveToStorage('manglarnet_alumnos', alumnos);
-  }, [alumnos]);
+  // Helper function to convert DB types to App types
+  const convertAlumno = (db: AlumnoDB): Alumno => {
+    const { created_at, updated_at, ...alumno } = db;
+    return alumno as Alumno;
+  };
 
-  useEffect(() => {
-    saveToStorage('manglarnet_docentes', docentes);
-  }, [docentes]);
+  const convertClase = (db: ClaseDB): Clase => {
+    const { created_at, updated_at, student_ids, ...clase } = db;
+    return {
+      ...clase,
+      studentIds: student_ids || []
+    };
+  };
 
-  useEffect(() => {
-    saveToStorage('manglarnet_clases', clases);
-  }, [clases]);
+  const convertHorario = (db: HorarioDB): Horario => {
+    // HorarioDB has grado and semana, but Horario interface doesn't
+    // These are handled separately in WeeklySchedules structure
+    const { created_at, updated_at, grado, semana, ...horario } = db;
+    return horario as Horario;
+  };
 
-  useEffect(() => {
-    saveToStorage('manglarnet_planificaciones', planificaciones);
-  }, [planificaciones]);
+  // Helper to convert App types to DB types for saving
+  const convertAlumnoToDB = (alumno: Alumno): Omit<AlumnoDB, 'created_at' | 'updated_at'> => {
+    const { studentIds, ...db } = alumno;
+    return db as any;
+  };
 
-  useEffect(() => {
-    saveToStorage('manglarnet_notifications', notifications);
-  }, [notifications]);
+  const convertClaseToDB = (clase: Clase): Omit<ClaseDB, 'created_at' | 'updated_at'> => {
+    const { studentIds, ...db } = clase;
+    return {
+      ...db,
+      student_ids: studentIds
+    };
+  };
 
+  // Load all data from Supabase
+  const loadAllData = async () => {
+    if (!currentUser) return;
+    
+    setIsLoadingData(true);
+    setDataError(null);
+    
+    try {
+      // Load all data in parallel
+      const [alumnosData, docentesData, clasesData, planificacionesData, horariosData, minutasData, notificationsData] = await Promise.all([
+        alumnosService.getAll().catch(() => []),
+        docentesService.getAll().catch(() => []),
+        clasesService.getAll().catch(() => []),
+        planificacionesService.getAll().catch(() => []),
+        horariosService.getAll().catch(() => []),
+        minutasService.getAll().catch(() => []),
+        notificacionesService.getAll().catch(() => [])
+      ]);
+
+      setAlumnos(alumnosData.map(convertAlumno));
+      setDocentes(docentesData);
+      setClases(clasesData.map(convertClase));
+      setPlanificaciones(planificacionesData);
+      setMinutas(minutasData);
+      setNotifications(notificationsData.map(n => {
+        const linkTo = typeof n.link_to === 'string' ? JSON.parse(n.link_to) : n.link_to;
+        return {
+          ...n,
+          recipientId: n.recipient_id,
+          linkTo: linkTo || { view: 'dashboard' }
+        };
+      }));
+
+      // Build schedules from horarios
+      const schedulesMap: WeeklySchedules = {};
+      horariosData.forEach(h => {
+        if (!schedulesMap[h.grado]) {
+          schedulesMap[h.grado] = {};
+        }
+        if (!schedulesMap[h.grado][h.semana]) {
+          schedulesMap[h.grado][h.semana] = [];
+        }
+        schedulesMap[h.grado][h.semana].push(convertHorario(h));
+      });
+      setSchedules(schedulesMap);
+
+    } catch (error: any) {
+      console.error('Error loading data:', error);
+      setDataError('Error al cargar los datos. Por favor, recarga la página.');
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  // Load data when user logs in
   useEffect(() => {
-    saveToStorage('manglarnet_minutas', minutas);
-  }, [minutas]);
+    if (currentUser) {
+      loadAllData();
+    }
+  }, [currentUser]);
+
+  // Sync schedules to Supabase when they change
+  const syncSchedulesToSupabase = async (schedulesToSync: WeeklySchedules) => {
+    if (!currentUser) return;
+    
+    try {
+      // Get all current horarios from DB
+      const allHorarios = await horariosService.getAll();
+      
+      // Delete all existing horarios (we'll recreate them)
+      // This is simpler than trying to diff
+      for (const horario of allHorarios) {
+        await horariosService.delete(horario.id_horario).catch(() => {});
+      }
+      
+      // Create new horarios from schedules
+      const horariosToCreate: Array<Omit<HorarioDB, 'id_horario' | 'created_at' | 'updated_at'>> = [];
+      
+      for (const [grado, weeks] of Object.entries(schedulesToSync)) {
+        for (const [semanaStr, horarios] of Object.entries(weeks)) {
+          const semana = parseInt(semanaStr);
+          for (const horario of horarios) {
+            horariosToCreate.push({
+              grado,
+              semana,
+              id_docente: horario.id_docente,
+              id_clase: horario.id_clase,
+              dia_semana: horario.dia_semana,
+              hora_inicio: horario.hora_inicio,
+              hora_fin: horario.hora_fin,
+              evento_descripcion: horario.evento_descripcion
+            });
+          }
+        }
+      }
+      
+      // Batch insert (Supabase supports up to 1000 rows per insert)
+      if (horariosToCreate.length > 0) {
+        const batchSize = 100;
+        for (let i = 0; i < horariosToCreate.length; i += batchSize) {
+          const batch = horariosToCreate.slice(i, i + batchSize);
+          await supabase.from('horarios').insert(batch);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error syncing schedules to Supabase:', error);
+      // Don't show alert for schedule sync errors as they happen frequently
+    }
+  };
+
+  // Debounced sync of schedules (wait 2 seconds after last change)
+  useEffect(() => {
+    if (!currentUser || Object.keys(schedules).length === 0) return;
+    
+    const timeoutId = setTimeout(() => {
+      syncSchedulesToSupabase(schedules);
+    }, 2000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [schedules, currentUser]);
 
 
   useEffect(() => {
@@ -2892,9 +3021,16 @@ const App: React.FC = () => {
     setNavParams(params);
   };
   
-  const handleNotificationClick = (notification: Notification) => {
-    setNotifications(prev => prev.map(n => n.id === notification.id ? {...n, isRead: true} : n));
-    handleNavigate(notification.linkTo.view, notification.linkTo.params);
+  const handleNotificationClick = async (notification: Notification) => {
+    try {
+      await notificacionesService.markAsRead(notification.id);
+      setNotifications(prev => prev.map(n => n.id === notification.id ? {...n, isRead: true} : n));
+      handleNavigate(notification.linkTo.view, notification.linkTo.params);
+    } catch (error: any) {
+      console.error('Error marking notification as read:', error);
+      // Still navigate even if marking as read fails
+      handleNavigate(notification.linkTo.view, notification.linkTo.params);
+    }
   };
 
   // Student CRUD handlers
@@ -2908,18 +3044,36 @@ const App: React.FC = () => {
     setStudentModalOpen(false);
   };
 
-  const handleSaveStudent = (studentData: Alumno) => {
-    if (editingStudent) {
-        setAlumnos(prev => prev.map(s => s.id_alumno === studentData.id_alumno ? studentData : s));
-    } else {
-        setAlumnos(prev => [...prev, { ...studentData, id_alumno: `alumno-${Date.now()}` }]);
+  const handleSaveStudent = async (studentData: Alumno) => {
+    try {
+      if (editingStudent) {
+        // Update existing student
+        const dbData = convertAlumnoToDB(studentData);
+        const updated = await alumnosService.update(studentData.id_alumno, dbData);
+        setAlumnos(prev => prev.map(s => s.id_alumno === updated.id_alumno ? convertAlumno(updated) : s));
+      } else {
+        // Create new student
+        const { id_alumno, ...newStudent } = studentData;
+        const dbData = convertAlumnoToDB(newStudent as Alumno);
+        const created = await alumnosService.create(dbData);
+        setAlumnos(prev => [...prev, convertAlumno(created)]);
+      }
+      handleCloseStudentModal();
+    } catch (error: any) {
+      console.error('Error saving student:', error);
+      alert('Error al guardar el alumno: ' + (error.message || 'Error desconocido'));
     }
-    handleCloseStudentModal();
   };
 
-  const handleDeleteStudent = (studentId: string) => {
+  const handleDeleteStudent = async (studentId: string) => {
     if (window.confirm('¿Está seguro de que desea eliminar a este alumno?')) {
+      try {
+        await alumnosService.delete(studentId);
         setAlumnos(prev => prev.filter(s => s.id_alumno !== studentId));
+      } catch (error: any) {
+        console.error('Error deleting student:', error);
+        alert('Error al eliminar el alumno: ' + (error.message || 'Error desconocido'));
+      }
     }
   };
 
@@ -2976,6 +3130,34 @@ const App: React.FC = () => {
 
   if (!currentUser) {
     return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  if (isLoadingData) {
+    return (
+      <div className="flex h-screen bg-background-light items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando datos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (dataError) {
+    return (
+      <div className="flex h-screen bg-background-light items-center justify-center">
+        <div className="bg-white p-6 rounded-lg shadow-md max-w-md">
+          <h2 className="text-xl font-bold text-red-600 mb-2">Error al cargar datos</h2>
+          <p className="text-gray-600 mb-4">{dataError}</p>
+          <button
+            onClick={() => loadAllData()}
+            className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-green-600"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
