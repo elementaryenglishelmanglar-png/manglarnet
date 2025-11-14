@@ -1659,23 +1659,61 @@ const PlanningView: React.FC<{
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredHistory.map(plan => {
-                                const clase = clases.find(c => c.id_clase === plan.id_clase);
-                                const docente = docentes.find(d => d.id_docente === plan.id_docente);
-                                return (
-                                    <tr key={plan.id_planificacion}>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm">{new Date(plan.fecha_creacion).toLocaleDateString()}</td>
-                                        {currentUser.role !== 'docente' && <td className="px-4 py-2 whitespace-nowrap text-sm">{docente ? `${docente.nombres} ${docente.apellidos}` : 'N/A'}</td>}
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm">{clase ? `${clase.nombre_materia} (${clase.grado_asignado})` : 'N/A'}</td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm">{plan.semana}</td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm">{plan.lapso}</td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm"><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyles[plan.status]}`}>{plan.status}</span></td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                            <button onClick={() => handleOpenModal(plan, true)} className="text-brand-primary hover:underline">Ver Detalles</button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                            {filteredHistory.length === 0 ? (
+                                <tr>
+                                    <td colSpan={currentUser.role !== 'docente' ? 7 : 6} className="px-4 py-8 text-center text-gray-500">
+                                        No hay planificaciones que coincidan con los filtros seleccionados.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredHistory.map(plan => {
+                                    try {
+                                        const clase = clases.find(c => c.id_clase === plan.id_clase);
+                                        const docente = docentes.find(d => d.id_docente === plan.id_docente);
+                                        const statusStyle = statusStyles[plan.status] || 'bg-gray-100 text-gray-800';
+                                        
+                                        return (
+                                            <tr key={plan.id_planificacion}>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                    {plan.fecha_creacion ? new Date(plan.fecha_creacion).toLocaleDateString() : 'N/A'}
+                                                </td>
+                                                {currentUser.role !== 'docente' && (
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                        {docente ? `${docente.nombres} ${docente.apellidos}` : 'N/A'}
+                                                    </td>
+                                                )}
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                    {clase ? `${clase.nombre_materia} (${clase.grado_asignado})` : 'N/A'}
+                                                </td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{plan.semana || 'N/A'}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{plan.lapso || 'N/A'}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyle}`}>
+                                                        {plan.status || 'N/A'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                    <button 
+                                                        onClick={() => handleOpenModal(plan, true)} 
+                                                        className="text-brand-primary hover:underline"
+                                                    >
+                                                        Ver Detalles
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    } catch (error) {
+                                        console.error('Error rendering plan row:', error, plan);
+                                        return (
+                                            <tr key={plan.id_planificacion}>
+                                                <td colSpan={currentUser.role !== 'docente' ? 7 : 6} className="px-4 py-2 text-sm text-red-500">
+                                                    Error al mostrar planificación: {plan.id_planificacion}
+                                                </td>
+                                            </tr>
+                                        );
+                                    }
+                                })
+                            )}
                         </tbody>
                     </table>
                 </div>
@@ -2708,15 +2746,36 @@ const EvaluationView: React.FC<{
 
 // --- MAIN APP COMPONENT ---
 
+// Helper functions for localStorage persistence
+const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
+  try {
+    const item = localStorage.getItem(key);
+    if (item) {
+      return JSON.parse(item);
+    }
+  } catch (error) {
+    console.error(`Error loading ${key} from localStorage:`, error);
+  }
+  return defaultValue;
+};
+
+const saveToStorage = <T,>(key: string, value: T): void => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error(`Error saving ${key} to localStorage:`, error);
+  }
+};
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
   const [activeView, setActiveView] = useState('dashboard');
   
-  // Data states
-  const [alumnos, setAlumnos] = useState<Alumno[]>(mockAlumnosData);
-  const [docentes, setDocentes] = useState<Docente[]>(mockDocentes);
-  const [clases, setClases] = useState<Clase[]>(mockClases);
-  const [planificaciones, setPlanificaciones] = useState<Planificacion[]>(mockPlanificaciones);
+  // Data states with localStorage persistence
+  const [alumnos, setAlumnos] = useState<Alumno[]>(() => loadFromStorage('manglarnet_alumnos', mockAlumnosData));
+  const [docentes, setDocentes] = useState<Docente[]>(() => loadFromStorage('manglarnet_docentes', mockDocentes));
+  const [clases, setClases] = useState<Clase[]>(() => loadFromStorage('manglarnet_clases', mockClases));
+  const [planificaciones, setPlanificaciones] = useState<Planificacion[]>(() => loadFromStorage('manglarnet_planificaciones', mockPlanificaciones));
   const [schedules, setSchedules] = useState<WeeklySchedules>(() => {
         const initialSchedules: WeeklySchedules = {};
         const grades = Array.from(new Set(mockAlumnosData.map(a => a.salon)));
@@ -2730,14 +2789,39 @@ const App: React.FC = () => {
         });
         return initialSchedules;
   });
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
-  const [minutas, setMinutas] = useState<MinutaEvaluacion[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>(() => loadFromStorage('manglarnet_notifications', mockNotifications));
+  const [minutas, setMinutas] = useState<MinutaEvaluacion[]>(() => loadFromStorage('manglarnet_minutas', []));
 
   // View-specific states
   const [selectedStudent, setSelectedStudent] = useState<Alumno | null>(null);
   const [isStudentModalOpen, setStudentModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Alumno | null>(null);
   const [navParams, setNavParams] = useState<any>(null);
+
+  // Persist data to localStorage when it changes
+  useEffect(() => {
+    saveToStorage('manglarnet_alumnos', alumnos);
+  }, [alumnos]);
+
+  useEffect(() => {
+    saveToStorage('manglarnet_docentes', docentes);
+  }, [docentes]);
+
+  useEffect(() => {
+    saveToStorage('manglarnet_clases', clases);
+  }, [clases]);
+
+  useEffect(() => {
+    saveToStorage('manglarnet_planificaciones', planificaciones);
+  }, [planificaciones]);
+
+  useEffect(() => {
+    saveToStorage('manglarnet_notifications', notifications);
+  }, [notifications]);
+
+  useEffect(() => {
+    saveToStorage('manglarnet_minutas', minutas);
+  }, [minutas]);
 
 
   useEffect(() => {
