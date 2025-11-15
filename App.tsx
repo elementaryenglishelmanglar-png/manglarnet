@@ -1127,7 +1127,7 @@ const TeacherFormModal: React.FC<{
         const finalTeacherData: Docente = {
             ...formData,
             id_docente: teacher?.id_docente || `docente-${Date.now()}`,
-            id_usuario: teacher?.id_usuario || `user-${Date.now()}`
+            id_usuario: teacher?.id_usuario || undefined
         };
         onSave(finalTeacherData, assignments);
     };
@@ -1228,8 +1228,13 @@ const TeachersView: React.FC<{
                 setDocentes(prev => prev.map(d => d.id_docente === savedTeacher.id_docente ? savedTeacher : d));
             } else {
                 // Create new teacher
-                const { id_docente, created_at, updated_at, ...newTeacher } = teacherData;
-                savedTeacher = await docentesService.create(newTeacher);
+                // Omit id_docente, created_at, updated_at - Supabase will generate id_docente automatically
+                const { id_docente, created_at, updated_at, id_usuario, ...newTeacher } = teacherData;
+                // Only include id_usuario if it's a valid UUID (not a generated string like "user-123456")
+                const teacherToCreate = id_usuario && !id_usuario.startsWith('user-') && !id_usuario.startsWith('docente-')
+                    ? { ...newTeacher, id_usuario } 
+                    : newTeacher;
+                savedTeacher = await docentesService.create(teacherToCreate);
                 setDocentes(prev => [...prev, savedTeacher]);
             }
 
