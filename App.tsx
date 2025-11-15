@@ -3051,6 +3051,48 @@ const TeamScheduleView: React.FC<{
 // CALENDAR VIEW COMPONENT
 // ============================================
 
+// Helper functions for Caracas timezone (GMT-4 / America/Caracas)
+// Caracas is UTC-4 (VET - Venezuela Time)
+
+const toCaracasISOString = (dateString: string): string => {
+    // dateString is in format "YYYY-MM-DDTHH:mm" from datetime-local input
+    // We treat it as Caracas local time (UTC-4) and convert to UTC for storage
+    // Parse the date string manually to avoid timezone interpretation issues
+    const [datePart, timePart] = dateString.split('T');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart.split(':').map(Number);
+    
+    // Caracas is UTC-4, so to convert Caracas time to UTC, we add 4 hours
+    // Create UTC date directly with the adjusted time
+    const utcHours = hours + 4; // Add 4 hours for UTC conversion
+    const utcDate = new Date(Date.UTC(year, month - 1, day, utcHours, minutes, 0));
+    return utcDate.toISOString();
+};
+
+const fromCaracasISOString = (isoString: string): Date => {
+    // Convert UTC ISO string from database to Caracas local time
+    const utcDate = new Date(isoString);
+    // Subtract 4 hours (Caracas offset) to get Caracas local time
+    const caracasDate = new Date(utcDate.getTime() - (4 * 60 * 60 * 1000));
+    return caracasDate;
+};
+
+const formatDateForInput = (date: Date): string => {
+    // Format date for datetime-local input (YYYY-MM-DDTHH:mm)
+    // This assumes the date is already in Caracas timezone
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+const getCaracasDateString = (date: Date): string => {
+    // Get date string in Caracas timezone for comparison
+    return date.toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }); // YYYY-MM-DD format
+};
+
 const CalendarView: React.FC<{
     currentUser: Usuario;
 }> = ({ currentUser }) => {
@@ -3092,8 +3134,19 @@ const CalendarView: React.FC<{
         try {
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
-            const startDate = new Date(year, month, 1).toISOString();
-            const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+            
+            // Create start and end dates in Caracas timezone (first and last day of month)
+            // We need to create these dates as if they were in Caracas, then convert to UTC
+            const startDateCaracas = new Date(`${year}-${String(month + 1).padStart(2, '0')}-01T00:00:00`);
+            const endDateCaracas = new Date(year, month + 1, 0, 23, 59, 59);
+            
+            // Convert Caracas dates to UTC for database query
+            // Caracas is UTC-4, so we add 4 hours to get UTC
+            const startDateUTC = new Date(startDateCaracas.getTime() + (4 * 60 * 60 * 1000));
+            const endDateUTC = new Date(endDateCaracas.getTime() + (4 * 60 * 60 * 1000));
+            
+            const startDate = startDateUTC.toISOString();
+            const endDate = endDateUTC.toISOString();
             
             const eventosData = await eventosCalendarioService.getByDateRange(startDate, endDate);
             setEventos(eventosData);
@@ -3152,16 +3205,23 @@ const CalendarView: React.FC<{
     const getEventosForDay = (date: Date | null): EventoCalendario[] => {
         if (!date) return [];
         
-        const dateStr = date.toISOString().split('T')[0];
+        // Get date string in YYYY-MM-DD format for comparison
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        
         return eventos.filter(evento => {
             // Verificar filtros
             if (!filtrosTipo[evento.tipo_evento]) return false;
             if (!evento.nivel_educativo.some(nivel => filtrosNivel[nivel])) return false;
             
-            const eventoInicio = new Date(evento.fecha_inicio).toISOString().split('T')[0];
-            const eventoFin = new Date(evento.fecha_fin).toISOString().split('T')[0];
+            // Convert UTC dates from database to Caracas timezone for comparison
+            const eventoInicio = fromCaracasISOString(evento.fecha_inicio);
+            const eventoFin = fromCaracasISOString(evento.fecha_fin);
             
-            return dateStr >= eventoInicio && dateStr <= eventoFin;
+            // Get date strings in YYYY-MM-DD format
+            const eventoInicioStr = `${eventoInicio.getFullYear()}-${String(eventoInicio.getMonth() + 1).padStart(2, '0')}-${String(eventoInicio.getDate()).padStart(2, '0')}`;
+            const eventoFinStr = `${eventoFin.getFullYear()}-${String(eventoFin.getMonth() + 1).padStart(2, '0')}-${String(eventoFin.getDate()).padStart(2, '0')}`;
+            
+            return dateStr >= eventoInicioStr && dateStr <= eventoFinStr;
         });
     };
 
@@ -3194,13 +3254,24 @@ const CalendarView: React.FC<{
     // Guardar evento
     const handleSaveEvent = async (eventoData: Omit<EventoCalendario, 'id_evento' | 'created_at' | 'updated_at'>) => {
         try {
+            // eventoData.fecha_inicio and fecha_fin are ISO strings from the form
+            // They represent dates in Caracas timezone, so we need to convert to UTC
+            const fechaInicioUTC = toCaracasISOString(eventoData.fecha_inicio);
+            const fechaFinUTC = toCaracasISOString(eventoData.fecha_fin);
+            
+            const eventoToSave = {
+                ...eventoData,
+                fecha_inicio: fechaInicioUTC,
+                fecha_fin: fechaFinUTC,
+            };
+            
             if (selectedEvent) {
                 // Actualizar evento existente
-                await eventosCalendarioService.update(selectedEvent.id_evento, eventoData);
+                await eventosCalendarioService.update(selectedEvent.id_evento, eventoToSave);
             } else {
                 // Crear nuevo evento
                 await eventosCalendarioService.create({
-                    ...eventoData,
+                    ...eventoToSave,
                     creado_por: currentUser.id,
                 });
             }
@@ -3373,7 +3444,12 @@ const CalendarView: React.FC<{
                                                         style={{ backgroundColor: evento.color || coloresEventos[evento.tipo_evento] }}
                                                         title={evento.titulo}
                                                     >
-                                                        {evento.todo_dia ? evento.titulo : `${new Date(evento.fecha_inicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} ${evento.titulo}`}
+                                                        {evento.todo_dia ? evento.titulo : (() => {
+                                                            const fechaCaracas = fromCaracasISOString(evento.fecha_inicio);
+                                                            const hora = String(fechaCaracas.getHours()).padStart(2, '0');
+                                                            const minutos = String(fechaCaracas.getMinutes()).padStart(2, '0');
+                                                            return `${hora}:${minutos} ${evento.titulo}`;
+                                                        })()}
                                                     </div>
                                                 ))}
                                                 {eventosDelDia.length > 3 && (
@@ -3421,23 +3497,23 @@ const EventoModal: React.FC<{
         titulo: evento?.titulo || '',
         descripcion: evento?.descripcion || '',
         fecha_inicio: evento 
-            ? new Date(evento.fecha_inicio).toISOString().slice(0, 16)
+            ? formatDateForInput(fromCaracasISOString(evento.fecha_inicio))
             : fechaInicial 
                 ? (() => {
                     const date = new Date(fechaInicial);
                     date.setHours(9, 0, 0, 0);
-                    return date.toISOString().slice(0, 16);
+                    return formatDateForInput(date);
                 })()
-                : new Date().toISOString().slice(0, 16),
+                : formatDateForInput(new Date()),
         fecha_fin: evento 
-            ? new Date(evento.fecha_fin).toISOString().slice(0, 16)
+            ? formatDateForInput(fromCaracasISOString(evento.fecha_fin))
             : fechaInicial 
                 ? (() => {
                     const date = new Date(fechaInicial);
                     date.setHours(10, 0, 0, 0);
-                    return date.toISOString().slice(0, 16);
+                    return formatDateForInput(date);
                 })()
-                : new Date(Date.now() + 3600000).toISOString().slice(0, 16),
+                : formatDateForInput(new Date(Date.now() + 3600000)),
         tipo_evento: evento?.tipo_evento || 'Actividades Generales' as EventoCalendario['tipo_evento'],
         nivel_educativo: evento?.nivel_educativo || [] as string[],
         color: evento?.color || coloresEventos['Actividades Generales'],
@@ -3463,11 +3539,16 @@ const EventoModal: React.FC<{
             return;
         }
 
+        // formData.fecha_inicio and fecha_fin are in format "YYYY-MM-DDTHH:mm"
+        // We treat these as Caracas local time and convert to UTC for storage
+        const fechaInicioUTC = toCaracasISOString(formData.fecha_inicio);
+        const fechaFinUTC = toCaracasISOString(formData.fecha_fin);
+        
         onSave({
             titulo: formData.titulo,
             descripcion: formData.descripcion,
-            fecha_inicio: new Date(formData.fecha_inicio).toISOString(),
-            fecha_fin: new Date(formData.fecha_fin).toISOString(),
+            fecha_inicio: fechaInicioUTC,
+            fecha_fin: fechaFinUTC,
             tipo_evento: formData.tipo_evento,
             nivel_educativo: formData.nivel_educativo,
             color: formData.color,
