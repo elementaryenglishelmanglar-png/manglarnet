@@ -2284,31 +2284,40 @@ const PlanningView: React.FC<{
         }
 
         // Calculate filtered history directly (like evaluation history does)
+        // Ensure it's always an array to prevent React errors
         let filteredHistory: Planificacion[] = [];
-        try {
-            if (planificaciones && planificaciones.length > 0) {
-                filteredHistory = [...planificaciones];
+        
+        if (!planificaciones || !Array.isArray(planificaciones)) {
+            filteredHistory = [];
+        } else {
+            try {
+                // Start with a safe copy
+                filteredHistory = planificaciones.filter(p => p != null && typeof p === 'object' && p.id_planificacion);
 
                 // Filter by docente if needed
-                if (currentUser.role === 'docente' && currentUser.docenteId) {
+                if (currentUser && currentUser.role === 'docente' && currentUser.docenteId) {
                     filteredHistory = filteredHistory.filter(p => p && p.id_docente === currentUser.docenteId);
                 }
 
-                // Apply filters
-                const { ano_escolar, lapso, status, grado, id_docente } = historyFilters;
-                filteredHistory = filteredHistory.filter(p => {
-                    if (!p || !p.id_planificacion) return false;
-                    if (ano_escolar !== 'all' && p.ano_escolar !== ano_escolar) return false;
-                    if (lapso !== 'all' && p.lapso !== lapso) return false;
-                    if (status !== 'all' && p.status !== status) return false;
-                    if (id_docente !== 'all' && p.id_docente !== id_docente) return false;
-                    
-                    const clase = clases.find(c => c && c.id_clase === p.id_clase);
-                    if (grado !== 'all' && clase?.grado_asignado !== grado) return false;
-                    return true;
-                });
+                // Apply filters safely
+                if (historyFilters) {
+                    const { ano_escolar, lapso, status, grado, id_docente } = historyFilters;
+                    filteredHistory = filteredHistory.filter(p => {
+                        if (!p || !p.id_planificacion) return false;
+                        if (ano_escolar && ano_escolar !== 'all' && p.ano_escolar !== ano_escolar) return false;
+                        if (lapso && lapso !== 'all' && p.lapso !== lapso) return false;
+                        if (status && status !== 'all' && p.status !== status) return false;
+                        if (id_docente && id_docente !== 'all' && p.id_docente !== id_docente) return false;
+                        
+                        if (grado && grado !== 'all') {
+                            const clase = clases && Array.isArray(clases) ? clases.find(c => c && c.id_clase === p.id_clase) : null;
+                            if (!clase || clase.grado_asignado !== grado) return false;
+                        }
+                        return true;
+                    });
+                }
 
-                // Sort by date
+                // Sort by date safely
                 filteredHistory.sort((a, b) => {
                     try {
                         const dateA = a && a.fecha_creacion ? new Date(a.fecha_creacion).getTime() : 0;
@@ -2318,9 +2327,14 @@ const PlanningView: React.FC<{
                         return 0;
                     }
                 });
+            } catch (error) {
+                console.error('Error filtering history:', error);
+                filteredHistory = [];
             }
-        } catch (error) {
-            console.error('Error filtering history:', error);
+        }
+        
+        // Final safety check - ensure it's always an array
+        if (!Array.isArray(filteredHistory)) {
             filteredHistory = [];
         }
 
@@ -2350,12 +2364,12 @@ const PlanningView: React.FC<{
                     </InputField>
                     <InputField as="select" label="Grado" name="grado" value={historyFilters.grado} onChange={handleFilterChange}>
                         <option value="all">Todos</option>
-                        {uniqueGrades.map(g => <option key={g} value={g}>{g}</option>)}
+                        {uniqueGrades && uniqueGrades.length > 0 ? uniqueGrades.map(g => <option key={g} value={g}>{g}</option>) : null}
                     </InputField>
                     {(currentUser.role === 'coordinador' || currentUser.role === 'directivo') && (
                         <InputField as="select" label="Docente" name="id_docente" value={historyFilters.id_docente} onChange={handleFilterChange}>
                             <option value="all">Todos</option>
-                            {docentes.map(d => <option key={d.id_docente} value={d.id_docente}>{d.nombres} {d.apellidos}</option>)}
+                            {docentes && docentes.length > 0 ? docentes.map(d => <option key={d.id_docente} value={d.id_docente}>{d.nombres || ''} {d.apellidos || ''}</option>) : null}
                         </InputField>
                     )}
                 </div>
@@ -2374,64 +2388,76 @@ const PlanningView: React.FC<{
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredHistory.length === 0 ? (
+                            {!filteredHistory || filteredHistory.length === 0 ? (
                                 <tr>
-                                    <td colSpan={currentUser.role !== 'docente' ? 7 : 6} className="px-4 py-8 text-center text-gray-500">
+                                    <td colSpan={currentUser && currentUser.role !== 'docente' ? 7 : 6} className="px-4 py-8 text-center text-gray-500">
                                         No hay planificaciones que coincidan con los filtros seleccionados.
                                     </td>
                                 </tr>
                             ) : (
-                                filteredHistory.map(plan => {
-                                    if (!plan || !plan.id_planificacion) {
-                                        return null;
-                                    }
-                                    
-                                    try {
-                                        const clase = clases.find(c => c && c.id_clase === plan.id_clase);
-                                        const docente = docentes.find(d => d && d.id_docente === plan.id_docente);
-                                        const statusStyle = statusStyles[plan.status] || 'bg-gray-100 text-gray-800';
+                                filteredHistory
+                                    .filter(plan => plan != null && plan.id_planificacion != null)
+                                    .map(plan => {
+                                        if (!plan || !plan.id_planificacion) {
+                                            return null;
+                                        }
                                         
-                                        return (
-                                            <tr key={plan.id_planificacion}>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                    {plan.fecha_creacion ? new Date(plan.fecha_creacion).toLocaleDateString() : 'N/A'}
-                                                </td>
-                                                {currentUser && currentUser.role !== 'docente' && (
+                                        try {
+                                            const clase = clases && Array.isArray(clases) ? clases.find(c => c && c.id_clase === plan.id_clase) : null;
+                                            const docente = docentes && Array.isArray(docentes) ? docentes.find(d => d && d.id_docente === plan.id_docente) : null;
+                                            const planStatus = (plan.status && typeof plan.status === 'string') ? plan.status : 'Borrador';
+                                            const statusStyle = statusStyles[planStatus as Planificacion['status']] || 'bg-gray-100 text-gray-800';
+                                            
+                                            return (
+                                                <tr key={String(plan.id_planificacion)}>
                                                     <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                        {docente ? `${docente.nombres || ''} ${docente.apellidos || ''}`.trim() || 'N/A' : 'N/A'}
+                                                        {plan.fecha_creacion ? new Date(plan.fecha_creacion).toLocaleDateString() : 'N/A'}
                                                     </td>
-                                                )}
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                    {clase ? `${clase.nombre_materia || 'N/A'} (${clase.grado_asignado || 'N/A'})` : 'N/A'}
-                                                </td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{plan.semana || 'N/A'}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">{plan.lapso || 'N/A'}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyle}`}>
-                                                        {plan.status || 'N/A'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                    <button 
-                                                        onClick={() => handleOpenModal(plan, true)} 
-                                                        className="text-brand-primary hover:underline"
-                                                    >
-                                                        Ver Detalles
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    } catch (error) {
-                                        console.error('Error rendering plan row:', error, plan);
-                                        return (
-                                            <tr key={plan.id_planificacion || `error-${Math.random()}`}>
-                                                <td colSpan={currentUser && currentUser.role !== 'docente' ? 7 : 6} className="px-4 py-2 text-sm text-red-500">
-                                                    Error al mostrar planificación: {plan.id_planificacion || 'ID desconocido'}
-                                                </td>
-                                            </tr>
-                                        );
-                                    }
-                                }).filter(Boolean)
+                                                    {currentUser && currentUser.role !== 'docente' && (
+                                                        <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                            {docente ? `${docente.nombres || ''} ${docente.apellidos || ''}`.trim() || 'N/A' : 'N/A'}
+                                                        </td>
+                                                    )}
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                        {clase ? `${clase.nombre_materia || 'N/A'} (${clase.grado_asignado || 'N/A'})` : 'N/A'}
+                                                    </td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{plan.semana || 'N/A'}</td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{plan.lapso || 'N/A'}</td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyle}`}>
+                                                            {planStatus || 'N/A'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                        <button 
+                                                            onClick={() => {
+                                                                try {
+                                                                    if (handleOpenModal && plan) {
+                                                                        handleOpenModal(plan, true);
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.error('Error opening modal:', error);
+                                                                }
+                                                            }} 
+                                                            className="text-brand-primary hover:underline"
+                                                        >
+                                                            Ver Detalles
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        } catch (error) {
+                                            console.error('Error rendering plan row:', error, plan);
+                                            return (
+                                                <tr key={plan.id_planificacion ? String(plan.id_planificacion) : `error-${Math.random()}`}>
+                                                    <td colSpan={currentUser && currentUser.role !== 'docente' ? 7 : 6} className="px-4 py-2 text-sm text-red-500">
+                                                        Error al mostrar planificación: {plan.id_planificacion || 'ID desconocido'}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+                                    })
+                                    .filter(Boolean)
                             )}
                         </tbody>
                     </table>
