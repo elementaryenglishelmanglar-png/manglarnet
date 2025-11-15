@@ -101,6 +101,21 @@ export interface MinutaEvaluacion {
   updated_at?: string;
 }
 
+export interface EventoCalendario {
+  id_evento: string;
+  titulo: string;
+  descripcion?: string;
+  fecha_inicio: string; // TIMESTAMPTZ
+  fecha_fin: string; // TIMESTAMPTZ
+  tipo_evento: 'Actividades Generales' | 'Actos Cívicos' | 'Entregas Administrativas' | 'Reuniones de Etapa';
+  nivel_educativo: string[]; // ['Preescolar', 'Primaria', 'Bachillerato']
+  color?: string; // Color hexadecimal
+  todo_dia: boolean;
+  creado_por?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Notification {
   id: string;
   recipient_id: string;
@@ -554,6 +569,77 @@ export const notificacionesService = {
       .from('notificaciones')
       .delete()
       .eq('id', id);
+    
+    if (error) throw error;
+  }
+};
+
+// ============================================
+// EVENTOS CALENDARIO (Calendar Events)
+// ============================================
+
+export const eventosCalendarioService = {
+  async getAll(): Promise<EventoCalendario[]> {
+    const { data, error } = await supabase
+      .from('eventos_calendario')
+      .select('*')
+      .order('fecha_inicio', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByDateRange(fechaInicio: string, fechaFin: string): Promise<EventoCalendario[]> {
+    const { data, error } = await supabase
+      .from('eventos_calendario')
+      .select('*')
+      .gte('fecha_inicio', fechaInicio)
+      .lte('fecha_fin', fechaFin)
+      .order('fecha_inicio', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getById(id: string): Promise<EventoCalendario | null> {
+    const { data, error } = await supabase
+      .from('eventos_calendario')
+      .select('*')
+      .eq('id_evento', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async create(evento: Omit<EventoCalendario, 'id_evento' | 'created_at' | 'updated_at'>): Promise<EventoCalendario> {
+    const { data, error } = await supabase
+      .from('eventos_calendario')
+      .insert([evento])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, updates: Partial<EventoCalendario>): Promise<EventoCalendario> {
+    const { data, error } = await supabase
+      .from('eventos_calendario')
+      .update(updates)
+      .eq('id_evento', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('eventos_calendario')
+      .delete()
+      .eq('id_evento', id);
     
     if (error) throw error;
   }

@@ -16,13 +16,15 @@ import {
   horariosService,
   minutasService,
   notificacionesService,
+  eventosCalendarioService,
   type Alumno as AlumnoDB,
   type Docente as DocenteDB,
   type Clase as ClaseDB,
   type Planificacion as PlanificacionDB,
   type Horario as HorarioDB,
   type MinutaEvaluacion as MinutaEvaluacionDB,
-  type Notification as NotificationDB
+  type Notification as NotificationDB,
+  type EventoCalendario as EventoCalendarioDB
 } from './services/supabaseDataService';
 
 
@@ -111,6 +113,21 @@ interface Horario {
   hora_inicio: string; // e.g., "08:00"
   hora_fin: string; // e.g., "09:00"
   evento_descripcion?: string; // For non-class events
+}
+
+interface EventoCalendario {
+  id_evento: string;
+  titulo: string;
+  descripcion?: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  tipo_evento: 'Actividades Generales' | 'Actos Cívicos' | 'Entregas Administrativas' | 'Reuniones de Etapa';
+  nivel_educativo: string[];
+  color?: string;
+  todo_dia: boolean;
+  creado_por?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // --- NEW TYPES FOR EVALUATION MODULE ---
@@ -767,6 +784,7 @@ const Sidebar: React.FC<{
         { id: 'teachers', label: 'Docentes', icon: TeachersIcon, roles: ['directivo', 'coordinador'] },
         { id: 'schedules', label: 'Horarios', icon: CalendarIcon, roles: ['coordinador', 'directivo'] },
         { id: 'team-schedules', label: 'Horarios Equipo', icon: UsersIcon, roles: ['coordinador', 'directivo'] },
+        { id: 'calendar', label: 'Calendario', icon: CalendarIcon, roles: ['directivo', 'coordinador'] },
         { id: 'planning', label: 'Planificaciones', icon: PlanningIcon, roles: ['directivo', 'coordinador', 'docente'] },
         { id: 'evaluation', label: 'Evaluación', icon: EvaluationIcon, roles: ['directivo', 'coordinador'] },
         { id: 'authorized-users', label: 'Usuarios Autorizados', icon: UsersIcon, roles: ['directivo'] },
@@ -3029,6 +3047,602 @@ const TeamScheduleView: React.FC<{
 
 // --- NEW EVALUATION VIEW COMPONENT ---
 
+// ============================================
+// CALENDAR VIEW COMPONENT
+// ============================================
+
+const CalendarView: React.FC<{
+    currentUser: Usuario;
+}> = ({ currentUser }) => {
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [eventos, setEventos] = useState<EventoCalendario[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedEvent, setSelectedEvent] = useState<EventoCalendario | null>(null);
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    
+    // Filtros
+    const [filtrosTipo, setFiltrosTipo] = useState<{ [key: string]: boolean }>({
+        'Actividades Generales': true,
+        'Actos Cívicos': true,
+        'Entregas Administrativas': true,
+        'Reuniones de Etapa': true,
+    });
+    const [filtrosNivel, setFiltrosNivel] = useState<{ [key: string]: boolean }>({
+        'Preescolar': true,
+        'Primaria': true,
+        'Bachillerato': true,
+    });
+
+    // Colores para cada tipo de evento
+    const coloresEventos: { [key: string]: string } = {
+        'Actividades Generales': '#3B82F6', // Azul
+        'Actos Cívicos': '#EF4444', // Rojo
+        'Entregas Administrativas': '#10B981', // Verde
+        'Reuniones de Etapa': '#F59E0B', // Amarillo/Naranja
+    };
+
+    // Cargar eventos
+    useEffect(() => {
+        loadEventos();
+    }, [currentDate]);
+
+    const loadEventos = async () => {
+        setIsLoading(true);
+        try {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const startDate = new Date(year, month, 1).toISOString();
+            const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+            
+            const eventosData = await eventosCalendarioService.getByDateRange(startDate, endDate);
+            setEventos(eventosData);
+        } catch (error: any) {
+            console.error('Error loading eventos:', error);
+            alert('Error al cargar eventos: ' + (error.message || 'Error desconocido'));
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Navegación del calendario
+    const goToPreviousMonth = () => {
+        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    };
+
+    const goToNextMonth = () => {
+        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    };
+
+    const goToToday = () => {
+        setCurrentDate(new Date());
+    };
+
+    // Obtener días del mes
+    const getDaysInMonth = () => {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const daysInMonth = lastDay.getDate();
+        const startingDayOfWeek = firstDay.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+
+        const days: (Date | null)[] = [];
+        
+        // Días del mes anterior para completar la primera semana
+        for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+            days.push(null);
+        }
+        
+        // Días del mes actual
+        for (let day = 1; day <= daysInMonth; day++) {
+            days.push(new Date(year, month, day));
+        }
+        
+        // Días del mes siguiente para completar la última semana
+        const remainingDays = 42 - days.length; // 6 semanas * 7 días
+        for (let day = 1; day <= remainingDays; day++) {
+            days.push(null);
+        }
+        
+        return days;
+    };
+
+    // Obtener eventos para un día específico
+    const getEventosForDay = (date: Date | null): EventoCalendario[] => {
+        if (!date) return [];
+        
+        const dateStr = date.toISOString().split('T')[0];
+        return eventos.filter(evento => {
+            // Verificar filtros
+            if (!filtrosTipo[evento.tipo_evento]) return false;
+            if (!evento.nivel_educativo.some(nivel => filtrosNivel[nivel])) return false;
+            
+            const eventoInicio = new Date(evento.fecha_inicio).toISOString().split('T')[0];
+            const eventoFin = new Date(evento.fecha_fin).toISOString().split('T')[0];
+            
+            return dateStr >= eventoInicio && dateStr <= eventoFin;
+        });
+    };
+
+    // Formatear fecha
+    const formatDate = (date: Date): string => {
+        return date.toLocaleDateString('es-ES', { 
+            year: 'numeric', 
+            month: 'long' 
+        });
+    };
+
+    // Abrir modal para crear/editar evento
+    const handleOpenModal = (date?: Date, evento?: EventoCalendario) => {
+        if (evento) {
+            setSelectedEvent(evento);
+            setSelectedDate(null);
+        } else {
+            setSelectedEvent(null);
+            setSelectedDate(date || null);
+        }
+        setIsModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setSelectedEvent(null);
+        setSelectedDate(null);
+    };
+
+    // Guardar evento
+    const handleSaveEvent = async (eventoData: Omit<EventoCalendario, 'id_evento' | 'created_at' | 'updated_at'>) => {
+        try {
+            if (selectedEvent) {
+                // Actualizar evento existente
+                await eventosCalendarioService.update(selectedEvent.id_evento, eventoData);
+            } else {
+                // Crear nuevo evento
+                await eventosCalendarioService.create({
+                    ...eventoData,
+                    creado_por: currentUser.id,
+                });
+            }
+            await loadEventos();
+            handleCloseModal();
+        } catch (error: any) {
+            console.error('Error saving evento:', error);
+            alert('Error al guardar evento: ' + (error.message || 'Error desconocido'));
+        }
+    };
+
+    // Eliminar evento
+    const handleDeleteEvent = async () => {
+        if (!selectedEvent) return;
+        if (!window.confirm('¿Está seguro de que desea eliminar este evento?')) return;
+        
+        try {
+            await eventosCalendarioService.delete(selectedEvent.id_evento);
+            await loadEventos();
+            handleCloseModal();
+        } catch (error: any) {
+            console.error('Error deleting evento:', error);
+            alert('Error al eliminar evento: ' + (error.message || 'Error desconocido'));
+        }
+    };
+
+    const days = getDaysInMonth();
+    const weekDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    const today = new Date();
+    const isToday = (date: Date | null): boolean => {
+        if (!date) return false;
+        return date.toDateString() === today.toDateString();
+    };
+
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+            {/* Header con navegación */}
+            <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={goToPreviousMonth}
+                        className="p-2 hover:bg-gray-100 rounded-md"
+                    >
+                        <ArrowLeftIcon />
+                    </button>
+                    <h2 className="text-2xl font-bold text-gray-800">
+                        {formatDate(currentDate)}
+                    </h2>
+                    <button
+                        onClick={goToNextMonth}
+                        className="p-2 hover:bg-gray-100 rounded-md"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={goToToday}
+                        className="ml-4 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md text-sm font-medium"
+                    >
+                        Hoy
+                    </button>
+                </div>
+                {(currentUser.role === 'directivo' || currentUser.role === 'coordinador') && (
+                    <button
+                        onClick={() => handleOpenModal()}
+                        className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-opacity-90"
+                    >
+                        <PlusIcon />
+                        Nuevo Evento
+                    </button>
+                )}
+            </div>
+
+            {/* Filtros */}
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-gray-50 rounded-lg">
+                {/* Filtros por tipo de evento */}
+                <div>
+                    <h3 className="font-semibold text-gray-700 mb-3">Ver Calendarios:</h3>
+                    <div className="space-y-2">
+                        {Object.keys(filtrosTipo).map(tipo => (
+                            <label key={tipo} className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={filtrosTipo[tipo]}
+                                    onChange={(e) => setFiltrosTipo(prev => ({ ...prev, [tipo]: e.target.checked }))}
+                                    className="rounded"
+                                />
+                                <span className="flex items-center gap-2">
+                                    <span
+                                        className="w-4 h-4 rounded"
+                                        style={{ backgroundColor: coloresEventos[tipo] }}
+                                    />
+                                    {tipo}
+                                </span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Filtros por nivel educativo */}
+                <div>
+                    <h3 className="font-semibold text-gray-700 mb-3">Ver Niveles:</h3>
+                    <div className="space-y-2">
+                        {Object.keys(filtrosNivel).map(nivel => (
+                            <label key={nivel} className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={filtrosNivel[nivel]}
+                                    onChange={(e) => setFiltrosNivel(prev => ({ ...prev, [nivel]: e.target.checked }))}
+                                    className="rounded"
+                                />
+                                <span>Mostrar solo {nivel}</span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Calendario */}
+            {isLoading ? (
+                <div className="text-center py-12">
+                    <p className="text-gray-500">Cargando eventos...</p>
+                </div>
+            ) : (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    {/* Días de la semana */}
+                    <div className="grid grid-cols-7 bg-gray-100 border-b">
+                        {weekDays.map(day => (
+                            <div key={day} className="p-3 text-center text-sm font-semibold text-gray-700 border-r last:border-r-0">
+                                {day}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Días del mes */}
+                    <div className="grid grid-cols-7">
+                        {days.map((date, index) => {
+                            const eventosDelDia = getEventosForDay(date);
+                            const isCurrentMonth = date && date.getMonth() === currentDate.getMonth();
+                            
+                            return (
+                                <div
+                                    key={index}
+                                    className={`min-h-[100px] border-r border-b p-2 ${
+                                        !isCurrentMonth ? 'bg-gray-50' : 'bg-white'
+                                    } ${isToday(date) ? 'bg-blue-50' : ''} hover:bg-gray-50 cursor-pointer`}
+                                    onClick={() => date && handleOpenModal(date)}
+                                >
+                                    {date && (
+                                        <>
+                                            <div className={`text-sm font-medium mb-1 ${
+                                                isToday(date) 
+                                                    ? 'text-blue-600 font-bold' 
+                                                    : isCurrentMonth 
+                                                        ? 'text-gray-900' 
+                                                        : 'text-gray-400'
+                                            }`}>
+                                                {date.getDate()}
+                                            </div>
+                                            <div className="space-y-1">
+                                                {eventosDelDia.slice(0, 3).map(evento => (
+                                                    <div
+                                                        key={evento.id_evento}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleOpenModal(date, evento);
+                                                        }}
+                                                        className="text-xs p-1 rounded text-white truncate cursor-pointer hover:opacity-80"
+                                                        style={{ backgroundColor: evento.color || coloresEventos[evento.tipo_evento] }}
+                                                        title={evento.titulo}
+                                                    >
+                                                        {evento.todo_dia ? evento.titulo : `${new Date(evento.fecha_inicio).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} ${evento.titulo}`}
+                                                    </div>
+                                                ))}
+                                                {eventosDelDia.length > 3 && (
+                                                    <div className="text-xs text-gray-500 font-medium">
+                                                        +{eventosDelDia.length - 3} más
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* Modal para crear/editar evento */}
+            {isModalOpen && (
+                <EventoModal
+                    evento={selectedEvent}
+                    fechaInicial={selectedDate}
+                    onClose={handleCloseModal}
+                    onSave={handleSaveEvent}
+                    onDelete={selectedEvent ? handleDeleteEvent : undefined}
+                    coloresEventos={coloresEventos}
+                    currentUser={currentUser}
+                />
+            )}
+        </div>
+    );
+};
+
+// Modal para crear/editar evento
+const EventoModal: React.FC<{
+    evento: EventoCalendario | null;
+    fechaInicial: Date | null;
+    onClose: () => void;
+    onSave: (evento: Omit<EventoCalendario, 'id_evento' | 'created_at' | 'updated_at'>) => void;
+    onDelete?: () => void;
+    coloresEventos: { [key: string]: string };
+    currentUser: Usuario;
+}> = ({ evento, fechaInicial, onClose, onSave, onDelete, coloresEventos, currentUser }) => {
+    const [formData, setFormData] = useState({
+        titulo: evento?.titulo || '',
+        descripcion: evento?.descripcion || '',
+        fecha_inicio: evento 
+            ? new Date(evento.fecha_inicio).toISOString().slice(0, 16)
+            : fechaInicial 
+                ? (() => {
+                    const date = new Date(fechaInicial);
+                    date.setHours(9, 0, 0, 0);
+                    return date.toISOString().slice(0, 16);
+                })()
+                : new Date().toISOString().slice(0, 16),
+        fecha_fin: evento 
+            ? new Date(evento.fecha_fin).toISOString().slice(0, 16)
+            : fechaInicial 
+                ? (() => {
+                    const date = new Date(fechaInicial);
+                    date.setHours(10, 0, 0, 0);
+                    return date.toISOString().slice(0, 16);
+                })()
+                : new Date(Date.now() + 3600000).toISOString().slice(0, 16),
+        tipo_evento: evento?.tipo_evento || 'Actividades Generales' as EventoCalendario['tipo_evento'],
+        nivel_educativo: evento?.nivel_educativo || [] as string[],
+        color: evento?.color || coloresEventos['Actividades Generales'],
+        todo_dia: evento?.todo_dia || false,
+    });
+
+    const nivelesDisponibles = ['Preescolar', 'Primaria', 'Bachillerato'];
+    const tiposEvento: EventoCalendario['tipo_evento'][] = [
+        'Actividades Generales',
+        'Actos Cívicos',
+        'Entregas Administrativas',
+        'Reuniones de Etapa'
+    ];
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!formData.titulo.trim()) {
+            alert('El título es requerido');
+            return;
+        }
+        if (formData.nivel_educativo.length === 0) {
+            alert('Debe seleccionar al menos un nivel educativo');
+            return;
+        }
+
+        onSave({
+            titulo: formData.titulo,
+            descripcion: formData.descripcion,
+            fecha_inicio: new Date(formData.fecha_inicio).toISOString(),
+            fecha_fin: new Date(formData.fecha_fin).toISOString(),
+            tipo_evento: formData.tipo_evento,
+            nivel_educativo: formData.nivel_educativo,
+            color: formData.color,
+            todo_dia: formData.todo_dia,
+        });
+    };
+
+    const toggleNivel = (nivel: string) => {
+        setFormData(prev => ({
+            ...prev,
+            nivel_educativo: prev.nivel_educativo.includes(nivel)
+                ? prev.nivel_educativo.filter(n => n !== nivel)
+                : [...prev.nivel_educativo, nivel]
+        }));
+    };
+
+    const handleTipoChange = (tipo: EventoCalendario['tipo_evento']) => {
+        setFormData(prev => ({
+            ...prev,
+            tipo_evento: tipo,
+            color: coloresEventos[tipo],
+        }));
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+            <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold text-gray-800">
+                        {evento ? 'Editar Evento' : 'Nuevo Evento'}
+                    </h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                        <CloseIcon />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <InputField
+                        label="Título"
+                        name="titulo"
+                        value={formData.titulo}
+                        onChange={(e) => setFormData(prev => ({ ...prev, titulo: e.target.value }))}
+                        required
+                    />
+
+                    <InputField
+                        as="textarea"
+                        label="Descripción"
+                        name="descripcion"
+                        value={formData.descripcion}
+                        onChange={(e) => setFormData(prev => ({ ...prev, descripcion: e.target.value }))}
+                        rows={3}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <InputField
+                                label="Fecha y Hora de Inicio"
+                                name="fecha_inicio"
+                                type={formData.todo_dia ? "date" : "datetime-local"}
+                                value={formData.todo_dia ? formData.fecha_inicio.split('T')[0] : formData.fecha_inicio}
+                                onChange={(e) => {
+                                    const value = formData.todo_dia 
+                                        ? `${e.target.value}T00:00`
+                                        : e.target.value;
+                                    setFormData(prev => ({ ...prev, fecha_inicio: value }));
+                                }}
+                                required
+                            />
+                        </div>
+                        <div>
+                            <InputField
+                                label="Fecha y Hora de Fin"
+                                name="fecha_fin"
+                                type={formData.todo_dia ? "date" : "datetime-local"}
+                                value={formData.todo_dia ? formData.fecha_fin.split('T')[0] : formData.fecha_fin}
+                                onChange={(e) => {
+                                    const value = formData.todo_dia 
+                                        ? `${e.target.value}T23:59`
+                                        : e.target.value;
+                                    setFormData(prev => ({ ...prev, fecha_fin: value }));
+                                }}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="todo_dia"
+                            checked={formData.todo_dia}
+                            onChange={(e) => setFormData(prev => ({ ...prev, todo_dia: e.target.checked }))}
+                            className="rounded"
+                        />
+                        <label htmlFor="todo_dia" className="text-sm font-medium text-gray-700">
+                            Evento de todo el día
+                        </label>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Tipo de Evento
+                        </label>
+                        <select
+                            value={formData.tipo_evento}
+                            onChange={(e) => handleTipoChange(e.target.value as EventoCalendario['tipo_evento'])}
+                            className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary"
+                        >
+                            {tiposEvento.map(tipo => (
+                                <option key={tipo} value={tipo}>{tipo}</option>
+                            ))}
+                        </select>
+                        <div className="mt-2 flex items-center gap-2">
+                            <span className="text-sm text-gray-600">Color:</span>
+                            <span
+                                className="w-6 h-6 rounded border border-gray-300"
+                                style={{ backgroundColor: formData.color }}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Niveles Educativos
+                        </label>
+                        <div className="space-y-2">
+                            {nivelesDisponibles.map(nivel => (
+                                <label key={nivel} className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.nivel_educativo.includes(nivel)}
+                                        onChange={() => toggleNivel(nivel)}
+                                        className="rounded"
+                                    />
+                                    <span>{nivel}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-6 border-t">
+                        <div>
+                            {evento && onDelete && (
+                                <button
+                                    type="button"
+                                    onClick={onDelete}
+                                    className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+                                >
+                                    Eliminar
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex gap-4">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-opacity-90"
+                            >
+                                {evento ? 'Actualizar' : 'Crear'} Evento
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 const GradeChart: React.FC<{ data: { [key in Nota]?: number } }> = ({ data }) => {
     const grades: Nota[] = ['A', 'B', 'C', 'D', 'E', 'SE'];
     const maxCount = Math.max(...Object.values(data).filter(v => typeof v === 'number'), 1);
@@ -3953,6 +4567,8 @@ const App: React.FC = () => {
         return <TeachersView docentes={docentes} clases={clases} alumnos={alumnos} setDocentes={setDocentes} setClases={setClases} />;
       case 'planning':
         return <PlanningView planificaciones={planificaciones} setPlanificaciones={setPlanificaciones} clases={clases} docentes={docentes} currentUser={currentUser!} navParams={navParams}/>;
+      case 'calendar':
+        return <CalendarView currentUser={currentUser!} />;
       case 'schedules':
         return <ScheduleView schedules={schedules} setSchedules={setSchedules} clases={clases} docentes={docentes} currentUser={currentUser!} alumnos={alumnos} />;
       case 'team-schedules':
@@ -3972,6 +4588,7 @@ const App: React.FC = () => {
       teachers: 'Gestión de Docentes',
       schedules: 'Gestión de Horarios',
       'team-schedules': 'Horarios de Equipo',
+      calendar: 'Calendario',
       planning: 'Planificaciones',
       evaluation: 'Seguimiento Pedagógico',
       'authorized-users': 'Usuarios Autorizados',
