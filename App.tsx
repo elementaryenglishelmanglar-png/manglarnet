@@ -3093,10 +3093,13 @@ const getCaracasDateString = (date: Date): string => {
     return date.toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }); // YYYY-MM-DD format
 };
 
+type CalendarViewType = 'month' | 'week' | 'day' | 'list';
+
 const CalendarView: React.FC<{
     currentUser: Usuario;
 }> = ({ currentUser }) => {
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [viewType, setViewType] = useState<CalendarViewType>('month');
     const [eventos, setEventos] = useState<EventoCalendario[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -3127,21 +3130,53 @@ const CalendarView: React.FC<{
     // Cargar eventos
     useEffect(() => {
         loadEventos();
-    }, [currentDate]);
+    }, [currentDate, viewType]);
 
     const loadEventos = async () => {
         setIsLoading(true);
         try {
-            const year = currentDate.getFullYear();
-            const month = currentDate.getMonth();
+            let startDateCaracas: Date;
+            let endDateCaracas: Date;
             
-            // Create start and end dates in Caracas timezone (first and last day of month)
-            // We need to create these dates as if they were in Caracas, then convert to UTC
-            const startDateCaracas = new Date(`${year}-${String(month + 1).padStart(2, '0')}-01T00:00:00`);
-            const endDateCaracas = new Date(year, month + 1, 0, 23, 59, 59);
+            if (viewType === 'month') {
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                startDateCaracas = new Date(`${year}-${String(month + 1).padStart(2, '0')}-01T00:00:00`);
+                endDateCaracas = new Date(year, month + 1, 0, 23, 59, 59);
+            } else if (viewType === 'week') {
+                // Get start of week (Monday)
+                const startOfWeek = new Date(currentDate);
+                const day = startOfWeek.getDay();
+                const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+                startOfWeek.setDate(diff);
+                startOfWeek.setHours(0, 0, 0, 0);
+                startDateCaracas = startOfWeek;
+                
+                // Get end of week (Sunday)
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setDate(startOfWeek.getDate() + 6);
+                endOfWeek.setHours(23, 59, 59, 999);
+                endDateCaracas = endOfWeek;
+            } else if (viewType === 'day') {
+                startDateCaracas = new Date(currentDate);
+                startDateCaracas.setHours(0, 0, 0, 0);
+                endDateCaracas = new Date(currentDate);
+                endDateCaracas.setHours(23, 59, 59, 999);
+            } else { // list view - show current week
+                const startOfWeek = new Date(currentDate);
+                const day = startOfWeek.getDay();
+                const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+                startOfWeek.setDate(diff);
+                startOfWeek.setHours(0, 0, 0, 0);
+                startDateCaracas = startOfWeek;
+                
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setDate(startOfWeek.getDate() + 6);
+                endOfWeek.setHours(23, 59, 59, 999);
+                endDateCaracas = endOfWeek;
+            }
             
             // Convert Caracas dates to UTC for database query
-            // Caracas is UTC-4, so we add 4 hours to get UTC
             const startDateUTC = new Date(startDateCaracas.getTime() + (4 * 60 * 60 * 1000));
             const endDateUTC = new Date(endDateCaracas.getTime() + (4 * 60 * 60 * 1000));
             
@@ -3159,16 +3194,62 @@ const CalendarView: React.FC<{
     };
 
     // Navegación del calendario
-    const goToPreviousMonth = () => {
-        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    const goToPrevious = () => {
+        const newDate = new Date(currentDate);
+        if (viewType === 'month') {
+            newDate.setMonth(newDate.getMonth() - 1);
+        } else if (viewType === 'week') {
+            newDate.setDate(newDate.getDate() - 7);
+        } else if (viewType === 'day') {
+            newDate.setDate(newDate.getDate() - 1);
+        } else { // list
+            newDate.setDate(newDate.getDate() - 7);
+        }
+        setCurrentDate(newDate);
     };
 
-    const goToNextMonth = () => {
-        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    const goToNext = () => {
+        const newDate = new Date(currentDate);
+        if (viewType === 'month') {
+            newDate.setMonth(newDate.getMonth() + 1);
+        } else if (viewType === 'week') {
+            newDate.setDate(newDate.getDate() + 7);
+        } else if (viewType === 'day') {
+            newDate.setDate(newDate.getDate() + 1);
+        } else { // list
+            newDate.setDate(newDate.getDate() + 7);
+        }
+        setCurrentDate(newDate);
     };
 
     const goToToday = () => {
         setCurrentDate(new Date());
+    };
+
+    // Formatear fecha según la vista
+    const formatDateForView = (): string => {
+        if (viewType === 'month') {
+            return formatDate(currentDate);
+        } else if (viewType === 'week') {
+            const startOfWeek = new Date(currentDate);
+            const day = startOfWeek.getDay();
+            const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+            startOfWeek.setDate(diff);
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            return `${startOfWeek.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} – ${endOfWeek.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        } else if (viewType === 'day') {
+            return currentDate.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        } else { // list
+            const startOfWeek = new Date(currentDate);
+            const day = startOfWeek.getDay();
+            const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+            startOfWeek.setDate(diff);
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+            return `${monthNames[startOfWeek.getMonth()]} ${startOfWeek.getDate()} – ${endOfWeek.getDate()}, ${endOfWeek.getFullYear()}`;
+        }
     };
 
     // Obtener días del mes
@@ -3206,29 +3287,6 @@ const CalendarView: React.FC<{
         return days;
     };
 
-    // Obtener eventos para un día específico
-    const getEventosForDay = (date: Date | null): EventoCalendario[] => {
-        if (!date) return [];
-        
-        // Get date string in YYYY-MM-DD format for comparison
-        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-        
-        return eventos.filter(evento => {
-            // Verificar filtros
-            if (!filtrosTipo[evento.tipo_evento]) return false;
-            if (!evento.nivel_educativo.some(nivel => filtrosNivel[nivel])) return false;
-            
-            // Convert UTC dates from database to Caracas timezone for comparison
-            const eventoInicio = fromCaracasISOString(evento.fecha_inicio);
-            const eventoFin = fromCaracasISOString(evento.fecha_fin);
-            
-            // Get date strings in YYYY-MM-DD format
-            const eventoInicioStr = `${eventoInicio.getFullYear()}-${String(eventoInicio.getMonth() + 1).padStart(2, '0')}-${String(eventoInicio.getDate()).padStart(2, '0')}`;
-            const eventoFinStr = `${eventoFin.getFullYear()}-${String(eventoFin.getMonth() + 1).padStart(2, '0')}-${String(eventoFin.getDate()).padStart(2, '0')}`;
-            
-            return dateStr >= eventoInicioStr && dateStr <= eventoFinStr;
-        });
-    };
 
     // Formatear fecha
     const formatDate = (date: Date): string => {
@@ -3303,12 +3361,383 @@ const CalendarView: React.FC<{
         }
     };
 
+    // Obtener eventos filtrados
+    const getFilteredEventos = (): EventoCalendario[] => {
+        return eventos.filter(evento => {
+            if (!filtrosTipo[evento.tipo_evento]) return false;
+            if (!evento.nivel_educativo.some(nivel => filtrosNivel[nivel])) return false;
+            return true;
+        });
+    };
+
     const days = getDaysInMonth();
     const weekDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    const weekDaysFull = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
     const today = new Date();
     const isToday = (date: Date | null): boolean => {
         if (!date) return false;
         return date.toDateString() === today.toDateString();
+    };
+
+    // Obtener días de la semana
+    const getWeekDays = (): Date[] => {
+        const startOfWeek = new Date(currentDate);
+        const day = startOfWeek.getDay();
+        const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+        startOfWeek.setDate(diff);
+        startOfWeek.setHours(0, 0, 0, 0);
+        
+        const days: Date[] = [];
+        for (let i = 0; i < 7; i++) {
+            const date = new Date(startOfWeek);
+            date.setDate(startOfWeek.getDate() + i);
+            days.push(date);
+        }
+        return days;
+    };
+
+    // Obtener eventos para una fecha específica (con filtros aplicados)
+    const getEventosForDate = (date: Date): EventoCalendario[] => {
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        return getFilteredEventos().filter(evento => {
+            const eventoInicio = fromCaracasISOString(evento.fecha_inicio);
+            const eventoFin = fromCaracasISOString(evento.fecha_fin);
+            
+            const eventoInicioStr = `${eventoInicio.getFullYear()}-${String(eventoInicio.getMonth() + 1).padStart(2, '0')}-${String(eventoInicio.getDate()).padStart(2, '0')}`;
+            const eventoFinStr = `${eventoFin.getFullYear()}-${String(eventoFin.getMonth() + 1).padStart(2, '0')}-${String(eventoFin.getDate()).padStart(2, '0')}`;
+            
+            return dateStr >= eventoInicioStr && dateStr <= eventoFinStr;
+        });
+    };
+
+    // Renderizar vista de mes
+    const renderMonthView = () => (
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="grid grid-cols-7 bg-gray-100 border-b">
+                {weekDays.map(day => (
+                    <div key={day} className="p-3 text-center text-sm font-semibold text-gray-700 border-r last:border-r-0">
+                        {day}
+                    </div>
+                ))}
+            </div>
+            <div className="grid grid-cols-7">
+                {days.map((date, index) => {
+                    const eventosDelDia = getEventosForDate(date!);
+                    const isCurrentMonth = date && date.getMonth() === currentDate.getMonth();
+                    
+                    return (
+                        <div
+                            key={index}
+                            className={`min-h-[100px] border-r border-b p-2 ${
+                                !isCurrentMonth ? 'bg-gray-50' : 'bg-white'
+                            } ${isToday(date) ? 'bg-blue-50' : ''} hover:bg-gray-50 cursor-pointer`}
+                            onClick={() => date && handleOpenModal(date)}
+                        >
+                            {date && (
+                                <>
+                                    <div className={`text-sm font-medium mb-1 ${
+                                        isToday(date) 
+                                            ? 'text-blue-600 font-bold' 
+                                            : isCurrentMonth 
+                                                ? 'text-gray-900' 
+                                                : 'text-gray-400'
+                                    }`}>
+                                        {date.getDate()}
+                                    </div>
+                                    <div className="space-y-1">
+                                        {eventosDelDia.slice(0, 3).map(evento => (
+                                            <div
+                                                key={evento.id_evento}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenModal(date, evento);
+                                                }}
+                                                className="text-xs p-1 rounded text-white truncate cursor-pointer hover:opacity-80"
+                                                style={{ backgroundColor: evento.color || coloresEventos[evento.tipo_evento] }}
+                                                title={evento.titulo}
+                                            >
+                                                {evento.todo_dia ? evento.titulo : (() => {
+                                                    const fechaCaracas = fromCaracasISOString(evento.fecha_inicio);
+                                                    const hora = String(fechaCaracas.getHours()).padStart(2, '0');
+                                                    const minutos = String(fechaCaracas.getMinutes()).padStart(2, '0');
+                                                    return `${hora}:${minutos} ${evento.titulo}`;
+                                                })()}
+                                            </div>
+                                        ))}
+                                        {eventosDelDia.length > 3 && (
+                                            <div className="text-xs text-gray-500 font-medium">
+                                                +{eventosDelDia.length - 3} más
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+
+    // Renderizar vista de semana
+    const renderWeekView = () => {
+        const weekDaysList = getWeekDays();
+        const hours = Array.from({ length: 24 }, (_, i) => i);
+        
+        return (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="grid grid-cols-8 bg-gray-100 border-b">
+                    <div className="p-3 text-center text-sm font-semibold text-gray-700 border-r"></div>
+                    {weekDaysList.map((date, idx) => (
+                        <div key={idx} className="p-3 text-center text-sm font-semibold text-gray-700 border-r last:border-r-0">
+                            <div>{weekDays[idx]}</div>
+                            <div className={`text-lg ${isToday(date) ? 'text-blue-600 font-bold' : 'text-gray-900'}`}>
+                                {date.getDate()}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div className="overflow-y-auto max-h-[600px]">
+                    {hours.map(hour => (
+                        <div key={hour} className="grid grid-cols-8 border-b">
+                            <div className="p-2 text-xs text-gray-500 border-r text-right pr-2">
+                                {String(hour).padStart(2, '0')}:00
+                            </div>
+                            {weekDaysList.map((date, dayIdx) => {
+                                const eventosDelDia = getEventosForDate(date);
+                                const eventosEnHora = eventosDelDia.filter(evento => {
+                                    if (evento.todo_dia) return false;
+                                    const fechaCaracas = fromCaracasISOString(evento.fecha_inicio);
+                                    return fechaCaracas.getHours() === hour;
+                                });
+                                
+                                return (
+                                    <div
+                                        key={dayIdx}
+                                        className="min-h-[60px] border-r p-1 hover:bg-gray-50 cursor-pointer"
+                                        onClick={() => {
+                                            const newDate = new Date(date);
+                                            newDate.setHours(hour, 0, 0, 0);
+                                            handleOpenModal(newDate);
+                                        }}
+                                    >
+                                        {eventosEnHora.map(evento => (
+                                            <div
+                                                key={evento.id_evento}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenModal(date, evento);
+                                                }}
+                                                className="text-xs p-1 rounded text-white mb-1 cursor-pointer hover:opacity-80"
+                                                style={{ backgroundColor: evento.color || coloresEventos[evento.tipo_evento] }}
+                                                title={evento.titulo}
+                                            >
+                                                {evento.titulo}
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    // Renderizar vista de día
+    const renderDayView = () => {
+        const hours = Array.from({ length: 24 }, (_, i) => i);
+        const eventosDelDia = getEventosForDate(currentDate);
+        const eventosTodoElDia = eventosDelDia.filter(e => e.todo_dia);
+        
+        return (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-gray-100 border-b p-4">
+                    <div className="text-lg font-semibold text-gray-800">
+                        {weekDaysFull[currentDate.getDay() === 0 ? 6 : currentDate.getDay() - 1]}, {currentDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </div>
+                </div>
+                <div className="overflow-y-auto max-h-[600px]">
+                    {eventosTodoElDia.length > 0 && (
+                        <div className="border-b p-4 bg-gray-50">
+                            <div className="text-sm font-semibold text-gray-700 mb-2">Todo el día</div>
+                            <div className="space-y-2">
+                                {eventosTodoElDia.map(evento => (
+                                    <div
+                                        key={evento.id_evento}
+                                        onClick={() => handleOpenModal(currentDate, evento)}
+                                        className="p-2 rounded text-white cursor-pointer hover:opacity-80"
+                                        style={{ backgroundColor: evento.color || coloresEventos[evento.tipo_evento] }}
+                                    >
+                                        {evento.titulo}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {hours.map(hour => {
+                        const eventosEnHora = eventosDelDia.filter(evento => {
+                            if (evento.todo_dia) return false;
+                            const fechaCaracas = fromCaracasISOString(evento.fecha_inicio);
+                            return fechaCaracas.getHours() === hour;
+                        });
+                        
+                        return (
+                            <div key={hour} className="grid grid-cols-12 border-b">
+                                <div className="col-span-2 p-3 text-sm text-gray-500 border-r text-right pr-4">
+                                    {String(hour).padStart(2, '0')}:00
+                                </div>
+                                <div
+                                    className="col-span-10 min-h-[80px] p-2 hover:bg-gray-50 cursor-pointer"
+                                    onClick={() => {
+                                        const newDate = new Date(currentDate);
+                                        newDate.setHours(hour, 0, 0, 0);
+                                        handleOpenModal(newDate);
+                                    }}
+                                >
+                                    {eventosEnHora.map(evento => {
+                                        const fechaInicio = fromCaracasISOString(evento.fecha_inicio);
+                                        const fechaFin = fromCaracasISOString(evento.fecha_fin);
+                                        const horaInicio = `${String(fechaInicio.getHours()).padStart(2, '0')}:${String(fechaInicio.getMinutes()).padStart(2, '0')}`;
+                                        const horaFin = `${String(fechaFin.getHours()).padStart(2, '0')}:${String(fechaFin.getMinutes()).padStart(2, '0')}`;
+                                        
+                                        return (
+                                            <div
+                                                key={evento.id_evento}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenModal(currentDate, evento);
+                                                }}
+                                                className="p-2 rounded text-white mb-2 cursor-pointer hover:opacity-80"
+                                                style={{ backgroundColor: evento.color || coloresEventos[evento.tipo_evento] }}
+                                            >
+                                                <div className="font-semibold">{evento.titulo}</div>
+                                                <div className="text-xs opacity-90">{horaInicio} - {horaFin}</div>
+                                                {evento.descripcion && (
+                                                    <div className="text-xs opacity-75 mt-1">{evento.descripcion}</div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
+    // Renderizar vista de lista
+    const renderListView = () => {
+        const weekDaysList = getWeekDays();
+        const filteredEventos = getFilteredEventos();
+        
+        // Agrupar eventos por día
+        const eventosPorDia = weekDaysList.map(date => ({
+            date,
+            eventos: filteredEventos.filter(evento => {
+                const eventoInicio = fromCaracasISOString(evento.fecha_inicio);
+                const eventoFin = fromCaracasISOString(evento.fecha_fin);
+                const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                const eventoInicioStr = `${eventoInicio.getFullYear()}-${String(eventoInicio.getMonth() + 1).padStart(2, '0')}-${String(eventoInicio.getDate()).padStart(2, '0')}`;
+                const eventoFinStr = `${eventoFin.getFullYear()}-${String(eventoFin.getMonth() + 1).padStart(2, '0')}-${String(eventoFin.getDate()).padStart(2, '0')}`;
+                return dateStr >= eventoInicioStr && dateStr <= eventoFinStr;
+            }).sort((a, b) => {
+                if (a.todo_dia && !b.todo_dia) return -1;
+                if (!a.todo_dia && b.todo_dia) return 1;
+                if (a.todo_dia && b.todo_dia) return 0;
+                const fechaA = fromCaracasISOString(a.fecha_inicio);
+                const fechaB = fromCaracasISOString(b.fecha_inicio);
+                return fechaA.getTime() - fechaB.getTime();
+            })
+        })).filter(day => day.eventos.length > 0);
+        
+        if (eventosPorDia.length === 0) {
+            return (
+                <div className="border border-gray-200 rounded-lg p-12 text-center text-gray-500">
+                    <p className="text-lg">No hay eventos en esta semana</p>
+                </div>
+            );
+        }
+        
+        return (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+                {eventosPorDia.map(({ date, eventos }, idx) => (
+                    <div key={idx} className="border-b last:border-b-0">
+                        <div className="p-4 bg-gray-50 border-b">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <div className="text-lg font-semibold text-gray-800">
+                                        {weekDaysFull[date.getDay() === 0 ? 6 : date.getDay() - 1]}
+                                    </div>
+                                    <div className="text-sm text-gray-600">
+                                        {date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-4 space-y-3">
+                            {eventos.map(evento => {
+                                const fechaInicio = fromCaracasISOString(evento.fecha_inicio);
+                                const fechaFin = fromCaracasISOString(evento.fecha_fin);
+                                
+                                return (
+                                    <div
+                                        key={evento.id_evento}
+                                        onClick={() => handleOpenModal(date, evento)}
+                                        className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer border-l-4"
+                                        style={{ borderLeftColor: evento.color || coloresEventos[evento.tipo_evento] }}
+                                    >
+                                        <div className="flex-shrink-0 mt-1">
+                                            <div
+                                                className="w-3 h-3 rounded-full"
+                                                style={{ backgroundColor: evento.color || coloresEventos[evento.tipo_evento] }}
+                                            />
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                {evento.todo_dia ? (
+                                                    <span className="text-xs font-medium text-gray-600">Todo el día</span>
+                                                ) : (
+                                                    <span className="text-xs font-medium text-gray-600">
+                                                        {`${String(fechaInicio.getHours()).padStart(2, '0')}:${String(fechaInicio.getMinutes()).padStart(2, '0')}`}
+                                                        {fechaInicio.getTime() !== fechaFin.getTime() && (
+                                                            <> - {`${String(fechaFin.getHours()).padStart(2, '0')}:${String(fechaFin.getMinutes()).padStart(2, '0')}`}</>
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="font-semibold text-gray-900">{evento.titulo}</div>
+                                            {evento.descripcion && (
+                                                <div className="text-sm text-gray-600 mt-1">{evento.descripcion}</div>
+                                            )}
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span
+                                                    className="text-xs px-2 py-1 rounded"
+                                                    style={{ 
+                                                        backgroundColor: (evento.color || coloresEventos[evento.tipo_evento]) + '20',
+                                                        color: evento.color || coloresEventos[evento.tipo_evento]
+                                                    }}
+                                                >
+                                                    {evento.tipo_evento}
+                                                </span>
+                                                {evento.nivel_educativo.length > 0 && (
+                                                    <span className="text-xs text-gray-500">
+                                                        {evento.nivel_educativo.join(', ')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
     };
 
     return (
@@ -3317,16 +3746,16 @@ const CalendarView: React.FC<{
             <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={goToPreviousMonth}
+                        onClick={goToPrevious}
                         className="p-2 hover:bg-gray-100 rounded-md"
                     >
                         <ArrowLeftIcon />
                     </button>
                     <h2 className="text-2xl font-bold text-gray-800">
-                        {formatDate(currentDate)}
+                        {formatDateForView()}
                     </h2>
                     <button
-                        onClick={goToNextMonth}
+                        onClick={goToNext}
                         className="p-2 hover:bg-gray-100 rounded-md"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3340,15 +3769,60 @@ const CalendarView: React.FC<{
                         Hoy
                     </button>
                 </div>
-                {(currentUser.role === 'directivo' || currentUser.role === 'coordinador') && (
-                    <button
-                        onClick={() => handleOpenModal()}
-                        className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-opacity-90"
-                    >
-                        <PlusIcon />
-                        Nuevo Evento
-                    </button>
-                )}
+                <div className="flex items-center gap-4">
+                    {/* Selector de vista */}
+                    <div className="flex items-center gap-1 bg-gray-100 rounded-md p-1">
+                        <button
+                            onClick={() => setViewType('month')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded ${
+                                viewType === 'month' 
+                                    ? 'bg-white text-gray-900 shadow-sm' 
+                                    : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                        >
+                            Mes
+                        </button>
+                        <button
+                            onClick={() => setViewType('week')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded ${
+                                viewType === 'week' 
+                                    ? 'bg-white text-gray-900 shadow-sm' 
+                                    : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                        >
+                            Semana
+                        </button>
+                        <button
+                            onClick={() => setViewType('day')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded ${
+                                viewType === 'day' 
+                                    ? 'bg-white text-gray-900 shadow-sm' 
+                                    : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                        >
+                            Día
+                        </button>
+                        <button
+                            onClick={() => setViewType('list')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded ${
+                                viewType === 'list' 
+                                    ? 'bg-white text-gray-900 shadow-sm' 
+                                    : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                        >
+                            Lista
+                        </button>
+                    </div>
+                    {(currentUser.role === 'directivo' || currentUser.role === 'coordinador') && (
+                        <button
+                            onClick={() => handleOpenModal()}
+                            className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-opacity-90"
+                        >
+                            <PlusIcon />
+                            Nuevo Evento
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Filtros */}
@@ -3396,80 +3870,18 @@ const CalendarView: React.FC<{
                 </div>
             </div>
 
-            {/* Calendario */}
+            {/* Calendario - Vista seleccionada */}
             {isLoading ? (
                 <div className="text-center py-12">
                     <p className="text-gray-500">Cargando eventos...</p>
                 </div>
             ) : (
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    {/* Días de la semana */}
-                    <div className="grid grid-cols-7 bg-gray-100 border-b">
-                        {weekDays.map(day => (
-                            <div key={day} className="p-3 text-center text-sm font-semibold text-gray-700 border-r last:border-r-0">
-                                {day}
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Días del mes */}
-                    <div className="grid grid-cols-7">
-                        {days.map((date, index) => {
-                            const eventosDelDia = getEventosForDay(date);
-                            const isCurrentMonth = date && date.getMonth() === currentDate.getMonth();
-                            
-                            return (
-                                <div
-                                    key={index}
-                                    className={`min-h-[100px] border-r border-b p-2 ${
-                                        !isCurrentMonth ? 'bg-gray-50' : 'bg-white'
-                                    } ${isToday(date) ? 'bg-blue-50' : ''} hover:bg-gray-50 cursor-pointer`}
-                                    onClick={() => date && handleOpenModal(date)}
-                                >
-                                    {date && (
-                                        <>
-                                            <div className={`text-sm font-medium mb-1 ${
-                                                isToday(date) 
-                                                    ? 'text-blue-600 font-bold' 
-                                                    : isCurrentMonth 
-                                                        ? 'text-gray-900' 
-                                                        : 'text-gray-400'
-                                            }`}>
-                                                {date.getDate()}
-                                            </div>
-                                            <div className="space-y-1">
-                                                {eventosDelDia.slice(0, 3).map(evento => (
-                                                    <div
-                                                        key={evento.id_evento}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleOpenModal(date, evento);
-                                                        }}
-                                                        className="text-xs p-1 rounded text-white truncate cursor-pointer hover:opacity-80"
-                                                        style={{ backgroundColor: evento.color || coloresEventos[evento.tipo_evento] }}
-                                                        title={evento.titulo}
-                                                    >
-                                                        {evento.todo_dia ? evento.titulo : (() => {
-                                                            const fechaCaracas = fromCaracasISOString(evento.fecha_inicio);
-                                                            const hora = String(fechaCaracas.getHours()).padStart(2, '0');
-                                                            const minutos = String(fechaCaracas.getMinutes()).padStart(2, '0');
-                                                            return `${hora}:${minutos} ${evento.titulo}`;
-                                                        })()}
-                                                    </div>
-                                                ))}
-                                                {eventosDelDia.length > 3 && (
-                                                    <div className="text-xs text-gray-500 font-medium">
-                                                        +{eventosDelDia.length - 3} más
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
+                <>
+                    {viewType === 'month' && renderMonthView()}
+                    {viewType === 'week' && renderWeekView()}
+                    {viewType === 'day' && renderDayView()}
+                    {viewType === 'list' && renderListView()}
+                </>
             )}
 
             {/* Modal para crear/editar evento */}
