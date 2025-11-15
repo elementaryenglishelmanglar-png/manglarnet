@@ -1253,23 +1253,61 @@ const TeachersView: React.FC<{
             }
             
             // Create new classes based on assignments
-            const newTeacherClasses = await Promise.all(
-                newAssignments.map(async (a) => {
-                    const newClass = {
-                        nombre_materia: a.subject,
-                        grado_asignado: a.grade,
-                        id_docente_asignado: savedTeacher.id_docente,
-                        student_ids: alumnos.filter(s => s.salon === a.grade).map(s => s.id_alumno),
-                    };
-                    const created = await clasesService.create(newClass);
-                    return {
-                        ...created,
-                        studentIds: created.student_ids || []
-                    };
-                })
-            );
+            if (newAssignments.length > 0) {
+                const createdClasses = [];
+                const errors: string[] = [];
+                
+                for (const a of newAssignments) {
+                    // Validar que la asignatura y el grado no estén vacíos
+                    if (!a.subject || !a.grade) {
+                        errors.push(`Asignatura o grado vacío: ${a.subject || 'Sin asignatura'} - ${a.grade || 'Sin grado'}`);
+                        continue;
+                    }
+                    
+                    try {
+                        const newClass = {
+                            nombre_materia: a.subject.trim(),
+                            grado_asignado: a.grade.trim(),
+                            id_docente_asignado: savedTeacher.id_docente,
+                            student_ids: alumnos.filter(s => s.salon === a.grade).map(s => s.id_alumno),
+                        };
+                        const created = await clasesService.create(newClass);
+                        createdClasses.push({
+                            ...created,
+                            studentIds: created.student_ids || []
+                        });
+                    } catch (error: any) {
+                        const errorMsg = `Error al crear la clase ${a.subject} (${a.grade}): ${error.message || 'Error desconocido'}`;
+                        console.error(`Error creating class for ${a.subject} - ${a.grade}:`, error);
+                        errors.push(errorMsg);
+                    }
+                }
+                
+                // Mostrar errores si los hay
+                if (errors.length > 0) {
+                    alert('Algunas clases no se pudieron crear:\n\n' + errors.join('\n'));
+                }
+                
+                // Recargar todas las clases desde Supabase para asegurar sincronización
+                try {
+                    const allClases = await clasesService.getAll();
+                    setClases(allClases.map((db: ClaseDB) => {
+                        const { created_at, updated_at, student_ids, ...clase } = db;
+                        return {
+                            ...clase,
+                            studentIds: student_ids || []
+                        };
+                    }));
+                } catch (error: any) {
+                    console.error('Error reloading classes:', error);
+                    // Si falla la recarga, al menos actualizar con las clases creadas
+                    setClases([...otherTeachersClasses, ...createdClasses]);
+                }
+            } else {
+                // Si no hay asignaturas, solo actualizar el estado local
+                setClases(otherTeachersClasses);
+            }
             
-            setClases([...otherTeachersClasses, ...newTeacherClasses]);
             handleCloseModal();
         } catch (error: any) {
             console.error('Error saving teacher:', error);
