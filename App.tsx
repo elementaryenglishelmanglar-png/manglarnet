@@ -2125,7 +2125,6 @@ const PlanningView: React.FC<{
     currentUser: Usuario;
     navParams?: any;
 }> = ({ planificaciones, setPlanificaciones, clases, docentes, currentUser, navParams }) => {
-    const [activeTab, setActiveTab] = useState<'board' | 'history'>('board');
     const [isModalOpen, setModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState<Planificacion | null>(null);
     const [isReadOnlyModal, setIsReadOnlyModal] = useState(false);
@@ -2133,21 +2132,20 @@ const PlanningView: React.FC<{
     const [aiSuggestions, setAiSuggestions] = useState('');
     const [isLoadingAi, setIsLoadingAi] = useState(false);
 
-    const [historyFilters, setHistoryFilters] = useState({
-        ano_escolar: '2024-2025',
+    const [boardFilters, setBoardFilters] = useState({
+        ano_escolar: 'all',
         lapso: 'all',
-        status: 'all',
-        grado: 'all',
+        id_clase: 'all',
         id_docente: 'all',
     });
 
     const highlightRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (activeTab === 'board' && navParams?.planId && highlightRef.current) {
+        if (navParams?.planId && highlightRef.current) {
             highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-    }, [navParams, planificaciones, activeTab]);
+    }, [navParams, planificaciones]);
 
     const handleOpenModal = (plan: Planificacion | null = null, isReadOnly = false) => {
         setSelectedPlan(plan);
@@ -2198,6 +2196,11 @@ const PlanningView: React.FC<{
             .map(c => ({ id_clase: c.id_clase, nombre_materia: c.nombre_materia, grado_asignado: c.grado_asignado}));
     }, [clases, currentUser]);
 
+    const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setBoardFilters(prev => ({ ...prev, [name]: value }));
+    };
+
     const renderBoardView = () => {
         const statusStyles: { [key in Planificacion['status']]: string } = {
             Borrador: 'bg-gray-100 text-gray-800',
@@ -2206,13 +2209,34 @@ const PlanningView: React.FC<{
             Aprobado: 'bg-green-100 text-green-800',
         };
         
+        // Filter planificaciones based on board filters
+        // All roles can see all planificaciones
         const filteredPlanificaciones = useMemo(() => {
-            if (!currentUser) return planificaciones;
-            if (currentUser.role === 'docente' && currentUser.docenteId) {
-                return planificaciones.filter(p => p.id_docente === currentUser.docenteId);
+            if (!planificaciones || planificaciones.length === 0) return [];
+            
+            let filtered = [...planificaciones];
+            
+            // Apply filters
+            const { ano_escolar, lapso, id_clase, id_docente } = boardFilters;
+            
+            if (ano_escolar && ano_escolar !== 'all') {
+                filtered = filtered.filter(p => p.ano_escolar === ano_escolar);
             }
-            return planificaciones;
-        }, [planificaciones, currentUser]);
+            
+            if (lapso && lapso !== 'all') {
+                filtered = filtered.filter(p => p.lapso === lapso);
+            }
+            
+            if (id_clase && id_clase !== 'all') {
+                filtered = filtered.filter(p => p.id_clase === id_clase);
+            }
+            
+            if (id_docente && id_docente !== 'all') {
+                filtered = filtered.filter(p => p.id_docente === id_docente);
+            }
+            
+            return filtered;
+        }, [planificaciones, boardFilters]);
 
         return (
             <div className="bg-white p-6 rounded-lg shadow-md">
@@ -2224,6 +2248,33 @@ const PlanningView: React.FC<{
                             Añadir Planificación
                         </button>
                     )}
+                </div>
+                
+                {/* Filters */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg border">
+                    <InputField as="select" label="Año Escolar" name="ano_escolar" value={boardFilters.ano_escolar} onChange={handleFilterChange}>
+                        <option value="all">Todos</option>
+                        <option value="2024-2025">2024-2025</option>
+                        <option value="2025-2026">2025-2026</option>
+                    </InputField>
+                    <InputField as="select" label="Lapso" name="lapso" value={boardFilters.lapso} onChange={handleFilterChange}>
+                        <option value="all">Todos</option>
+                        <option value="I Lapso">I Lapso</option>
+                        <option value="II Lapso">II Lapso</option>
+                        <option value="III Lapso">III Lapso</option>
+                    </InputField>
+                    <InputField as="select" label="Materia" name="id_clase" value={boardFilters.id_clase} onChange={handleFilterChange}>
+                        <option value="all">Todas</option>
+                        {clases && clases.length > 0 ? clases.map(c => (
+                            <option key={c.id_clase} value={c.id_clase}>{c.nombre_materia} ({c.grado_asignado})</option>
+                        )) : null}
+                    </InputField>
+                    <InputField as="select" label="Docente" name="id_docente" value={boardFilters.id_docente} onChange={handleFilterChange}>
+                        <option value="all">Todos</option>
+                        {docentes && docentes.length > 0 ? docentes.map(d => (
+                            <option key={d.id_docente} value={d.id_docente}>{d.nombres || ''} {d.apellidos || ''}</option>
+                        )) : null}
+                    </InputField>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredPlanificaciones
@@ -2244,9 +2295,11 @@ const PlanningView: React.FC<{
                                     <p className="text-sm text-gray-500">Docente: {docente?.nombres} {docente?.apellidos}</p>
                                     <p className="text-sm text-gray-500">Semana {plan.semana} | {plan.lapso} | {plan.ano_escolar}</p>
                                     <p className="text-xs text-gray-400 mt-1">Creado: {new Date(plan.fecha_creacion).toLocaleDateString()}</p>
-                                    <div className="mt-4 space-y-1 text-sm">
-                                        <p><span className="font-semibold">Competencia:</span> {plan.competencia_indicadores.substring(0, 50)}...</p>
-                                    </div>
+                                    {plan.competencia_indicadores && (
+                                        <div className="mt-4 space-y-1 text-sm">
+                                            <p><span className="font-semibold">Competencia:</span> {plan.competencia_indicadores.length > 50 ? plan.competencia_indicadores.substring(0, 50) + '...' : plan.competencia_indicadores}</p>
+                                        </div>
+                                    )}
                                     {plan.observaciones && (
                                         <div className="mt-3 bg-yellow-50 border-l-4 border-yellow-400 p-2">
                                             <p className="text-sm text-yellow-800"><span className="font-bold">Observaciones:</span> {plan.observaciones}</p>
@@ -2273,199 +2326,6 @@ const PlanningView: React.FC<{
         )
     };
 
-    const uniqueGrades = useMemo(() => {
-        if (!clases || clases.length === 0) return [];
-        return [...new Set(clases.map(c => c?.grado_asignado).filter(Boolean))].sort();
-    }, [clases]);
-
-    const renderHistoryView = () => {
-        if (!currentUser) {
-            return <div className="bg-white p-6 rounded-lg shadow-md">Cargando...</div>;
-        }
-
-        // Calculate filtered history directly (like evaluation history does)
-        // Ensure it's always an array to prevent React errors
-        let filteredHistory: Planificacion[] = [];
-        
-        if (!planificaciones || !Array.isArray(planificaciones)) {
-            filteredHistory = [];
-        } else {
-            try {
-                // Start with a safe copy
-                filteredHistory = planificaciones.filter(p => p != null && typeof p === 'object' && p.id_planificacion);
-
-                // Filter by docente if needed
-                if (currentUser && currentUser.role === 'docente' && currentUser.docenteId) {
-                    filteredHistory = filteredHistory.filter(p => p && p.id_docente === currentUser.docenteId);
-                }
-
-                // Apply filters safely
-                if (historyFilters) {
-                    const { ano_escolar, lapso, status, grado, id_docente } = historyFilters;
-                    filteredHistory = filteredHistory.filter(p => {
-                        if (!p || !p.id_planificacion) return false;
-                        if (ano_escolar && ano_escolar !== 'all' && p.ano_escolar !== ano_escolar) return false;
-                        if (lapso && lapso !== 'all' && p.lapso !== lapso) return false;
-                        if (status && status !== 'all' && p.status !== status) return false;
-                        if (id_docente && id_docente !== 'all' && p.id_docente !== id_docente) return false;
-                        
-                        if (grado && grado !== 'all') {
-                            const clase = clases && Array.isArray(clases) ? clases.find(c => c && c.id_clase === p.id_clase) : null;
-                            if (!clase || clase.grado_asignado !== grado) return false;
-                        }
-                        return true;
-                    });
-                }
-
-                // Sort by date safely
-                filteredHistory.sort((a, b) => {
-                    try {
-                        const dateA = a && a.fecha_creacion ? new Date(a.fecha_creacion).getTime() : 0;
-                        const dateB = b && b.fecha_creacion ? new Date(b.fecha_creacion).getTime() : 0;
-                        return dateB - dateA;
-                    } catch {
-                        return 0;
-                    }
-                });
-            } catch (error) {
-                console.error('Error filtering history:', error);
-                filteredHistory = [];
-            }
-        }
-        
-        // Final safety check - ensure it's always an array
-        if (!Array.isArray(filteredHistory)) {
-            filteredHistory = [];
-        }
-
-        const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-            const { name, value } = e.target;
-            setHistoryFilters(prev => ({ ...prev, [name]: value }));
-        };
-        const statusStyles: { [key in Planificacion['status']]: string } = {
-            Borrador: 'bg-gray-100 text-gray-800', Enviado: 'bg-blue-100 text-blue-800',
-            Revisado: 'bg-yellow-100 text-yellow-800', Aprobado: 'bg-green-100 text-green-800',
-        };
-
-        return (
-            <div className="bg-white p-6 rounded-lg shadow-md">
-                <h2 className="text-xl font-bold text-text-main mb-4">Historial de Planificaciones</h2>
-                
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-4 p-4 bg-gray-50 rounded-lg border">
-                    <InputField as="select" label="Año Escolar" name="ano_escolar" value={historyFilters.ano_escolar} onChange={handleFilterChange}>
-                        <option value="all">Todos</option>
-                        <option value="2024-2025">2024-2025</option><option value="2025-2026">2025-2026</option>
-                    </InputField>
-                    <InputField as="select" label="Lapso" name="lapso" value={historyFilters.lapso} onChange={handleFilterChange}>
-                        <option value="all">Todos</option><option value="I Lapso">I Lapso</option><option value="II Lapso">II Lapso</option><option value="III Lapso">III Lapso</option>
-                    </InputField>
-                    <InputField as="select" label="Estado" name="status" value={historyFilters.status} onChange={handleFilterChange}>
-                        <option value="all">Todos</option><option value="Borrador">Borrador</option><option value="Enviado">Enviado</option><option value="Revisado">Revisado</option><option value="Aprobado">Aprobado</option>
-                    </InputField>
-                    <InputField as="select" label="Grado" name="grado" value={historyFilters.grado} onChange={handleFilterChange}>
-                        <option value="all">Todos</option>
-                        {uniqueGrades && uniqueGrades.length > 0 ? uniqueGrades.map(g => <option key={g} value={g}>{g}</option>) : null}
-                    </InputField>
-                    {(currentUser.role === 'coordinador' || currentUser.role === 'directivo') && (
-                        <InputField as="select" label="Docente" name="id_docente" value={historyFilters.id_docente} onChange={handleFilterChange}>
-                            <option value="all">Todos</option>
-                            {docentes && docentes.length > 0 ? docentes.map(d => <option key={d.id_docente} value={d.id_docente}>{d.nombres || ''} {d.apellidos || ''}</option>) : null}
-                        </InputField>
-                    )}
-                </div>
-
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                                {currentUser.role !== 'docente' && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Docente</th>}
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Materia/Grado</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Semana</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lapso</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {!filteredHistory || filteredHistory.length === 0 ? (
-                                <tr>
-                                    <td colSpan={currentUser && currentUser.role !== 'docente' ? 7 : 6} className="px-4 py-8 text-center text-gray-500">
-                                        No hay planificaciones que coincidan con los filtros seleccionados.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredHistory
-                                    .filter(plan => plan != null && plan.id_planificacion != null)
-                                    .map(plan => {
-                                        if (!plan || !plan.id_planificacion) {
-                                            return null;
-                                        }
-                                        
-                                        try {
-                                            const clase = clases && Array.isArray(clases) ? clases.find(c => c && c.id_clase === plan.id_clase) : null;
-                                            const docente = docentes && Array.isArray(docentes) ? docentes.find(d => d && d.id_docente === plan.id_docente) : null;
-                                            const planStatus = (plan.status && typeof plan.status === 'string') ? plan.status : 'Borrador';
-                                            const statusStyle = statusStyles[planStatus as Planificacion['status']] || 'bg-gray-100 text-gray-800';
-                                            
-                                            return (
-                                                <tr key={String(plan.id_planificacion)}>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                        {plan.fecha_creacion ? new Date(plan.fecha_creacion).toLocaleDateString() : 'N/A'}
-                                                    </td>
-                                                    {currentUser && currentUser.role !== 'docente' && (
-                                                        <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                            {docente ? `${docente.nombres || ''} ${docente.apellidos || ''}`.trim() || 'N/A' : 'N/A'}
-                                                        </td>
-                                                    )}
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                        {clase ? `${clase.nombre_materia || 'N/A'} (${clase.grado_asignado || 'N/A'})` : 'N/A'}
-                                                    </td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{plan.semana || 'N/A'}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">{plan.lapso || 'N/A'}</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyle}`}>
-                                                            {planStatus || 'N/A'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                        <button 
-                                                            onClick={() => {
-                                                                try {
-                                                                    if (handleOpenModal && plan) {
-                                                                        handleOpenModal(plan, true);
-                                                                    }
-                                                                } catch (error) {
-                                                                    console.error('Error opening modal:', error);
-                                                                }
-                                                            }} 
-                                                            className="text-brand-primary hover:underline"
-                                                        >
-                                                            Ver Detalles
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        } catch (error) {
-                                            console.error('Error rendering plan row:', error, plan);
-                                            return (
-                                                <tr key={plan.id_planificacion ? String(plan.id_planificacion) : `error-${Math.random()}`}>
-                                                    <td colSpan={currentUser && currentUser.role !== 'docente' ? 7 : 6} className="px-4 py-2 text-sm text-red-500">
-                                                        Error al mostrar planificación: {plan.id_planificacion || 'ID desconocido'}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        }
-                                    })
-                                    .filter(Boolean)
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        );
-    }
-    
     // Early return if currentUser is not available (after hooks)
     if (!currentUser) {
         return <div className="bg-white p-6 rounded-lg shadow-md">Cargando...</div>;
@@ -2473,38 +2333,7 @@ const PlanningView: React.FC<{
 
     return (
         <div>
-            <div className="flex border-b mb-6">
-                <button
-                    onClick={() => setActiveTab('board')}
-                    className={`px-4 py-2 text-sm font-medium ${activeTab === 'board' ? 'border-b-2 border-brand-primary text-brand-primary' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                    Tablero de Planificaciones
-                </button>
-                <button
-                    onClick={() => setActiveTab('history')}
-                    className={`px-4 py-2 text-sm font-medium ${activeTab === 'history' ? 'border-b-2 border-brand-primary text-brand-primary' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                    Historial de Planificaciones
-                </button>
-            </div>
-            
-            {activeTab === 'board' ? renderBoardView() : (
-                (() => {
-                    try {
-                        return renderHistoryView();
-                    } catch (error) {
-                        console.error('Error rendering history view:', error);
-                        return (
-                            <div className="bg-white p-6 rounded-lg shadow-md">
-                                <div className="text-center py-12">
-                                    <p className="text-red-600 font-semibold mb-2">Error al cargar el historial</p>
-                                    <p className="text-gray-500 text-sm">Por favor, recarga la página o contacta al administrador.</p>
-                                </div>
-                            </div>
-                        );
-                    }
-                })()
-            )}
+            {renderBoardView()}
             
             {isModalOpen && (
                 <PlanningFormModal 
@@ -2525,11 +2354,26 @@ const PlanningView: React.FC<{
                             <button onClick={() => setAiModalOpen(false)}><CloseIcon /></button>
                         </div>
                         {isLoadingAi ? (
-                            <div className="text-center py-8">
-                                <p>Analizando planificación, por favor espere...</p>
-                            </div>
+                            <div className="text-center py-8">Generando sugerencias...</div>
                         ) : (
-                            <div className="prose max-w-none max-h-[60vh] overflow-y-auto" dangerouslySetInnerHTML={{ __html: marked(aiSuggestions) }}></div>
+                            <div>
+                                <textarea 
+                                    value={aiSuggestions} 
+                                    onChange={(e) => setAiSuggestions(e.target.value)}
+                                    className="w-full h-64 p-4 border rounded-md"
+                                    placeholder="Las sugerencias aparecerán aquí..."
+                                />
+                                <div className="flex justify-end gap-2 mt-4">
+                                    <button onClick={() => setAiModalOpen(false)} className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cerrar</button>
+                                    <button onClick={async () => {
+                                        if (selectedPlan && aiSuggestions) {
+                                            const updatedPlan = { ...selectedPlan, competencia_indicadores: aiSuggestions };
+                                            await handleSavePlan(updatedPlan);
+                                            setAiModalOpen(false);
+                                        }
+                                    }} className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-opacity-90">Aplicar Sugerencias</button>
+                                </div>
+                            </div>
                         )}
                     </div>
                 </div>
