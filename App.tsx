@@ -1690,9 +1690,12 @@ const TeachersView: React.FC<{
     alumnos: Alumno[];
     setDocentes: React.Dispatch<React.SetStateAction<Docente[]>>;
     setClases: React.Dispatch<React.SetStateAction<Clase[]>>;
-}> = ({ docentes, clases, alumnos, setDocentes, setClases }) => {
+    currentUser: Usuario;
+}> = ({ docentes, clases, alumnos, setDocentes, setClases, currentUser }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [selectedTeacher, setSelectedTeacher] = useState<Docente | null>(null);
+    const [unlinkedUsers, setUnlinkedUsers] = useState<Array<{id: string, email: string, role: string}>>([]);
+    const [showUnlinkedSection, setShowUnlinkedSection] = useState(false);
 
     const handleOpenModal = (teacher: Docente | null = null) => {
         setSelectedTeacher(teacher);
@@ -1889,6 +1892,71 @@ const TeachersView: React.FC<{
                     </tbody>
                 </table>
             </div>
+
+            {/* Unlinked Authorized Users Section - Only for coordinadores and directivos */}
+            {(currentUser.role === 'coordinador' || currentUser.role === 'directivo') && unlinkedUsers.length > 0 && (
+                <div className="mt-8 border-t pt-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-800">Usuarios Autorizados Sin Vincular</h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                                Estos usuarios están en la lista blanca pero no tienen un registro de docente. 
+                                Vincúlalos con un docente existente o crea un nuevo docente.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setShowUnlinkedSection(!showUnlinkedSection)}
+                            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md text-sm font-medium"
+                        >
+                            {showUnlinkedSection ? 'Ocultar' : 'Mostrar'} ({unlinkedUsers.length})
+                        </button>
+                    </div>
+                    
+                    {showUnlinkedSection && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <div className="space-y-3">
+                                {unlinkedUsers.map(user => (
+                                    <div key={user.id} className="flex items-center justify-between bg-white p-3 rounded-md border border-yellow-300">
+                                        <div className="flex-1">
+                                            <div className="font-medium text-gray-900">{user.email}</div>
+                                            <div className="text-sm text-gray-500">Rol: {user.role}</div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            {/* Link to existing docente */}
+                                            <select
+                                                onChange={(e) => {
+                                                    if (e.target.value) {
+                                                        handleLinkToExisting(user.email, e.target.value);
+                                                        e.target.value = '';
+                                                    }
+                                                }}
+                                                className="px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                                                defaultValue=""
+                                            >
+                                                <option value="">Vincular con docente existente...</option>
+                                                {docentes.map(d => (
+                                                    <option key={d.id_docente} value={d.id_docente}>
+                                                        {d.nombres} {d.apellidos} ({d.email})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            
+                                            {/* Create new docente */}
+                                            <button
+                                                onClick={() => handleCreateFromAuthorized(user.email)}
+                                                className="px-4 py-1.5 bg-brand-primary text-white rounded-md hover:bg-opacity-90 text-sm font-medium"
+                                            >
+                                                Crear Nuevo Docente
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {isModalOpen && <TeacherFormModal teacher={selectedTeacher} clases={clases} onClose={handleCloseModal} onSave={handleSaveTeacher} />}
         </div>
     );
@@ -4993,11 +5061,57 @@ const App: React.FC = () => {
                           session.user.user_metadata?.name ||
                           session.user.email.split('@')[0];
 
+          // For docentes, try to link to existing docente record by email
+          let docenteId: string | undefined = undefined;
+          if (authorizedUser.role === 'docente') {
+            try {
+              // Try to find existing docente by email
+              const { data: docente } = await supabase
+                .from('docentes')
+                .select('id_docente, id_usuario')
+                .eq('email', session.user.email.toLowerCase())
+                .single();
+
+              if (docente) {
+                docenteId = docente.id_docente;
+                // If docente exists but id_usuario is not set, update it
+                if (!docente.id_usuario) {
+                  await supabase
+                    .from('docentes')
+                    .update({ id_usuario: session.user.id })
+                    .eq('id_docente', docente.id_docente);
+                }
+              } else {
+                // If no docente exists, create one automatically
+                const { data: newDocente } = await supabase
+                  .from('docentes')
+                  .insert({
+                    email: session.user.email.toLowerCase(),
+                    nombres: fullName.split(' ')[0] || '',
+                    apellidos: fullName.split(' ').slice(1).join(' ') || '',
+                    id_usuario: session.user.id,
+                    telefono: '',
+                    especialidad: '',
+                  })
+                  .select('id_docente')
+                  .single();
+
+                if (newDocente) {
+                  docenteId = newDocente.id_docente;
+                }
+              }
+            } catch (error) {
+              console.error('Error linking docente:', error);
+              // Continue even if linking fails
+            }
+          }
+
           setCurrentUser({
             id: session.user.id,
             email: session.user.email,
             role: authorizedUser.role as UserRole,
             fullName: fullName,
+            docenteId: docenteId,
           });
         } else {
           // User not authorized, sign them out
@@ -5020,12 +5134,58 @@ const App: React.FC = () => {
     };
   }, []);
   
-  const handleLoginSuccess = (user: { id: string; email: string; role: string; fullName?: string }) => {
+  const handleLoginSuccess = async (user: { id: string; email: string; role: string; fullName?: string }) => {
+    // For docentes, try to link to existing docente record by email
+    let docenteId: string | undefined = undefined;
+    if (user.role === 'docente') {
+      try {
+        // Try to find existing docente by email
+        const { data: docente } = await supabase
+          .from('docentes')
+          .select('id_docente, id_usuario')
+          .eq('email', user.email.toLowerCase())
+          .single();
+
+        if (docente) {
+          docenteId = docente.id_docente;
+          // If docente exists but id_usuario is not set, update it
+          if (!docente.id_usuario) {
+            await supabase
+              .from('docentes')
+              .update({ id_usuario: user.id })
+              .eq('id_docente', docente.id_docente);
+          }
+        } else {
+          // If no docente exists, create one automatically
+          const { data: newDocente } = await supabase
+            .from('docentes')
+            .insert({
+              email: user.email.toLowerCase(),
+              nombres: user.fullName?.split(' ')[0] || '',
+              apellidos: user.fullName?.split(' ').slice(1).join(' ') || '',
+              id_usuario: user.id,
+              telefono: '',
+              especialidad: '',
+            })
+            .select('id_docente')
+            .single();
+
+          if (newDocente) {
+            docenteId = newDocente.id_docente;
+          }
+        }
+      } catch (error) {
+        console.error('Error linking docente:', error);
+        // Continue even if linking fails
+      }
+    }
+
     setCurrentUser({
       id: user.id,
       email: user.email,
       role: user.role as UserRole,
       fullName: user.fullName,
+      docenteId: docenteId,
     });
     setActiveView('dashboard');
   };
@@ -5123,7 +5283,7 @@ const App: React.FC = () => {
                     onDeleteStudent={handleDeleteStudent}
                 />;
       case 'teachers':
-        return <TeachersView docentes={docentes} clases={clases} alumnos={alumnos} setDocentes={setDocentes} setClases={setClases} />;
+        return <TeachersView docentes={docentes} clases={clases} alumnos={alumnos} setDocentes={setDocentes} setClases={setClases} currentUser={currentUser!} />;
       case 'planning':
         return <PlanningView planificaciones={planificaciones} setPlanificaciones={setPlanificaciones} clases={clases} docentes={docentes} currentUser={currentUser!} navParams={navParams}/>;
       case 'calendar':
