@@ -782,9 +782,9 @@ const Sidebar: React.FC<{
         { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon, roles: ['directivo', 'coordinador', 'docente', 'administrativo'] },
         { id: 'students', label: 'Alumnos', icon: StudentsIcon, roles: ['directivo', 'coordinador', 'administrativo'] },
         { id: 'teachers', label: 'Docentes', icon: TeachersIcon, roles: ['directivo', 'coordinador'] },
-        { id: 'schedules', label: 'Horarios', icon: CalendarIcon, roles: ['coordinador', 'directivo'] },
+        { id: 'schedules', label: 'Horarios', icon: CalendarIcon, roles: ['coordinador', 'directivo', 'docente'] },
         { id: 'team-schedules', label: 'Horarios Equipo', icon: UsersIcon, roles: ['coordinador', 'directivo'] },
-        { id: 'calendar', label: 'Calendario', icon: CalendarIcon, roles: ['directivo', 'coordinador'] },
+        { id: 'calendar', label: 'Calendario', icon: CalendarIcon, roles: ['directivo', 'coordinador', 'docente'] },
         { id: 'planning', label: 'Planificaciones', icon: PlanningIcon, roles: ['directivo', 'coordinador', 'docente'] },
         { id: 'evaluation', label: 'Evaluación', icon: EvaluationIcon, roles: ['directivo', 'coordinador'] },
         { id: 'authorized-users', label: 'Usuarios Autorizados', icon: UsersIcon, roles: ['directivo'] },
@@ -2444,6 +2444,7 @@ const ScheduleView: React.FC<{
 
 
     const handleDrop = (day: number, slot: string) => {
+        if (currentUser.role === 'docente') return; // Docentes no pueden editar
         if (!draggedItem || !currentWeek) return;
 
         const [hora_inicio, hora_fin] = slot.split(' - ');
@@ -2504,6 +2505,10 @@ const ScheduleView: React.FC<{
     };
 
     const handleDragStart = (e: React.DragEvent, item: any, type: 'class' | 'event', data?: any) => {
+        if (currentUser.role === 'docente') {
+            e.preventDefault(); // Prevenir drag para docentes
+            return;
+        }
         const payload = type === 'class'
             ? { id: item.id_clase, docenteId: item.id_docente_asignado, type }
             : { id: item.id_horario, type, data: item };
@@ -2683,7 +2688,7 @@ const ScheduleView: React.FC<{
                                 ))}
                             </select>
                         </div>
-                        {currentWeek && (
+                        {currentWeek && (currentUser.role === 'coordinador' || currentUser.role === 'directivo') && (
                             <button
                                 onClick={handleSaveSchedule}
                                 disabled={isSaving}
@@ -2742,19 +2747,38 @@ const ScheduleView: React.FC<{
                                             <td key={`${day}-${slot}`}
                                                 className="border p-1 align-top text-xs relative h-24"
                                                 onDrop={() => handleDrop(day, slot)}
-                                                onDragOver={(e) => e.preventDefault()}
-                                                onDoubleClick={() => !item && handleOpenEventModal(day, slot)}
+                                                onDragOver={(e) => {
+                                                    if (currentUser.role !== 'docente') {
+                                                        e.preventDefault();
+                                                    }
+                                                }}
+                                                onDoubleClick={() => {
+                                                    if (currentUser.role !== 'docente' && !item) {
+                                                        handleOpenEventModal(day, slot);
+                                                    }
+                                                }}
                                             >
                                                 {item && (
                                                     item.evento_descripcion ? (
-                                                        <div onClick={() => handleOpenEventModal(day, slot, item)} className="bg-gray-200 p-2 rounded-md h-full cursor-pointer">
+                                                        <div 
+                                                            onClick={() => {
+                                                                if (currentUser.role !== 'docente') {
+                                                                    handleOpenEventModal(day, slot, item);
+                                                                }
+                                                            }} 
+                                                            className={`bg-gray-200 p-2 rounded-md h-full ${currentUser.role !== 'docente' ? 'cursor-pointer' : 'cursor-default'}`}
+                                                        >
                                                              <div className="font-semibold text-gray-700 flex items-center gap-1">
                                                                 <TagIcon className="h-4 w-4 text-gray-500" />
                                                                 {item.evento_descripcion}
                                                             </div>
                                                         </div>
                                                     ) : item.id_clase && (
-                                                        <div draggable onDragStart={(e) => handleDragStart(e, item, 'event')} className="h-full cursor-grab">
+                                                        <div 
+                                                            draggable={currentUser.role !== 'docente'} 
+                                                            onDragStart={(e) => handleDragStart(e, item, 'event')} 
+                                                            className={`h-full ${currentUser.role !== 'docente' ? 'cursor-grab' : 'cursor-default'}`}
+                                                        >
                                                         {(clase => (
                                                             <div className="p-2 rounded-md h-full" style={{backgroundColor: subjectColors[clase?.nombre_materia || 'default'] || getSubjectColor(clase?.nombre_materia || '')}}>
                                                                 <div className="font-bold">{clase?.nombre_materia}</div>
@@ -2776,47 +2800,49 @@ const ScheduleView: React.FC<{
                 </div>
                 )}
             </div>
-            <div className="w-64 flex-shrink-0">
-                <div className="bg-white p-4 rounded-lg shadow-md">
-                    <h3 className="font-bold text-lg mb-2">Asignaturas sin Horario</h3>
-                    <div 
-                        className="space-y-2 min-h-[200px] p-2 rounded-md border-2 border-dashed border-gray-300 transition-all"
-                        id="unassigned-classes-drop-zone"
-                        onDrop={(e) => {
-                            e.preventDefault();
-                            e.currentTarget.classList.remove('bg-blue-50', 'border-blue-400');
-                            handleDropOutside();
-                        }}
-                        onDragOver={(e) => {
-                            e.preventDefault();
-                            e.currentTarget.classList.add('bg-blue-50', 'border-blue-400');
-                            e.currentTarget.classList.remove('border-gray-300');
-                        }}
-                        onDragLeave={(e) => {
-                            e.currentTarget.classList.remove('bg-blue-50', 'border-blue-400');
-                            e.currentTarget.classList.add('border-gray-300');
-                        }}
-                    >
-                        {unassignedClasses.map(clase => (
-                             <div key={clase.id_clase}
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, clase, 'class')}
-                                className="p-2 rounded-md cursor-grab hover:shadow-md transition-shadow"
-                                style={{backgroundColor: subjectColors[clase.nombre_materia] || getSubjectColor(clase.nombre_materia)}}
-                             >
-                                <div className="font-bold">{clase.nombre_materia}</div>
-                                <div className="text-sm text-gray-600">{docentes.find(d => d.id_docente === clase.id_docente_asignado)?.nombres}</div>
-                            </div>
-                        ))}
-                        {unassignedClasses.length === 0 && (
-                            <div className="text-sm text-gray-500 p-4 border-2 border-dashed border-gray-300 rounded-md text-center">
-                                <p className="mb-2">Todas las asignaturas están en el horario</p>
-                                <p className="text-xs">Arrastra aquí para remover del horario</p>
-                            </div>
-                        )}
+            {(currentUser.role === 'coordinador' || currentUser.role === 'directivo') && (
+                <div className="w-64 flex-shrink-0">
+                    <div className="bg-white p-4 rounded-lg shadow-md">
+                        <h3 className="font-bold text-lg mb-2">Asignaturas sin Horario</h3>
+                        <div 
+                            className="space-y-2 min-h-[200px] p-2 rounded-md border-2 border-dashed border-gray-300 transition-all"
+                            id="unassigned-classes-drop-zone"
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                e.currentTarget.classList.remove('bg-blue-50', 'border-blue-400');
+                                handleDropOutside();
+                            }}
+                            onDragOver={(e) => {
+                                e.preventDefault();
+                                e.currentTarget.classList.add('bg-blue-50', 'border-blue-400');
+                                e.currentTarget.classList.remove('border-gray-300');
+                            }}
+                            onDragLeave={(e) => {
+                                e.currentTarget.classList.remove('bg-blue-50', 'border-blue-400');
+                                e.currentTarget.classList.add('border-gray-300');
+                            }}
+                        >
+                            {unassignedClasses.map(clase => (
+                                 <div key={clase.id_clase}
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, clase, 'class')}
+                                    className="p-2 rounded-md cursor-grab hover:shadow-md transition-shadow"
+                                    style={{backgroundColor: subjectColors[clase.nombre_materia] || getSubjectColor(clase.nombre_materia)}}
+                                 >
+                                    <div className="font-bold">{clase.nombre_materia}</div>
+                                    <div className="text-sm text-gray-600">{docentes.find(d => d.id_docente === clase.id_docente_asignado)?.nombres}</div>
+                                </div>
+                            ))}
+                            {unassignedClasses.length === 0 && (
+                                <div className="text-sm text-gray-500 p-4 border-2 border-dashed border-gray-300 rounded-md text-center">
+                                    <p className="mb-2">Todas las asignaturas están en el horario</p>
+                                    <p className="text-xs">Arrastra aquí para remover del horario</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
             {isEventModalOpen && (
                  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
                      <div className="bg-white rounded-lg p-6 w-96">
@@ -3298,6 +3324,9 @@ const CalendarView: React.FC<{
 
     // Abrir modal para crear/editar evento
     const handleOpenModal = (date?: Date, evento?: EventoCalendario) => {
+        // Docentes no pueden crear ni editar eventos
+        if (currentUser.role === 'docente') return;
+        
         if (evento) {
             setSelectedEvent(evento);
             setSelectedDate(null);
@@ -3316,6 +3345,9 @@ const CalendarView: React.FC<{
 
     // Guardar evento
     const handleSaveEvent = async (eventoData: Omit<EventoCalendario, 'id_evento' | 'created_at' | 'updated_at'>) => {
+        // Docentes no pueden guardar eventos
+        if (currentUser.role === 'docente') return;
+        
         try {
             // eventoData.fecha_inicio and fecha_fin are ISO strings from the form
             // They represent dates in Caracas timezone, so we need to convert to UTC
@@ -3348,6 +3380,8 @@ const CalendarView: React.FC<{
 
     // Eliminar evento
     const handleDeleteEvent = async () => {
+        // Docentes no pueden eliminar eventos
+        if (currentUser.role === 'docente') return;
         if (!selectedEvent) return;
         if (!window.confirm('¿Está seguro de que desea eliminar este evento?')) return;
         
@@ -3434,8 +3468,12 @@ const CalendarView: React.FC<{
                             key={index}
                             className={`min-h-[100px] border-r border-b p-2 ${
                                 !isCurrentMonth ? 'bg-gray-50' : 'bg-white'
-                            } ${isToday(date) ? 'bg-blue-50' : ''} hover:bg-gray-50 cursor-pointer`}
-                            onClick={() => date && handleOpenModal(date)}
+                            } ${isToday(date) ? 'bg-blue-50' : ''} ${currentUser.role !== 'docente' ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'}`}
+                            onClick={() => {
+                                if (currentUser.role !== 'docente' && date) {
+                                    handleOpenModal(date);
+                                }
+                            }}
                         >
                             {date && (
                                 <>
@@ -3453,10 +3491,12 @@ const CalendarView: React.FC<{
                                             <div
                                                 key={evento.id_evento}
                                                 onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleOpenModal(date, evento);
+                                                    if (currentUser.role !== 'docente') {
+                                                        e.stopPropagation();
+                                                        handleOpenModal(date, evento);
+                                                    }
                                                 }}
-                                                className="text-xs p-1 rounded text-white truncate cursor-pointer hover:opacity-80"
+                                                className={`text-xs p-1 rounded text-white truncate ${currentUser.role !== 'docente' ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
                                                 style={{ backgroundColor: evento.color || coloresEventos[evento.tipo_evento] }}
                                                 title={evento.titulo}
                                             >
@@ -3519,21 +3559,25 @@ const CalendarView: React.FC<{
                                 return (
                                     <div
                                         key={dayIdx}
-                                        className="min-h-[60px] border-r p-1 hover:bg-gray-50 cursor-pointer"
+                                        className={`min-h-[60px] border-r p-1 ${currentUser.role !== 'docente' ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'}`}
                                         onClick={() => {
-                                            const newDate = new Date(date);
-                                            newDate.setHours(hour, 0, 0, 0);
-                                            handleOpenModal(newDate);
+                                            if (currentUser.role !== 'docente') {
+                                                const newDate = new Date(date);
+                                                newDate.setHours(hour, 0, 0, 0);
+                                                handleOpenModal(newDate);
+                                            }
                                         }}
                                     >
                                         {eventosEnHora.map(evento => (
                                             <div
                                                 key={evento.id_evento}
                                                 onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleOpenModal(date, evento);
+                                                    if (currentUser.role !== 'docente') {
+                                                        e.stopPropagation();
+                                                        handleOpenModal(date, evento);
+                                                    }
                                                 }}
-                                                className="text-xs p-1 rounded text-white mb-1 cursor-pointer hover:opacity-80"
+                                                className={`text-xs p-1 rounded text-white mb-1 ${currentUser.role !== 'docente' ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
                                                 style={{ backgroundColor: evento.color || coloresEventos[evento.tipo_evento] }}
                                                 title={evento.titulo}
                                             >
@@ -3571,8 +3615,12 @@ const CalendarView: React.FC<{
                                 {eventosTodoElDia.map(evento => (
                                     <div
                                         key={evento.id_evento}
-                                        onClick={() => handleOpenModal(currentDate, evento)}
-                                        className="p-2 rounded text-white cursor-pointer hover:opacity-80"
+                                        onClick={() => {
+                                            if (currentUser.role !== 'docente') {
+                                                handleOpenModal(currentDate, evento);
+                                            }
+                                        }}
+                                        className={`p-2 rounded text-white ${currentUser.role !== 'docente' ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
                                         style={{ backgroundColor: evento.color || coloresEventos[evento.tipo_evento] }}
                                     >
                                         {evento.titulo}
@@ -3594,11 +3642,13 @@ const CalendarView: React.FC<{
                                     {String(hour).padStart(2, '0')}:00
                                 </div>
                                 <div
-                                    className="col-span-10 min-h-[80px] p-2 hover:bg-gray-50 cursor-pointer"
+                                    className={`col-span-10 min-h-[80px] p-2 ${currentUser.role !== 'docente' ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'}`}
                                     onClick={() => {
-                                        const newDate = new Date(currentDate);
-                                        newDate.setHours(hour, 0, 0, 0);
-                                        handleOpenModal(newDate);
+                                        if (currentUser.role !== 'docente') {
+                                            const newDate = new Date(currentDate);
+                                            newDate.setHours(hour, 0, 0, 0);
+                                            handleOpenModal(newDate);
+                                        }
                                     }}
                                 >
                                     {eventosEnHora.map(evento => {
@@ -3611,10 +3661,12 @@ const CalendarView: React.FC<{
                                             <div
                                                 key={evento.id_evento}
                                                 onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleOpenModal(currentDate, evento);
+                                                    if (currentUser.role !== 'docente') {
+                                                        e.stopPropagation();
+                                                        handleOpenModal(currentDate, evento);
+                                                    }
                                                 }}
-                                                className="p-2 rounded text-white mb-2 cursor-pointer hover:opacity-80"
+                                                className={`p-2 rounded text-white mb-2 ${currentUser.role !== 'docente' ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
                                                 style={{ backgroundColor: evento.color || coloresEventos[evento.tipo_evento] }}
                                             >
                                                 <div className="font-semibold">{evento.titulo}</div>
@@ -3691,8 +3743,12 @@ const CalendarView: React.FC<{
                                 return (
                                     <div
                                         key={evento.id_evento}
-                                        onClick={() => handleOpenModal(date, evento)}
-                                        className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer border-l-4"
+                                        onClick={() => {
+                                            if (currentUser.role !== 'docente') {
+                                                handleOpenModal(date, evento);
+                                            }
+                                        }}
+                                        className={`flex items-start gap-3 p-3 rounded-lg border-l-4 ${currentUser.role !== 'docente' ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'}`}
                                         style={{ borderLeftColor: evento.color || coloresEventos[evento.tipo_evento] }}
                                     >
                                         <div className="flex-shrink-0 mt-1">
