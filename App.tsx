@@ -2192,7 +2192,7 @@ const PlanningView: React.FC<{
     };
 
     const teacherClasses = useMemo(() => {
-        if (currentUser.role !== 'docente') return [];
+        if (!currentUser || currentUser.role !== 'docente' || !currentUser.docenteId) return [];
         return clases
             .filter(c => c.id_docente_asignado === currentUser.docenteId)
             .map(c => ({ id_clase: c.id_clase, nombre_materia: c.nombre_materia, grado_asignado: c.grado_asignado}));
@@ -2207,7 +2207,8 @@ const PlanningView: React.FC<{
         };
         
         const filteredPlanificaciones = useMemo(() => {
-            if (currentUser.role === 'docente') {
+            if (!currentUser) return planificaciones;
+            if (currentUser.role === 'docente' && currentUser.docenteId) {
                 return planificaciones.filter(p => p.id_docente === currentUser.docenteId);
             }
             return planificaciones;
@@ -2273,30 +2274,56 @@ const PlanningView: React.FC<{
     };
 
     // Move useMemo hooks to component level (not inside renderHistoryView)
+    // Only calculate if currentUser exists to avoid React errors
     const filteredHistory = useMemo(() => {
-        let plans = [...planificaciones];
+        if (!planificaciones || planificaciones.length === 0) return [];
+        if (!currentUser || !currentUser.role) return [];
+        
+        try {
+            let plans = [...planificaciones];
 
-        if (currentUser.role === 'docente') {
-            plans = plans.filter(p => p.id_docente === currentUser.docenteId);
+            if (currentUser.role === 'docente' && currentUser.docenteId) {
+                plans = plans.filter(p => p && p.id_docente === currentUser.docenteId);
+            }
+
+            return plans.filter(p => {
+                if (!p || !p.id_planificacion) return false;
+                
+                const { ano_escolar, lapso, status, grado, id_docente } = historyFilters;
+                if (ano_escolar !== 'all' && p.ano_escolar !== ano_escolar) return false;
+                if (lapso !== 'all' && p.lapso !== lapso) return false;
+                if (status !== 'all' && p.status !== status) return false;
+                if (id_docente !== 'all' && p.id_docente !== id_docente) return false;
+                
+                const clase = clases.find(c => c && c.id_clase === p.id_clase);
+                if (grado !== 'all' && clase?.grado_asignado !== grado) return false;
+
+                return true;
+            }).sort((a, b) => {
+                try {
+                    const dateA = a && a.fecha_creacion ? new Date(a.fecha_creacion).getTime() : 0;
+                    const dateB = b && b.fecha_creacion ? new Date(b.fecha_creacion).getTime() : 0;
+                    return dateB - dateA;
+                } catch {
+                    return 0;
+                }
+            });
+        } catch (error) {
+            console.error('Error filtering history:', error);
+            return [];
         }
-
-        return plans.filter(p => {
-            const { ano_escolar, lapso, status, grado, id_docente } = historyFilters;
-            if (ano_escolar !== 'all' && p.ano_escolar !== ano_escolar) return false;
-            if (lapso !== 'all' && p.lapso !== lapso) return false;
-            if (status !== 'all' && p.status !== status) return false;
-            if (id_docente !== 'all' && p.id_docente !== id_docente) return false;
-            
-            const clase = clases.find(c => c.id_clase === p.id_clase);
-            if (grado !== 'all' && clase?.grado_asignado !== grado) return false;
-
-            return true;
-        }).sort((a, b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime());
     }, [planificaciones, historyFilters, currentUser, clases]);
 
-    const uniqueGrades = useMemo(() => [...new Set(clases.map(c => c.grado_asignado))].sort(), [clases]);
+    const uniqueGrades = useMemo(() => {
+        if (!clases || clases.length === 0) return [];
+        return [...new Set(clases.map(c => c?.grado_asignado).filter(Boolean))].sort();
+    }, [clases]);
 
     const renderHistoryView = () => {
+        if (!currentUser) {
+            return <div className="bg-white p-6 rounded-lg shadow-md">Cargando...</div>;
+        }
+
         const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
             const { name, value } = e.target;
             setHistoryFilters(prev => ({ ...prev, [name]: value }));
@@ -2355,9 +2382,13 @@ const PlanningView: React.FC<{
                                 </tr>
                             ) : (
                                 filteredHistory.map(plan => {
+                                    if (!plan || !plan.id_planificacion) {
+                                        return null;
+                                    }
+                                    
                                     try {
-                                        const clase = clases.find(c => c.id_clase === plan.id_clase);
-                                        const docente = docentes.find(d => d.id_docente === plan.id_docente);
+                                        const clase = clases.find(c => c && c.id_clase === plan.id_clase);
+                                        const docente = docentes.find(d => d && d.id_docente === plan.id_docente);
                                         const statusStyle = statusStyles[plan.status] || 'bg-gray-100 text-gray-800';
                                         
                                         return (
@@ -2365,13 +2396,13 @@ const PlanningView: React.FC<{
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">
                                                     {plan.fecha_creacion ? new Date(plan.fecha_creacion).toLocaleDateString() : 'N/A'}
                                                 </td>
-                                                {currentUser.role !== 'docente' && (
+                                                {currentUser && currentUser.role !== 'docente' && (
                                                     <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                        {docente ? `${docente.nombres} ${docente.apellidos}` : 'N/A'}
+                                                        {docente ? `${docente.nombres || ''} ${docente.apellidos || ''}`.trim() || 'N/A' : 'N/A'}
                                                     </td>
                                                 )}
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                    {clase ? `${clase.nombre_materia} (${clase.grado_asignado})` : 'N/A'}
+                                                    {clase ? `${clase.nombre_materia || 'N/A'} (${clase.grado_asignado || 'N/A'})` : 'N/A'}
                                                 </td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{plan.semana || 'N/A'}</td>
                                                 <td className="px-4 py-2 whitespace-nowrap text-sm">{plan.lapso || 'N/A'}</td>
@@ -2393,14 +2424,14 @@ const PlanningView: React.FC<{
                                     } catch (error) {
                                         console.error('Error rendering plan row:', error, plan);
                                         return (
-                                            <tr key={plan.id_planificacion}>
-                                                <td colSpan={currentUser.role !== 'docente' ? 7 : 6} className="px-4 py-2 text-sm text-red-500">
-                                                    Error al mostrar planificación: {plan.id_planificacion}
+                                            <tr key={plan.id_planificacion || `error-${Math.random()}`}>
+                                                <td colSpan={currentUser && currentUser.role !== 'docente' ? 7 : 6} className="px-4 py-2 text-sm text-red-500">
+                                                    Error al mostrar planificación: {plan.id_planificacion || 'ID desconocido'}
                                                 </td>
                                             </tr>
                                         );
                                     }
-                                })
+                                }).filter(Boolean)
                             )}
                         </tbody>
                     </table>
@@ -2409,6 +2440,11 @@ const PlanningView: React.FC<{
         );
     }
     
+    // Early return if currentUser is not available (after hooks)
+    if (!currentUser) {
+        return <div className="bg-white p-6 rounded-lg shadow-md">Cargando...</div>;
+    }
+
     return (
         <div>
             <div className="flex border-b mb-6">
@@ -2426,9 +2462,35 @@ const PlanningView: React.FC<{
                 </button>
             </div>
             
-            {activeTab === 'board' ? renderBoardView() : renderHistoryView()}
+            {activeTab === 'board' ? renderBoardView() : (
+                (() => {
+                    try {
+                        return renderHistoryView();
+                    } catch (error) {
+                        console.error('Error rendering history view:', error);
+                        return (
+                            <div className="bg-white p-6 rounded-lg shadow-md">
+                                <div className="text-center py-12">
+                                    <p className="text-red-600 font-semibold mb-2">Error al cargar el historial</p>
+                                    <p className="text-gray-500 text-sm">Por favor, recarga la página o contacta al administrador.</p>
+                                </div>
+                            </div>
+                        );
+                    }
+                })()
+            )}
             
-            {isModalOpen && <PlanningFormModal plan={selectedPlan} userRole={currentUser.role} userId={currentUser.docenteId!} assignedClasses={teacherClasses} onClose={handleCloseModal} onSave={handleSavePlan} isReadOnly={isReadOnlyModal} />}
+            {isModalOpen && (
+                <PlanningFormModal 
+                    plan={selectedPlan} 
+                    userRole={currentUser.role} 
+                    userId={currentUser.docenteId || ''} 
+                    assignedClasses={teacherClasses} 
+                    onClose={handleCloseModal} 
+                    onSave={handleSavePlan} 
+                    isReadOnly={isReadOnlyModal} 
+                />
+            )}
             {isAiModalOpen && selectedPlan && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
                     <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-3xl">
