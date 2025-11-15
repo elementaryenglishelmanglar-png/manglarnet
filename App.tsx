@@ -3128,11 +3128,7 @@ const CalendarView: React.FC<{
     };
 
     // Cargar eventos
-    useEffect(() => {
-        loadEventos();
-    }, [currentDate, viewType]);
-
-    const loadEventos = async () => {
+    const loadEventos = useCallback(async () => {
         setIsLoading(true);
         try {
             let startDateCaracas: Date;
@@ -3191,7 +3187,12 @@ const CalendarView: React.FC<{
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [currentDate, viewType]);
+
+    // Cargar eventos cuando cambia la fecha o la vista
+    useEffect(() => {
+        loadEventos();
+    }, [loadEventos]);
 
     // Navegación del calendario
     const goToPrevious = () => {
@@ -3224,6 +3225,14 @@ const CalendarView: React.FC<{
 
     const goToToday = () => {
         setCurrentDate(new Date());
+    };
+
+    // Formatear fecha
+    const formatDate = (date: Date): string => {
+        return date.toLocaleDateString('es-ES', { 
+            year: 'numeric', 
+            month: 'long' 
+        });
     };
 
     // Formatear fecha según la vista
@@ -3285,15 +3294,6 @@ const CalendarView: React.FC<{
         }
         
         return days;
-    };
-
-
-    // Formatear fecha
-    const formatDate = (date: Date): string => {
-        return date.toLocaleDateString('es-ES', { 
-            year: 'numeric', 
-            month: 'long' 
-        });
     };
 
     // Abrir modal para crear/editar evento
@@ -3370,7 +3370,6 @@ const CalendarView: React.FC<{
         });
     };
 
-    const days = getDaysInMonth();
     const weekDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     const weekDaysFull = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
     const today = new Date();
@@ -3411,19 +3410,24 @@ const CalendarView: React.FC<{
     };
 
     // Renderizar vista de mes
-    const renderMonthView = () => (
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="grid grid-cols-7 bg-gray-100 border-b">
-                {weekDays.map(day => (
-                    <div key={day} className="p-3 text-center text-sm font-semibold text-gray-700 border-r last:border-r-0">
-                        {day}
-                    </div>
-                ))}
-            </div>
-            <div className="grid grid-cols-7">
-                {days.map((date, index) => {
-                    const eventosDelDia = getEventosForDate(date!);
-                    const isCurrentMonth = date && date.getMonth() === currentDate.getMonth();
+    const renderMonthView = () => {
+        const days = getDaysInMonth();
+        return (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="grid grid-cols-7 bg-gray-100 border-b">
+                    {weekDays.map(day => (
+                        <div key={day} className="p-3 text-center text-sm font-semibold text-gray-700 border-r last:border-r-0">
+                            {day}
+                        </div>
+                    ))}
+                </div>
+                <div className="grid grid-cols-7">
+                    {days.map((date, index) => {
+                    if (!date) {
+                        return <div key={index} className="min-h-[100px] border-r border-b bg-gray-50" />;
+                    }
+                    const eventosDelDia = getEventosForDate(date);
+                    const isCurrentMonth = date.getMonth() === currentDate.getMonth();
                     
                     return (
                         <div
@@ -3474,10 +3478,11 @@ const CalendarView: React.FC<{
                             )}
                         </div>
                     );
-                })}
+                    })}
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     // Renderizar vista de semana
     const renderWeekView = () => {
