@@ -2539,25 +2539,37 @@ const EvaluationView: React.FC<{
     const handleSaveMinuta = async () => {
         try {
             const newMinuta: MinutaEvaluacion = {
-                id_minuta: `minuta-${Date.now()}`,
+                id_minuta: `minuta-${Date.now()}`, // Temporal, será omitido
                 ...filters,
                 fecha_creacion: new Date().toISOString(),
                 datos_alumnos: Array.from(studentEvals.values()),
                 analisis_ia: aiAnalysis,
             };
             
-            // Save to Supabase
+            // Save to Supabase - omitir id_minuta para que Supabase lo genere
             const { id_minuta, fecha_creacion, updated_at, ...minutaData } = newMinuta;
-            const created = await minutasService.create(minutaData);
             
-            setMinutas(prev => [...prev, created]);
+            // Asegurar que los arrays estén en el formato correcto
+            const minutaToSave = {
+                ...minutaData,
+                datos_alumnos: minutaData.datos_alumnos || [],
+                analisis_ia: minutaData.analisis_ia || []
+            };
+            
+            const created = await minutasService.create(minutaToSave);
+            
+            // Recargar todas las minutas desde Supabase para asegurar sincronización
+            const allMinutas = await minutasService.getAll();
+            setMinutas(allMinutas);
+            
             alert('Minuta de la reunión guardada con éxito.');
             setFilters({ ano_escolar: '2024-2025', lapso: 'I Lapso', evaluacion: 'I Mensual', grado: '', materia: '' });
             setStudentEvals(new Map());
             setAiAnalysis([]);
         } catch (error: any) {
             console.error('Error saving minuta:', error);
-            alert('Error al guardar la minuta: ' + (error.message || 'Error desconocido'));
+            console.error('Error details:', JSON.stringify(error, null, 2));
+            alert('Error al guardar la minuta: ' + (error.message || 'Error desconocido') + '\n\nRevisa la consola para más detalles.');
         }
     }
 
@@ -2908,13 +2920,17 @@ const App: React.FC = () => {
     try {
       // Load all data in parallel
       const [alumnosData, docentesData, clasesData, planificacionesData, horariosData, minutasData, notificationsData] = await Promise.all([
-        alumnosService.getAll().catch(() => []),
-        docentesService.getAll().catch(() => []),
-        clasesService.getAll().catch(() => []),
-        planificacionesService.getAll().catch(() => []),
-        horariosService.getAll().catch(() => []),
-        minutasService.getAll().catch(() => []),
-        notificacionesService.getAll().catch(() => [])
+        alumnosService.getAll().catch((err) => { console.error('Error loading alumnos:', err); return []; }),
+        docentesService.getAll().catch((err) => { console.error('Error loading docentes:', err); return []; }),
+        clasesService.getAll().catch((err) => { console.error('Error loading clases:', err); return []; }),
+        planificacionesService.getAll().catch((err) => { console.error('Error loading planificaciones:', err); return []; }),
+        horariosService.getAll().catch((err) => { console.error('Error loading horarios:', err); return []; }),
+        minutasService.getAll().catch((err) => { 
+          console.error('Error loading minutas:', err); 
+          console.error('Minutas error details:', JSON.stringify(err, null, 2));
+          return []; 
+        }),
+        notificacionesService.getAll().catch((err) => { console.error('Error loading notifications:', err); return []; })
       ]);
 
       setAlumnos(alumnosData.map(convertAlumno));
