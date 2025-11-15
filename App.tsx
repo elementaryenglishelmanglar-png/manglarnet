@@ -2388,9 +2388,20 @@ const ScheduleView: React.FC<{
     const weeklySchedule = useMemo(() => {
         if (!currentWeek) return [];
         if (!schedules[selectedGrade] || !schedules[selectedGrade][currentWeek]) {
-            const previousWeekSchedule = schedules[selectedGrade]?.[currentWeek - 1] || [];
-            // Create a deep copy for the new week
-            return JSON.parse(JSON.stringify(previousWeekSchedule));
+            // Try to get from previous week, or week 1 if currentWeek is 1
+            let previousWeekSchedule: Horario[] = [];
+            if (currentWeek > 1) {
+                previousWeekSchedule = schedules[selectedGrade]?.[currentWeek - 1] || [];
+            }
+            // If no previous week, try week 1
+            if (previousWeekSchedule.length === 0 && currentWeek > 1) {
+                previousWeekSchedule = schedules[selectedGrade]?.[1] || [];
+            }
+            // Create a deep copy for the new week with updated IDs to avoid conflicts
+            return previousWeekSchedule.map((h, index) => ({
+                ...h,
+                id_horario: `h-${selectedGrade.replace(/\s+/g, '-')}-${currentWeek}-${h.dia_semana}-${h.hora_inicio.replace(':', '')}-${index}`
+            }));
         }
         return schedules[selectedGrade][currentWeek];
     }, [schedules, selectedGrade, currentWeek]);
@@ -2398,30 +2409,35 @@ const ScheduleView: React.FC<{
     useEffect(() => {
         // This effect ensures that when a schedule for a new week is generated from the previous one, it gets saved to the state.
         if (currentWeek && (!schedules[selectedGrade] || !schedules[selectedGrade][currentWeek])) {
-            setSchedules(prev => ({
-                ...prev,
-                [selectedGrade]: {
-                    ...prev[selectedGrade],
-                    [currentWeek]: weeklySchedule
-                }
-            }));
+            // Only save if weeklySchedule has content (copied from previous week)
+            if (weeklySchedule.length > 0) {
+                setSchedules(prev => ({
+                    ...prev,
+                    [selectedGrade]: {
+                        ...prev[selectedGrade],
+                        [currentWeek]: weeklySchedule
+                    }
+                }));
+            }
         }
     }, [weeklySchedule, selectedGrade, currentWeek, schedules, setSchedules]);
 
 
     const handleDrop = (day: number, slot: string) => {
-        if (!draggedItem) return;
+        if (!draggedItem || !currentWeek) return;
 
         const [hora_inicio, hora_fin] = slot.split(' - ');
         
+        // Remove the item from its current position
         const updatedSchedule = weeklySchedule.filter(item => 
             !(draggedItem.type === 'class' && item.id_clase === draggedItem.id) &&
             !(draggedItem.type === 'event' && item.id_horario === draggedItem.id)
         );
 
+        // Create new item with updated position
         const newItem: Horario = draggedItem.type === 'class'
             ? {
-                id_horario: `h-${draggedItem.id}-${day}-${hora_inicio}`,
+                id_horario: `h-${selectedGrade.replace(/\s+/g, '-')}-${currentWeek}-${day}-${hora_inicio.replace(':', '')}-${draggedItem.id}`,
                 id_docente: draggedItem.docenteId,
                 id_clase: draggedItem.id,
                 dia_semana: day,
@@ -2440,6 +2456,27 @@ const ScheduleView: React.FC<{
             [selectedGrade]: {
                 ...prev[selectedGrade],
                 [currentWeek]: [...updatedSchedule, newItem]
+            }
+        }));
+
+        setDraggedItem(null);
+    };
+
+    // Handle dropping outside the schedule (to remove from schedule)
+    const handleDropOutside = () => {
+        if (!draggedItem || !currentWeek) return;
+
+        // Remove the item from the schedule
+        const updatedSchedule = weeklySchedule.filter(item => 
+            !(draggedItem.type === 'class' && item.id_clase === draggedItem.id) &&
+            !(draggedItem.type === 'event' && item.id_horario === draggedItem.id)
+        );
+
+        setSchedules(prev => ({
+            ...prev,
+            [selectedGrade]: {
+                ...prev[selectedGrade],
+                [currentWeek]: updatedSchedule
             }
         }));
 
@@ -2587,19 +2624,41 @@ const ScheduleView: React.FC<{
             <div className="w-64 flex-shrink-0">
                 <div className="bg-white p-4 rounded-lg shadow-md">
                     <h3 className="font-bold text-lg mb-2">Asignaturas sin Horario</h3>
-                    <div className="space-y-2">
+                    <div 
+                        className="space-y-2 min-h-[200px] p-2 rounded-md border-2 border-dashed border-gray-300 transition-all"
+                        id="unassigned-classes-drop-zone"
+                        onDrop={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.remove('bg-blue-50', 'border-blue-400');
+                            handleDropOutside();
+                        }}
+                        onDragOver={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.add('bg-blue-50', 'border-blue-400');
+                            e.currentTarget.classList.remove('border-gray-300');
+                        }}
+                        onDragLeave={(e) => {
+                            e.currentTarget.classList.remove('bg-blue-50', 'border-blue-400');
+                            e.currentTarget.classList.add('border-gray-300');
+                        }}
+                    >
                         {unassignedClasses.map(clase => (
                              <div key={clase.id_clase}
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, clase, 'class')}
-                                className="p-2 rounded-md cursor-grab"
+                                className="p-2 rounded-md cursor-grab hover:shadow-md transition-shadow"
                                 style={{backgroundColor: subjectColors[clase.nombre_materia] || getSubjectColor(clase.nombre_materia)}}
                              >
                                 <div className="font-bold">{clase.nombre_materia}</div>
                                 <div className="text-sm text-gray-600">{docentes.find(d => d.id_docente === clase.id_docente_asignado)?.nombres}</div>
                             </div>
                         ))}
-                        {unassignedClasses.length === 0 && <p className="text-sm text-gray-500">Todas las asignaturas han sido añadidas al horario.</p>}
+                        {unassignedClasses.length === 0 && (
+                            <div className="text-sm text-gray-500 p-4 border-2 border-dashed border-gray-300 rounded-md text-center">
+                                <p className="mb-2">Todas las asignaturas están en el horario</p>
+                                <p className="text-xs">Arrastra aquí para remover del horario</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -3513,20 +3572,24 @@ const App: React.FC = () => {
       // Get all current horarios from DB
       const allHorarios = await horariosService.getAll();
       
-      // Delete all existing horarios (we'll recreate them)
-      // This is simpler than trying to diff
-      for (const horario of allHorarios) {
-        await horariosService.delete(horario.id_horario).catch(() => {});
-      }
+      // Create a map of existing horarios by grado-semana for efficient lookup
+      const existingMap = new Map<string, HorarioDB>();
+      allHorarios.forEach(h => {
+        const key = `${h.grado}-${h.semana}-${h.dia_semana}-${h.hora_inicio}`;
+        existingMap.set(key, h);
+      });
       
-      // Create new horarios from schedules
+      // Build map of new horarios
+      const newHorariosMap = new Map<string, Omit<HorarioDB, 'id_horario' | 'created_at' | 'updated_at'>>();
       const horariosToCreate: Array<Omit<HorarioDB, 'id_horario' | 'created_at' | 'updated_at'>> = [];
+      const horariosToDelete: string[] = [];
       
       for (const [grado, weeks] of Object.entries(schedulesToSync)) {
         for (const [semanaStr, horarios] of Object.entries(weeks)) {
           const semana = parseInt(semanaStr);
           for (const horario of horarios) {
-            horariosToCreate.push({
+            const key = `${grado}-${semana}-${horario.dia_semana}-${horario.hora_inicio}`;
+            const newHorario = {
               grado,
               semana,
               id_docente: horario.id_docente,
@@ -3535,22 +3598,58 @@ const App: React.FC = () => {
               hora_inicio: horario.hora_inicio,
               hora_fin: horario.hora_fin,
               evento_descripcion: horario.evento_descripcion
-            });
+            };
+            newHorariosMap.set(key, newHorario);
+            
+            // Check if this horario already exists
+            const existing = existingMap.get(key);
+            if (!existing) {
+              horariosToCreate.push(newHorario);
+            } else {
+              // Check if it needs updating
+              if (existing.id_docente !== newHorario.id_docente || 
+                  existing.id_clase !== newHorario.id_clase ||
+                  existing.hora_fin !== newHorario.hora_fin ||
+                  existing.evento_descripcion !== newHorario.evento_descripcion) {
+                await horariosService.update(existing.id_horario, {
+                  id_docente: newHorario.id_docente,
+                  id_clase: newHorario.id_clase,
+                  hora_fin: newHorario.hora_fin,
+                  evento_descripcion: newHorario.evento_descripcion
+                }).catch(err => console.error('Error updating horario:', err));
+              }
+            }
           }
         }
       }
       
-      // Batch insert (Supabase supports up to 1000 rows per insert)
+      // Find horarios to delete (exist in DB but not in new schedules)
+      existingMap.forEach((horario, key) => {
+        if (!newHorariosMap.has(key)) {
+          horariosToDelete.push(horario.id_horario);
+        }
+      });
+      
+      // Delete removed horarios
+      if (horariosToDelete.length > 0) {
+        for (const id of horariosToDelete) {
+          await horariosService.delete(id).catch(err => console.error('Error deleting horario:', err));
+        }
+      }
+      
+      // Batch insert new horarios (Supabase supports up to 1000 rows per insert)
       if (horariosToCreate.length > 0) {
         const batchSize = 100;
         for (let i = 0; i < horariosToCreate.length; i += batchSize) {
           const batch = horariosToCreate.slice(i, i + batchSize);
-          await supabase.from('horarios').insert(batch);
+          await supabase.from('horarios').insert(batch).catch(err => {
+            console.error('Error inserting horarios batch:', err);
+          });
         }
       }
     } catch (error: any) {
       console.error('Error syncing schedules to Supabase:', error);
-      // Don't show alert for schedule sync errors as they happen frequently
+      console.error('Error details:', JSON.stringify(error, null, 2));
     }
   };
 
