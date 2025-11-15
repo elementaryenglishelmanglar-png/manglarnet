@@ -3178,12 +3178,17 @@ const CalendarView: React.FC<{
         const firstDay = new Date(year, month, 1);
         const lastDay = new Date(year, month + 1, 0);
         const daysInMonth = lastDay.getDate();
-        const startingDayOfWeek = firstDay.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+        
+        // getDay() returns: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
+        // But our calendar starts with Monday, so we need to convert:
+        // Sunday (0) -> 6, Monday (1) -> 0, Tuesday (2) -> 1, etc.
+        const startingDayOfWeek = firstDay.getDay();
+        const offset = startingDayOfWeek === 0 ? 6 : startingDayOfWeek - 1; // Convert to Monday-based week
 
         const days: (Date | null)[] = [];
         
-        // Días del mes anterior para completar la primera semana
-        for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+        // Días del mes anterior para completar la primera semana (empezando en lunes)
+        for (let i = 0; i < offset; i++) {
             days.push(null);
         }
         
