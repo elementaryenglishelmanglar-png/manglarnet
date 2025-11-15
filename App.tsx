@@ -2273,47 +2273,6 @@ const PlanningView: React.FC<{
         )
     };
 
-    // Move useMemo hooks to component level (not inside renderHistoryView)
-    // Only calculate if currentUser exists to avoid React errors
-    const filteredHistory = useMemo(() => {
-        if (!planificaciones || planificaciones.length === 0) return [];
-        if (!currentUser || !currentUser.role) return [];
-        
-        try {
-            let plans = [...planificaciones];
-
-            if (currentUser.role === 'docente' && currentUser.docenteId) {
-                plans = plans.filter(p => p && p.id_docente === currentUser.docenteId);
-            }
-
-            return plans.filter(p => {
-                if (!p || !p.id_planificacion) return false;
-                
-                const { ano_escolar, lapso, status, grado, id_docente } = historyFilters;
-                if (ano_escolar !== 'all' && p.ano_escolar !== ano_escolar) return false;
-                if (lapso !== 'all' && p.lapso !== lapso) return false;
-                if (status !== 'all' && p.status !== status) return false;
-                if (id_docente !== 'all' && p.id_docente !== id_docente) return false;
-                
-                const clase = clases.find(c => c && c.id_clase === p.id_clase);
-                if (grado !== 'all' && clase?.grado_asignado !== grado) return false;
-
-                return true;
-            }).sort((a, b) => {
-                try {
-                    const dateA = a && a.fecha_creacion ? new Date(a.fecha_creacion).getTime() : 0;
-                    const dateB = b && b.fecha_creacion ? new Date(b.fecha_creacion).getTime() : 0;
-                    return dateB - dateA;
-                } catch {
-                    return 0;
-                }
-            });
-        } catch (error) {
-            console.error('Error filtering history:', error);
-            return [];
-        }
-    }, [planificaciones, historyFilters, currentUser, clases]);
-
     const uniqueGrades = useMemo(() => {
         if (!clases || clases.length === 0) return [];
         return [...new Set(clases.map(c => c?.grado_asignado).filter(Boolean))].sort();
@@ -2322,6 +2281,47 @@ const PlanningView: React.FC<{
     const renderHistoryView = () => {
         if (!currentUser) {
             return <div className="bg-white p-6 rounded-lg shadow-md">Cargando...</div>;
+        }
+
+        // Calculate filtered history directly (like evaluation history does)
+        let filteredHistory: Planificacion[] = [];
+        try {
+            if (planificaciones && planificaciones.length > 0) {
+                filteredHistory = [...planificaciones];
+
+                // Filter by docente if needed
+                if (currentUser.role === 'docente' && currentUser.docenteId) {
+                    filteredHistory = filteredHistory.filter(p => p && p.id_docente === currentUser.docenteId);
+                }
+
+                // Apply filters
+                const { ano_escolar, lapso, status, grado, id_docente } = historyFilters;
+                filteredHistory = filteredHistory.filter(p => {
+                    if (!p || !p.id_planificacion) return false;
+                    if (ano_escolar !== 'all' && p.ano_escolar !== ano_escolar) return false;
+                    if (lapso !== 'all' && p.lapso !== lapso) return false;
+                    if (status !== 'all' && p.status !== status) return false;
+                    if (id_docente !== 'all' && p.id_docente !== id_docente) return false;
+                    
+                    const clase = clases.find(c => c && c.id_clase === p.id_clase);
+                    if (grado !== 'all' && clase?.grado_asignado !== grado) return false;
+                    return true;
+                });
+
+                // Sort by date
+                filteredHistory.sort((a, b) => {
+                    try {
+                        const dateA = a && a.fecha_creacion ? new Date(a.fecha_creacion).getTime() : 0;
+                        const dateB = b && b.fecha_creacion ? new Date(b.fecha_creacion).getTime() : 0;
+                        return dateB - dateA;
+                    } catch {
+                        return 0;
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error filtering history:', error);
+            filteredHistory = [];
         }
 
         const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
