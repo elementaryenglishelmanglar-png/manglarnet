@@ -891,9 +891,10 @@ const TeacherScheduleDashboard: React.FC<{
     }, [schedules, alumnos]);
 
     const [selectedGrade, setSelectedGrade] = useState(allGrades.length > 0 ? allGrades[0] : '');
-    const [currentWeek, setCurrentWeek] = useState(() => getWeekNumber(new Date('2024-09-01')));
+    const [currentWeek, setCurrentWeek] = useState<number | null>(null);
     
     const weeklySchedule = useMemo(() => {
+        if (!currentWeek) return [];
         return schedules[selectedGrade]?.[currentWeek] || [];
     }, [schedules, selectedGrade, currentWeek]);
     
@@ -914,7 +915,7 @@ const TeacherScheduleDashboard: React.FC<{
             backgroundColor: '#ffffff',
         });
 
-        const fileName = `horario-${selectedGrade.replace(/\s+/g, '-')}-semana-${currentWeek}`;
+        const fileName = `horario-${selectedGrade.replace(/\s+/g, '-')}-semana-${currentWeek || 'sin-semana'}`;
 
         if (format === 'jpeg') {
             const imgData = canvas.toDataURL('image/jpeg', 1.0);
@@ -948,11 +949,16 @@ const TeacherScheduleDashboard: React.FC<{
                     >
                         {allGrades.map(grade => <option key={grade} value={grade}>{grade}</option>)}
                     </select>
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} className="p-2 bg-gray-200 rounded-md">&lt;</button>
-                        <span className="font-semibold w-24 text-center">Semana {currentWeek}</span>
-                        <button onClick={() => setCurrentWeek(w => Math.min(18, w + 1))} className="p-2 bg-gray-200 rounded-md disabled:opacity-50" disabled={currentWeek >= 18}>&gt;</button>
-                    </div>
+                    <select
+                        value={currentWeek || ''}
+                        onChange={(e) => setCurrentWeek(e.target.value ? parseInt(e.target.value) : null)}
+                        className="p-2 border border-gray-300 rounded-md shadow-sm min-w-[150px]"
+                    >
+                        <option value="">Elegir Semana</option>
+                        {Array.from({ length: 18 }, (_, i) => i + 1).map(week => (
+                            <option key={week} value={week}>Semana {week}</option>
+                        ))}
+                    </select>
                      <div className="relative">
                         <button
                             onClick={() => setDownloadMenuOpen(!isDownloadMenuOpen)}
@@ -976,6 +982,12 @@ const TeacherScheduleDashboard: React.FC<{
                     </div>
                 </div>
             </div>
+            {!currentWeek ? (
+                <div className="text-center py-12 text-gray-500 mt-4">
+                    <p className="text-lg font-medium">Seleccione una semana para ver el horario</p>
+                    <p className="text-sm mt-2">Use el menú desplegable arriba para elegir una semana (1-18)</p>
+                </div>
+            ) : (
             <div className="overflow-x-auto mt-4" >
                 <table ref={scheduleTableRef} className="min-w-full divide-y divide-gray-200 border bg-white">
                     <thead className="bg-gray-50">
@@ -1029,6 +1041,7 @@ const TeacherScheduleDashboard: React.FC<{
                     </tbody>
                 </table>
             </div>
+            )}
         </div>
     );
 }
@@ -2360,7 +2373,7 @@ const ScheduleView: React.FC<{
 }> = ({ schedules, setSchedules, clases, docentes, currentUser, alumnos }) => {
     const allGrades = useMemo(() => Array.from(new Set(alumnos.map(a => a.salon))).sort(), [alumnos]);
     const [selectedGrade, setSelectedGrade] = useState(allGrades[0] || '');
-    const [currentWeek, setCurrentWeek] = useState(() => getWeekNumber(new Date('2024-09-01')));
+    const [currentWeek, setCurrentWeek] = useState<number | null>(null);
     const [draggedItem, setDraggedItem] = useState<any>(null);
     const [isEventModalOpen, setEventModalOpen] = useState(false);
     const [eventData, setEventData] = useState<{dia: number, hora: string, desc: string, id: string | null}>({dia: 0, hora: '', desc: '', id: null});
@@ -2373,6 +2386,7 @@ const ScheduleView: React.FC<{
     const timeSlots = isPrimaryGrade ? TIME_SLOTS_PRIMARIA : TIME_SLOTS_STANDARD;
 
     const weeklySchedule = useMemo(() => {
+        if (!currentWeek) return [];
         if (!schedules[selectedGrade] || !schedules[selectedGrade][currentWeek]) {
             const previousWeekSchedule = schedules[selectedGrade]?.[currentWeek - 1] || [];
             // Create a deep copy for the new week
@@ -2383,7 +2397,7 @@ const ScheduleView: React.FC<{
 
     useEffect(() => {
         // This effect ensures that when a schedule for a new week is generated from the previous one, it gets saved to the state.
-        if (!schedules[selectedGrade] || !schedules[selectedGrade][currentWeek]) {
+        if (currentWeek && (!schedules[selectedGrade] || !schedules[selectedGrade][currentWeek])) {
             setSchedules(prev => ({
                 ...prev,
                 [selectedGrade]: {
@@ -2500,12 +2514,23 @@ const ScheduleView: React.FC<{
                      <select value={selectedGrade} onChange={e => setSelectedGrade(e.target.value)} className="p-2 border rounded-md">
                         {allGrades.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} className="p-2 bg-gray-200 rounded-md">&lt;</button>
-                        <span className="font-semibold w-24 text-center">Semana {currentWeek}</span>
-                        <button onClick={() => setCurrentWeek(w => Math.min(18, w + 1))} className="p-2 bg-gray-200 rounded-md disabled:opacity-50" disabled={currentWeek >= 18}>&gt;</button>
-                    </div>
+                    <select
+                        value={currentWeek || ''}
+                        onChange={(e) => setCurrentWeek(e.target.value ? parseInt(e.target.value) : null)}
+                        className="p-2 border border-gray-300 rounded-md shadow-sm min-w-[150px]"
+                    >
+                        <option value="">Elegir Semana</option>
+                        {Array.from({ length: 18 }, (_, i) => i + 1).map(week => (
+                            <option key={week} value={week}>Semana {week}</option>
+                        ))}
+                    </select>
                 </div>
+                {!currentWeek ? (
+                    <div className="text-center py-12 text-gray-500">
+                        <p className="text-lg font-medium">Seleccione una semana para ver el horario</p>
+                        <p className="text-sm mt-2">Use el menú desplegable arriba para elegir una semana (1-18)</p>
+                    </div>
+                ) : (
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 border">
                         <thead className="bg-gray-50">
@@ -2553,10 +2578,11 @@ const ScheduleView: React.FC<{
                                         );
                                     })}
                                 </tr>
-                            ))}
-                        </tbody>
+                        ))}
+                    </tbody>
                     </table>
                 </div>
+                )}
             </div>
             <div className="w-64 flex-shrink-0">
                 <div className="bg-white p-4 rounded-lg shadow-md">
