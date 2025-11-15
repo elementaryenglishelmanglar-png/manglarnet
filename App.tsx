@@ -1215,36 +1215,88 @@ const TeachersView: React.FC<{
         setSelectedTeacher(null);
     };
 
-    const handleSaveTeacher = (teacherData: Docente, newAssignments: Assignment[]) => {
-        // Update teacher details
-        const teacherExists = docentes.some(d => d.id_docente === teacherData.id_docente);
-        if (teacherExists) {
-            setDocentes(prev => prev.map(d => d.id_docente === teacherData.id_docente ? teacherData : d));
-        } else {
-            setDocentes(prev => [...prev, teacherData]);
+    const handleSaveTeacher = async (teacherData: Docente, newAssignments: Assignment[]) => {
+        try {
+            // Update teacher details in Supabase
+            const teacherExists = docentes.some(d => d.id_docente === teacherData.id_docente);
+            let savedTeacher: Docente;
+            
+            if (teacherExists) {
+                // Update existing teacher
+                const { id_docente, created_at, updated_at, ...updateData } = teacherData;
+                savedTeacher = await docentesService.update(id_docente, updateData);
+                setDocentes(prev => prev.map(d => d.id_docente === savedTeacher.id_docente ? savedTeacher : d));
+            } else {
+                // Create new teacher
+                const { id_docente, created_at, updated_at, ...newTeacher } = teacherData;
+                savedTeacher = await docentesService.create(newTeacher);
+                setDocentes(prev => [...prev, savedTeacher]);
+            }
+
+            // Update classes based on assignments
+            // Remove all old classes for this teacher
+            const otherTeachersClasses = clases.filter(c => c.id_docente_asignado !== savedTeacher.id_docente);
+            
+            // Delete old classes from Supabase
+            const oldClasses = clases.filter(c => c.id_docente_asignado === savedTeacher.id_docente);
+            for (const oldClass of oldClasses) {
+                try {
+                    await clasesService.delete(oldClass.id_clase);
+                } catch (error) {
+                    console.error('Error deleting old class:', error);
+                }
+            }
+            
+            // Create new classes based on assignments
+            const newTeacherClasses = await Promise.all(
+                newAssignments.map(async (a) => {
+                    const newClass = {
+                        nombre_materia: a.subject,
+                        grado_asignado: a.grade,
+                        id_docente_asignado: savedTeacher.id_docente,
+                        student_ids: alumnos.filter(s => s.salon === a.grade).map(s => s.id_alumno),
+                    };
+                    const created = await clasesService.create(newClass);
+                    return {
+                        ...created,
+                        studentIds: created.student_ids || []
+                    };
+                })
+            );
+            
+            setClases([...otherTeachersClasses, ...newTeacherClasses]);
+            handleCloseModal();
+        } catch (error: any) {
+            console.error('Error saving teacher:', error);
+            alert('Error al guardar el docente: ' + (error.message || 'Error desconocido'));
         }
-
-        // Update classes based on assignments
-        // Remove all old classes for this teacher
-        const otherTeachersClasses = clases.filter(c => c.id_docente_asignado !== teacherData.id_docente);
-        // Create new classes based on assignments
-        const newTeacherClasses = newAssignments.map(a => ({
-            id_clase: `clase-${teacherData.id_docente}-${a.subject.replace(/\s/g, '')}-${a.grade.replace(/\s/g, '')}`,
-            nombre_materia: a.subject,
-            grado_asignado: a.grade,
-            id_docente_asignado: teacherData.id_docente,
-            studentIds: alumnos.filter(s => s.salon === a.grade).map(s => s.id_alumno),
-        }));
-        
-        setClases([...otherTeachersClasses, ...newTeacherClasses]);
-
-        handleCloseModal();
     };
 
-    const handleDeleteTeacher = (id_docente: string) => {
+    const handleDeleteTeacher = async (id_docente: string) => {
         if (window.confirm('¿Está seguro de que desea eliminar a este docente? Esta acción también eliminará sus asignaturas.')) {
-            setDocentes(prev => prev.filter(d => d.id_docente !== id_docente));
-            setClases(prev => prev.filter(c => c.id_docente_asignado !== id_docente));
+            try {
+                // Get classes to delete
+                const classesToDelete = clases.filter(c => c.id_docente_asignado === id_docente);
+                
+                // Delete classes from Supabase
+                for (const clase of classesToDelete) {
+                    try {
+                        await clasesService.delete(clase.id_clase);
+                    } catch (error) {
+                        console.error('Error deleting class:', error);
+                    }
+                }
+                
+                // Delete teacher from Supabase
+                await docentesService.delete(id_docente);
+                
+                // Update local state
+                setDocentes(prev => prev.filter(d => d.id_docente !== id_docente));
+                setClases(prev => prev.filter(c => c.id_docente_asignado !== id_docente));
+            } catch (error: any) {
+                console.error('Error deleting teacher:', error);
+                alert('Error al eliminar el docente: ' + (error.message || 'Error desconocido'));
+            }
         }
     };
 
@@ -2479,19 +2531,29 @@ const EvaluationView: React.FC<{
         setAiAnalysis(prev => prev.map((item, i) => i === index ? { ...item, accionesSugeridas: value } : item));
     }
 
-    const handleSaveMinuta = () => {
-        const newMinuta: MinutaEvaluacion = {
-            id_minuta: `minuta-${Date.now()}`,
-            ...filters,
-            fecha_creacion: new Date().toISOString(),
-            datos_alumnos: Array.from(studentEvals.values()),
-            analisis_ia: aiAnalysis,
-        };
-        setMinutas(prev => [...prev, newMinuta]);
-        alert('Minuta de la reunión guardada con éxito.');
-        setFilters({ ano_escolar: '2024-2025', lapso: 'I Lapso', evaluacion: 'I Mensual', grado: '', materia: '' });
-        setStudentEvals(new Map());
-        setAiAnalysis([]);
+    const handleSaveMinuta = async () => {
+        try {
+            const newMinuta: MinutaEvaluacion = {
+                id_minuta: `minuta-${Date.now()}`,
+                ...filters,
+                fecha_creacion: new Date().toISOString(),
+                datos_alumnos: Array.from(studentEvals.values()),
+                analisis_ia: aiAnalysis,
+            };
+            
+            // Save to Supabase
+            const { id_minuta, fecha_creacion, updated_at, ...minutaData } = newMinuta;
+            const created = await minutasService.create(minutaData);
+            
+            setMinutas(prev => [...prev, created]);
+            alert('Minuta de la reunión guardada con éxito.');
+            setFilters({ ano_escolar: '2024-2025', lapso: 'I Lapso', evaluacion: 'I Mensual', grado: '', materia: '' });
+            setStudentEvals(new Map());
+            setAiAnalysis([]);
+        } catch (error: any) {
+            console.error('Error saving minuta:', error);
+            alert('Error al guardar la minuta: ' + (error.message || 'Error desconocido'));
+        }
     }
 
     const isFormReady = filters.grado && filters.materia;
