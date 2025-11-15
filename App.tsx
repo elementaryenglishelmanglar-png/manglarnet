@@ -387,14 +387,254 @@ const GRADOS = [
 ];
 
 
+// Función helper para obtener el color de una materia
+const getSubjectColor = (subjectName: string): string => {
+  const normalizedName = subjectName?.trim() || '';
+  
+  // Matemáticas - #01b0f3
+  if (normalizedName.includes('Matemáticas')) {
+    return '#01b0f3';
+  }
+  
+  // Lenguaje - #e7b6b7
+  if (normalizedName.includes('Lenguaje')) {
+    return '#e7b6b7';
+  }
+  
+  // Ciencias - #99ff32
+  if (normalizedName === 'Ciencias' || normalizedName.includes('Ciencias')) {
+    return '#99ff32';
+  }
+  
+  // Sociales - #fe9900
+  if (normalizedName === 'Sociales') {
+    return '#fe9900';
+  }
+  
+  // Proyecto - #feff99
+  if (normalizedName === 'Proyecto') {
+    return '#feff99';
+  }
+  
+  // Inglés - #9b99fd
+  if (normalizedName.includes('Inglés') || normalizedName.includes('English')) {
+    return '#9b99fd';
+  }
+  
+  // Francés - #c17ba0
+  if (normalizedName === 'Francés' || normalizedName === 'FRANCES') {
+    return '#c17ba0';
+  }
+  
+  // Literatura - #a64d79
+  if (normalizedName === 'Literatura') {
+    return '#a64d79';
+  }
+  
+  // Música - #00ff99
+  if (normalizedName === 'Música' || normalizedName === 'MUSICA' || normalizedName.includes('Música')) {
+    return '#00ff99';
+  }
+  
+  // Arte - #ff99ff
+  if (normalizedName === 'Arte' || normalizedName.includes('Arte')) {
+    return '#ff99ff';
+  }
+  
+  // Tecnología - #c17ba0
+  if (normalizedName.includes('Tecnología') || normalizedName.includes('Tecnologia') || normalizedName.includes('Computación') || normalizedName.includes('Robótica') || normalizedName.includes('Robotica')) {
+    return '#c17ba0';
+  }
+  
+  // Ajedrez - #cccccc
+  if (normalizedName === 'Ajedrez') {
+    return '#cccccc';
+  }
+  
+  // Ed, Física y Deporte - #ffc000 (debe verificarse antes que Ciencias para evitar conflictos)
+  if (normalizedName.includes('Deporte') || normalizedName.includes('EDUCACIÓN FÍSICA') || normalizedName.includes('Ed, Física') || normalizedName === 'FÍSICA (Inglés)') {
+    return '#ffc000';
+  }
+  
+  // Física (como materia de ciencias) - #99ff32
+  if (normalizedName === 'Física') {
+    return '#99ff32';
+  }
+  
+  // Valores - #ffff00
+  if (normalizedName === 'Valores') {
+    return '#ffff00';
+  }
+  
+  // ADP - #ffff00
+  if (normalizedName === 'ADP') {
+    return '#ffff00';
+  }
+  
+  // Taller Mañanero - #feff97
+  if (normalizedName === 'Taller Mañanero') {
+    return '#feff97';
+  }
+  
+  // Metacognición - #feff99
+  if (normalizedName === 'Metacognición' || normalizedName === 'Metacogción') {
+    return '#feff99';
+  }
+  
+  // Psicomotricidad - #feff99
+  if (normalizedName === 'Psicomotricidad') {
+    return '#feff99';
+  }
+  
+  // Conciencia Fonológica - #feff99
+  if (normalizedName === 'Conciencia fonológica' || normalizedName === 'Conciencia Fonológica') {
+    return '#feff99';
+  }
+  
+  // Clubes - #feff99
+  if (normalizedName.includes('Club')) {
+    return '#feff99';
+  }
+  
+  // Color por defecto
+  return '#F3F4F6';
+};
+
+// Objeto de colores para compatibilidad con código existente
 const subjectColors: { [key: string]: string } = {
-  'Matemáticas': '#FEE2E2', // Red
-  'Ciencias': '#D1FAE5',         // Green
-  'Sociales': '#FEF3C7',      // Amber
-  'Ed, Física y Deporte': '#DBEAFE',// Blue
-  'Inglés': '#E0E7FF',// Indigo
-  'Lenguaje': '#F3E8FF', // Purple
-  'default': '#F3F4F6',          // Gray
+  // Matemáticas
+  'Matemáticas': '#01b0f3',
+  'Matemáticas (EAC)': '#01b0f3',
+  'Matemáticas (AC)': '#01b0f3',
+  'Matemáticas (OB)': '#01b0f3',
+  'Matemáticas (Prob)': '#01b0f3',
+  'Matemáticas (Geometría)': '#01b0f3',
+  'Matemáticas (EV)': '#01b0f3',
+  'MATEMATICA': '#01b0f3',
+  
+  // Lenguaje
+  'Lenguaje': '#e7b6b7',
+  'Lenguaje (AC)': '#e7b6b7',
+  'Lenguaje (EAC)': '#e7b6b7',
+  'Lenguaje (CL)': '#e7b6b7',
+  'Lenguaje (LO)': '#e7b6b7',
+  'Lenguaje (PT)': '#e7b6b7',
+  'Lenguaje (Gram)': '#e7b6b7',
+  'CASTELLANO': '#e7b6b7',
+  
+  // Ciencias
+  'Ciencias': '#99ff32',
+  'Física': '#99ff32',
+  'QUÍMICA': '#99ff32',
+  'BIOLOGÍA': '#99ff32',
+  'CIENCIAS DE LA TIERRA': '#99ff32',
+  'SISTEMAS AMBIENTALES': '#99ff32',
+  
+  // Sociales
+  'Sociales': '#fe9900',
+  'GHC (Geografía, Historia y Ciudadanía)': '#fe9900',
+  
+  // Proyecto
+  'Proyecto': '#feff99',
+  
+  // Inglés
+  'Inglés': '#9b99fd',
+  'Inglés (reading)': '#9b99fd',
+  'Inglés (Use of English)': '#9b99fd',
+  'Inglés (Writing)': '#9b99fd',
+  'Inglés (Writting)': '#9b99fd',
+  'Inglés (Speaking)': '#9b99fd',
+  'Inglés (Project)': '#9b99fd',
+  'Inglés (Basic)': '#9b99fd',
+  'Inglés (Lower)': '#9b99fd',
+  'Inglés (Upper)': '#9b99fd',
+  'INGLES': '#9b99fd',
+  'English Club (Board Games Club)': '#9b99fd',
+  'English Club (Reading Club)': '#9b99fd',
+  'English Club (Entertainment Club)': '#9b99fd',
+  'English Club (Drawing and Animation Club)': '#9b99fd',
+  
+  // Francés
+  'Francés': '#c17ba0',
+  'FRANCES': '#c17ba0',
+  
+  // Literatura
+  'Literatura': '#a64d79',
+  
+  // Música
+  'Música': '#00ff99',
+  'MUSICA': '#00ff99',
+  'Club (Música)': '#feff99',
+  'HUB (Música)': '#00ff99',
+  
+  // Arte
+  'Arte': '#ff99ff',
+  'ARTE Y PATRIMONIO': '#ff99ff',
+  'HUB (Arte)': '#ff99ff',
+  
+  // Tecnología
+  'Tecnología (Robótica)': '#c17ba0',
+  'Tecnología (Computación)': '#c17ba0',
+  'Tecnología (financiera)': '#c17ba0',
+  'Tecnología (Financiera)': '#c17ba0',
+  'Robótica': '#c17ba0',
+  'Computación': '#c17ba0',
+  'COMPUTACION': '#c17ba0',
+  'HUB (Robótica/Programación)': '#c17ba0',
+  
+  // Ajedrez
+  'Ajedrez': '#cccccc',
+  'Club (Ajedrez)': '#cccccc',
+  
+  // Educación Física y Deporte
+  'Ed, Física y Deporte': '#ffc000',
+  'EDUCACIÓN FÍSICA Y DEPORTE': '#ffc000',
+  'FÍSICA (Inglés)': '#ffc000',
+  
+  // Valores
+  'Valores': '#ffff00',
+  
+  // ADP
+  'ADP': '#ffff00',
+  
+  // Taller Mañanero
+  'Taller Mañanero': '#feff97',
+  
+  // Metacognición
+  'Metacognición': '#feff99',
+  'Metacogción': '#feff99',
+  
+  // Psicomotricidad
+  'Psicomotricidad': '#feff99',
+  
+  // Conciencia Fonológica
+  'Conciencia fonológica': '#feff99',
+  'Conciencia Fonológica': '#feff99',
+  
+  // Clubes
+  'Club (Teatro)': '#feff99',
+  'Club (Estudiantina)': '#feff99',
+  'Club (Música)': '#feff99',
+  
+  // Otras materias
+  'Evaluación': '#F3F4F6',
+  'Personal y Social': '#F3F4F6',
+  'Relación con el ambiente': '#F3F4F6',
+  'Comunicación y Representación': '#F3F4F6',
+  'HUB (Gastronomia)': '#F3F4F6',
+  'HUB (MUN)': '#F3F4F6',
+  'ELECTIVA (Oratoria)': '#F3F4F6',
+  'ELECTIVA (Inteligencia Artificial)': '#F3F4F6',
+  'ELECTIVA (Seguridad y Prevención de Emergencias)': '#F3F4F6',
+  'ELECTIVA (Edición videos)': '#F3F4F6',
+  'ELECTIVA (Lab de Soluciones Verdes)': '#F3F4F6',
+  'TDC (Teoría del Conocimiento)': '#F3F4F6',
+  'CAS (Creatividad, Actividad y Servicio)': '#F3F4F6',
+  'MONOGRAFIA': '#F3F4F6',
+  'GESTION EMPRESARIAL': '#F3F4F6',
+  
+  // Default
+  'default': '#F3F4F6',
 };
 
 
@@ -767,7 +1007,7 @@ const TeacherScheduleDashboard: React.FC<{
                                             const isCurrentUserClass = item.id_docente === currentUser.docenteId;
                                     
                                             const bgColor = isCurrentUserClass 
-                                                ? subjectColors[clase?.nombre_materia || 'default'] || subjectColors.default
+                                                ? (subjectColors[clase?.nombre_materia || 'default'] || getSubjectColor(clase?.nombre_materia || ''))
                                                 : '#F3F4F6'; 
                                             
                                             const textColor = isCurrentUserClass ? 'text-black' : 'text-gray-600';
@@ -2299,7 +2539,7 @@ const ScheduleView: React.FC<{
                                                     ) : item.id_clase && (
                                                         <div draggable onDragStart={(e) => handleDragStart(e, item, 'event')} className="h-full cursor-grab">
                                                         {(clase => (
-                                                            <div className="p-2 rounded-md h-full" style={{backgroundColor: subjectColors[clase?.nombre_materia || 'default']}}>
+                                                            <div className="p-2 rounded-md h-full" style={{backgroundColor: subjectColors[clase?.nombre_materia || 'default'] || getSubjectColor(clase?.nombre_materia || '')}}>
                                                                 <div className="font-bold">{clase?.nombre_materia}</div>
                                                                 <div className="text-gray-600">
                                                                     {(docente => docente ? `${docente.nombres} ${docente.apellidos}` : 'N/A')(docentes.find(d => d.id_docente === item.id_docente))}
@@ -2327,7 +2567,7 @@ const ScheduleView: React.FC<{
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, clase, 'class')}
                                 className="p-2 rounded-md cursor-grab"
-                                style={{backgroundColor: subjectColors[clase.nombre_materia] || subjectColors.default}}
+                                style={{backgroundColor: subjectColors[clase.nombre_materia] || getSubjectColor(clase.nombre_materia)}}
                              >
                                 <div className="font-bold">{clase.nombre_materia}</div>
                                 <div className="text-sm text-gray-600">{docentes.find(d => d.id_docente === clase.id_docente_asignado)?.nombres}</div>
@@ -2522,7 +2762,7 @@ const TeamScheduleView: React.FC<{
                                                     </div>
                                                 ) : item.id_clase && (
                                                     (clase => clase ? (
-                                                        <div className="p-2 rounded-md h-full" style={{backgroundColor: subjectColors[clase.nombre_materia] || subjectColors.default}}>
+                                                        <div className="p-2 rounded-md h-full" style={{backgroundColor: subjectColors[clase.nombre_materia] || getSubjectColor(clase.nombre_materia)}}>
                                                             <div className="font-bold">{clase.nombre_materia}</div>
                                                             <div className="text-gray-600">{clase.grado_asignado}</div>
                                                         </div>
