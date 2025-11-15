@@ -35,3 +35,46 @@ body {
   background: #555;
 }
 
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  /* Prevent zoom on input focus in iOS */
+  input[type="text"],
+  input[type="email"],
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Ensure buttons are touch-friendly (min 44x44px) */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Improve touch targets */
+  a, button, input, select, textarea {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Improve form inputs on mobile */
+input, select, textarea {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Better focus states for accessibility */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #78AC40;
+  outline-offset: 2px;
+}
+

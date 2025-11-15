@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { DashboardIcon, StudentsIcon, TeachersIcon, ClassesIcon, PlusIcon, CloseIcon, EditIcon, DeleteIcon, ChevronDownIcon, LogoutIcon, PlanningIcon, GradesIcon, FilterIcon, CalendarIcon, SearchIcon, SpecialSubjectIcon, SparklesIcon, ArrowLeftIcon, UserCircleIcon, AcademicCapIcon, UsersIcon, IdentificationIcon, CakeIcon, LocationMarkerIcon, MailIcon, PhoneIcon, ClipboardCheckIcon, SendIcon, BellIcon, TagIcon, DownloadIcon, EvaluationIcon, SaveIcon } from './components/Icons';
+import { DashboardIcon, StudentsIcon, TeachersIcon, ClassesIcon, PlusIcon, CloseIcon, EditIcon, DeleteIcon, ChevronDownIcon, LogoutIcon, PlanningIcon, GradesIcon, FilterIcon, CalendarIcon, SearchIcon, SpecialSubjectIcon, SparklesIcon, ArrowLeftIcon, UserCircleIcon, AcademicCapIcon, UsersIcon, IdentificationIcon, CakeIcon, LocationMarkerIcon, MailIcon, PhoneIcon, ClipboardCheckIcon, SendIcon, BellIcon, TagIcon, DownloadIcon, EvaluationIcon, SaveIcon, MenuIcon } from './components/Icons';
 import { getAIPlanSuggestions, getAIEvaluationAnalysis } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
 import { LoginScreen } from './components/LoginScreen';
@@ -688,7 +688,8 @@ const Header: React.FC<{
     onLogout: () => void;
     notifications: Notification[];
     onNotificationClick: (notification: Notification) => void;
-}> = ({ title, currentUser, onLogout, notifications, onNotificationClick }) => {
+    onMenuToggle?: () => void;
+}> = ({ title, currentUser, onLogout, notifications, onNotificationClick, onMenuToggle }) => {
     const [isMenuOpen, setMenuOpen] = useState(false);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
     const unreadCount = notifications.filter(n => !n.isRead && n.recipientId === currentUser.docenteId).length;
@@ -709,9 +710,20 @@ const Header: React.FC<{
     }
 
     return (
-        <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-text-main">{title}</h1>
-            <div className="flex items-center gap-4">
+        <header className="bg-white shadow-sm p-4 flex justify-between items-center sticky top-0 z-30">
+            <div className="flex items-center gap-3">
+                {onMenuToggle && (
+                    <button
+                        onClick={onMenuToggle}
+                        className="lg:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                        aria-label="Toggle menu"
+                    >
+                        <MenuIcon className="h-6 w-6" />
+                    </button>
+                )}
+                <h1 className="text-xl sm:text-2xl font-bold text-text-main truncate">{title}</h1>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-4">
                  {currentUser.role === 'docente' && (
                     <div className="relative">
                         <button onClick={() => setNotificationsOpen(!isNotificationsOpen)} className="relative text-gray-500 hover:text-gray-700">
@@ -751,11 +763,14 @@ const Header: React.FC<{
                 )}
                 <div className="relative">
                     <button onClick={() => setMenuOpen(!isMenuOpen)} className="flex items-center gap-2 text-left">
-                        <div>
-                            <p className="font-semibold text-text-main">{currentUser.fullName}</p>
-                            <p className="text-sm text-text-secondary capitalize">{currentUser.role}</p>
+                        <div className="hidden sm:block">
+                            <p className="font-semibold text-text-main text-sm sm:text-base">{currentUser.fullName}</p>
+                            <p className="text-xs sm:text-sm text-text-secondary capitalize">{currentUser.role}</p>
                         </div>
-                        <ChevronDownIcon />
+                        <div className="sm:hidden">
+                            <UserCircleIcon className="h-8 w-8 text-gray-600" />
+                        </div>
+                        <ChevronDownIcon className="hidden sm:block" />
                     </button>
                     {isMenuOpen && (
                         <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
@@ -777,7 +792,9 @@ const Sidebar: React.FC<{
     activeView: string;
     onNavigate: (view: string) => void;
     userRole: UserRole;
-}> = ({ activeView, onNavigate, userRole }) => {
+    isOpen: boolean;
+    onClose: () => void;
+}> = ({ activeView, onNavigate, userRole, isOpen, onClose }) => {
     const navLinks = [
         { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon, roles: ['directivo', 'coordinador', 'docente', 'administrativo'] },
         { id: 'students', label: 'Alumnos', icon: StudentsIcon, roles: ['directivo', 'coordinador', 'administrativo'] },
@@ -790,30 +807,58 @@ const Sidebar: React.FC<{
         { id: 'authorized-users', label: 'Usuarios Autorizados', icon: UsersIcon, roles: ['directivo'] },
     ].filter(link => link.roles.includes(userRole));
 
+    const handleNavigate = (view: string) => {
+        onNavigate(view);
+        onClose(); // Close mobile menu after navigation
+    };
+
     return (
-        <aside className="w-64 bg-background-dark text-white flex flex-col">
-            <div className="p-6 text-center">
-                <h2 className="text-2xl font-bold text-brand-secondary">ManglarNet</h2>
-                <p className="text-sm text-gray-400">Conexión Pedagógica</p>
-            </div>
-            <nav className="flex-1 px-4">
-                {navLinks.map(({ id, label, icon: Icon }) => (
-                    <a
-                        key={id}
-                        href="#"
-                        onClick={(e) => { e.preventDefault(); onNavigate(id); }}
-                        className={`flex items-center gap-3 px-4 py-3 my-1 rounded-md text-sm font-medium transition-colors ${
-                            activeView === id
-                                ? 'bg-brand-primary text-white'
-                                : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                        }`}
+        <>
+            {/* Overlay for mobile */}
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden transition-opacity"
+                    onClick={onClose}
+                />
+            )}
+            <aside className={`
+                fixed lg:static inset-y-0 left-0 z-50
+                w-64 bg-background-dark text-white flex flex-col
+                transform transition-transform duration-300 ease-in-out
+                ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+            `}>
+                <div className="p-4 lg:p-6 flex justify-between items-center lg:block">
+                    <div className="text-center flex-1 lg:block">
+                        <h2 className="text-xl lg:text-2xl font-bold text-brand-secondary">ManglarNet</h2>
+                        <p className="text-xs lg:text-sm text-gray-400">Conexión Pedagógica</p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="lg:hidden p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md"
+                        aria-label="Close menu"
                     >
-                        <Icon className="h-5 w-5" />
-                        {label}
-                    </a>
-                ))}
-            </nav>
-        </aside>
+                        <CloseIcon />
+                    </button>
+                </div>
+                <nav className="flex-1 px-2 lg:px-4 overflow-y-auto">
+                    {navLinks.map(({ id, label, icon: Icon }) => (
+                        <a
+                            key={id}
+                            href="#"
+                            onClick={(e) => { e.preventDefault(); handleNavigate(id); }}
+                            className={`flex items-center gap-3 px-3 lg:px-4 py-3 my-1 rounded-md text-sm font-medium transition-colors ${
+                                activeView === id
+                                    ? 'bg-brand-primary text-white'
+                                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                            }`}
+                        >
+                            <Icon className="h-5 w-5 flex-shrink-0" />
+                            <span>{label}</span>
+                        </a>
+                    ))}
+                </nav>
+            </aside>
+        </>
     );
 };
 
@@ -1088,12 +1133,13 @@ const StudentListView: React.FC<{
         <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-text-main">Lista de Alumnos</h2>
-                <button onClick={onAddStudent} className="flex items-center gap-2 bg-brand-primary text-white px-4 py-2 rounded-md hover:bg-opacity-90">
+                <button onClick={onAddStudent} className="flex items-center gap-2 bg-brand-primary text-white px-4 py-2.5 rounded-md hover:bg-opacity-90 text-sm sm:text-base font-medium min-h-[44px]">
                     <PlusIcon />
-                    Añadir Alumno
+                    <span className="hidden sm:inline">Añadir Alumno</span>
+                    <span className="sm:hidden">Añadir</span>
                 </button>
             </div>
-            <div className="flex gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4">
                 <div className="relative flex-grow">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3">
                         <SearchIcon />
@@ -1103,18 +1149,71 @@ const StudentListView: React.FC<{
                         placeholder="Buscar por nombre..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="pl-10 p-2 border border-gray-300 rounded-md w-full"
+                        className="pl-10 p-2.5 border border-gray-300 rounded-md w-full text-base"
                     />
                 </div>
                 <select
                     value={filterGrade}
                     onChange={e => setFilterGrade(e.target.value)}
-                    className="p-2 border border-gray-300 rounded-md"
+                    className="p-2.5 border border-gray-300 rounded-md text-base w-full sm:w-auto"
                 >
                     {grades.map(grade => <option key={grade} value={grade}>{grade === 'all' ? 'Todos los Salones' : grade}</option>)}
                 </select>
             </div>
-            <div className="overflow-x-auto">
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+                {filteredStudents.map(student => (
+                    <div key={student.id_alumno} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                        <div className="flex justify-between items-start mb-3">
+                            <div className="flex-1">
+                                <h3 className="font-semibold text-gray-900 text-lg">{student.nombres} {student.apellidos}</h3>
+                                <p className="text-sm text-gray-500 mt-1">{student.email_alumno}</p>
+                            </div>
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${student.condicion === 'Regular' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                {student.condicion}
+                            </span>
+                        </div>
+                        <div className="space-y-2 mb-4">
+                            <div className="flex items-center text-sm">
+                                <span className="text-gray-600 font-medium w-24">Salón:</span>
+                                <span className="text-gray-900">{student.salon}</span>
+                            </div>
+                            <div className="flex items-center text-sm">
+                                <span className="text-gray-600 font-medium w-24">Cédula:</span>
+                                <span className="text-gray-900">{student.cedula_escolar}</span>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 pt-3 border-t border-gray-200">
+                            <button 
+                                onClick={() => onSelectStudent(student)} 
+                                className="flex-1 px-3 py-2 bg-brand-primary text-white rounded-md hover:bg-opacity-90 text-sm font-medium transition-colors"
+                            >
+                                Ver
+                            </button>
+                            <button 
+                                onClick={() => onEditStudent(student)} 
+                                className="px-3 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 text-sm font-medium transition-colors"
+                            >
+                                <EditIcon />
+                            </button>
+                            <button 
+                                onClick={() => onDeleteStudent(student.id_alumno)} 
+                                className="px-3 py-2 bg-red-50 text-red-700 rounded-md hover:bg-red-100 text-sm font-medium transition-colors"
+                            >
+                                <DeleteIcon />
+                            </button>
+                        </div>
+                    </div>
+                ))}
+                {filteredStudents.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                        No se encontraron alumnos
+                    </div>
+                )}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
@@ -1272,11 +1371,11 @@ const StudentFormModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold">{student ? 'Editar Alumno' : 'Añadir Alumno'}</h2>
-                    <button onClick={onClose}><CloseIcon /></button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-0 sm:p-4">
+            <div className="bg-white rounded-none sm:rounded-lg shadow-xl p-4 sm:p-6 lg:p-8 w-full h-full sm:h-auto sm:max-w-4xl sm:max-h-[90vh] overflow-y-auto flex flex-col">
+                <div className="flex justify-between items-center mb-4 sm:mb-6 flex-shrink-0">
+                    <h2 className="text-xl sm:text-2xl font-bold">{student ? 'Editar Alumno' : 'Añadir Alumno'}</h2>
+                    <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600"><CloseIcon /></button>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Personal Info */}
@@ -1340,9 +1439,9 @@ const StudentFormModal: React.FC<{
                         </div>
                     </div>
                     {/* Actions */}
-                    <div className="flex justify-end gap-4 mt-8 pt-6 border-t">
-                        <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded-md">Cancelar</button>
-                        <button type="submit" className="px-4 py-2 bg-brand-primary text-white rounded-md">Guardar Alumno</button>
+                    <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 sm:mt-8 pt-4 sm:pt-6 border-t flex-shrink-0">
+                        <button type="button" onClick={onClose} className="w-full sm:w-auto px-4 py-2.5 bg-gray-200 rounded-md text-base font-medium">Cancelar</button>
+                        <button type="submit" className="w-full sm:w-auto px-4 py-2.5 bg-brand-primary text-white rounded-md text-base font-medium">Guardar Alumno</button>
                     </div>
                 </form>
             </div>
@@ -1482,19 +1581,19 @@ const TeacherFormModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50" onClick={onClose}>
-            <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-gray-800">{teacher ? 'Editar Docente' : 'Añadir Docente'}</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-0 sm:p-4" onClick={onClose}>
+            <div className="bg-white rounded-none sm:rounded-lg shadow-xl p-4 sm:p-6 lg:p-8 w-full h-full sm:h-auto sm:max-w-3xl sm:max-h-[90vh] overflow-y-auto flex flex-col" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-4 sm:mb-6 flex-shrink-0">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-800">{teacher ? 'Editar Docente' : 'Añadir Docente'}</h2>
                     <button 
                         onClick={onClose} 
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        className="text-gray-400 hover:text-gray-600 transition-colors p-1"
                         disabled={isSubmitting}
                     >
                         <CloseIcon />
                     </button>
                 </div>
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 flex-1 overflow-y-auto">
                     {/* Información Personal */}
                     <div>
                         <h3 className="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Información Personal</h3>
@@ -1654,18 +1753,18 @@ const TeacherFormModal: React.FC<{
                     </div>
 
                     {/* Botones de acción */}
-                    <div className="flex justify-end gap-4 mt-8 pt-6 border-t">
+                    <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 sm:mt-8 pt-4 sm:pt-6 border-t flex-shrink-0">
                         <button 
                             type="button" 
                             onClick={onClose} 
-                            className="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            className="w-full sm:w-auto px-6 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed text-base font-medium"
                             disabled={isSubmitting}
                         >
                             Cancelar
                         </button>
                         <button 
                             type="submit" 
-                            className="px-6 py-2 bg-brand-primary text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="w-full sm:w-auto px-6 py-2.5 bg-brand-primary text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base font-medium"
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? (
@@ -4755,6 +4854,7 @@ const EvaluationView: React.FC<{
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
   const [activeView, setActiveView] = useState('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Data states - loaded from Supabase
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
@@ -5279,17 +5379,24 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-background-light">
-      <Sidebar activeView={activeView} onNavigate={handleNavigate} userRole={currentUser.role} />
-      <main className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex h-screen bg-background-light overflow-hidden">
+      <Sidebar 
+        activeView={activeView} 
+        onNavigate={handleNavigate} 
+        userRole={currentUser.role}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+      />
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
         <Header 
             title={viewTitles[activeView] || 'ManglarNet'} 
             currentUser={currentUser} 
             onLogout={handleLogout} 
             notifications={notifications}
             onNotificationClick={handleNotificationClick}
+            onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
-        <div className="p-6 flex-1 overflow-y-auto">
+        <div className="p-3 sm:p-4 lg:p-6 flex-1 overflow-y-auto">
           {renderView()}
         </div>
       </main>

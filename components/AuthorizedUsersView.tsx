@@ -146,33 +146,75 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Usuarios Autorizados</h2>
-          <p className="text-gray-600 mt-1">Gestiona quién puede acceder al sistema</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Usuarios Autorizados</h2>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">Gestiona quién puede acceder al sistema</p>
         </div>
         <button
           onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-green-600 transition-colors"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-green-600 transition-colors"
         >
           <PlusIcon />
           Agregar Usuario
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
         <div className="mb-4">
           <input
             type="text"
             placeholder="Buscar por correo electrónico..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-base"
           />
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-4">
+          {filteredUsers.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              {searchTerm ? 'No se encontraron usuarios' : 'No hay usuarios autorizados'}
+            </div>
+          ) : (
+            filteredUsers.map((user) => (
+              <div key={user.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900 text-sm">{user.email}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(user.created_at).toLocaleDateString('es-VE')}
+                    </p>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
+                    {roleLabels[user.role]}
+                  </span>
+                </div>
+                <div className="flex gap-2 pt-3 border-t border-gray-200">
+                  <button
+                    onClick={() => handleOpenModal(user)}
+                    className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                  >
+                    <EditIcon />
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleDelete(user.id, user.email)}
+                    className="flex-1 px-3 py-2 bg-red-50 text-red-700 rounded-md hover:bg-red-100 text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                  >
+                    <DeleteIcon />
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
@@ -233,21 +275,21 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="text-xl font-bold text-gray-800">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white rounded-none sm:rounded-lg shadow-xl max-w-md w-full h-full sm:h-auto sm:mx-4 flex flex-col">
+            <div className="flex justify-between items-center p-4 sm:p-6 border-b flex-shrink-0">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-800">
                 {editingUser ? 'Editar Usuario' : 'Agregar Usuario'}
               </h3>
               <button
                 onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 p-1"
               >
                 <CloseIcon />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm">
                   {error}
@@ -288,16 +330,16 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 p-6 border-t">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 p-4 sm:p-6 border-t flex-shrink-0">
               <button
                 onClick={handleCloseModal}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="w-full sm:w-auto px-4 py-2.5 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-base font-medium"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSave}
-                className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-green-600 transition-colors"
+                className="w-full sm:w-auto px-4 py-2.5 bg-brand-primary text-white rounded-lg hover:bg-green-600 transition-colors text-base font-medium"
               >
                 {editingUser ? 'Guardar Cambios' : 'Agregar Usuario'}
               </button>
