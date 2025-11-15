@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { DashboardIcon, StudentsIcon, TeachersIcon, ClassesIcon, PlusIcon, CloseIcon, EditIcon, DeleteIcon, ChevronDownIcon, LogoutIcon, PlanningIcon, GradesIcon, FilterIcon, CalendarIcon, SearchIcon, SpecialSubjectIcon, SparklesIcon, ArrowLeftIcon, UserCircleIcon, AcademicCapIcon, UsersIcon, IdentificationIcon, CakeIcon, LocationMarkerIcon, MailIcon, PhoneIcon, ClipboardCheckIcon, SendIcon, BellIcon, TagIcon, DownloadIcon, EvaluationIcon } from './components/Icons';
+import { DashboardIcon, StudentsIcon, TeachersIcon, ClassesIcon, PlusIcon, CloseIcon, EditIcon, DeleteIcon, ChevronDownIcon, LogoutIcon, PlanningIcon, GradesIcon, FilterIcon, CalendarIcon, SearchIcon, SpecialSubjectIcon, SparklesIcon, ArrowLeftIcon, UserCircleIcon, AcademicCapIcon, UsersIcon, IdentificationIcon, CakeIcon, LocationMarkerIcon, MailIcon, PhoneIcon, ClipboardCheckIcon, SendIcon, BellIcon, TagIcon, DownloadIcon, EvaluationIcon, SaveIcon } from './components/Icons';
 import { getAIPlanSuggestions, getAIEvaluationAnalysis } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
 import { LoginScreen } from './components/LoginScreen';
@@ -2377,6 +2377,8 @@ const ScheduleView: React.FC<{
     const [draggedItem, setDraggedItem] = useState<any>(null);
     const [isEventModalOpen, setEventModalOpen] = useState(false);
     const [eventData, setEventData] = useState<{dia: number, hora: string, desc: string, id: string | null}>({dia: 0, hora: '', desc: '', id: null});
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveMessage, setSaveMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
     const isPrimaryGrade = useMemo(() => {
         const gradeNum = parseInt(selectedGrade.match(/\d+/)?.[0] || '0');
@@ -2544,6 +2546,104 @@ const ScheduleView: React.FC<{
         setEventModalOpen(false);
     }
 
+    const handleSaveSchedule = async () => {
+        if (!currentWeek || !selectedGrade) {
+            setSaveMessage({ type: 'error', text: 'Por favor seleccione un grado y una semana' });
+            setTimeout(() => setSaveMessage(null), 3000);
+            return;
+        }
+
+        setIsSaving(true);
+        setSaveMessage(null);
+
+        try {
+            // Get current horarios for this grade and week from DB
+            const existingHorarios = await horariosService.getByGradeAndWeek(selectedGrade, currentWeek);
+            
+            // Create a map of existing horarios by key (dia_semana-hora_inicio)
+            const existingMap = new Map<string, HorarioDB>();
+            existingHorarios.forEach(h => {
+                const key = `${h.dia_semana}-${h.hora_inicio}`;
+                existingMap.set(key, h);
+            });
+
+            // Get current schedule for this week
+            const currentSchedule = schedules[selectedGrade]?.[currentWeek] || [];
+            
+            // Create a map of new horarios
+            const newHorariosMap = new Map<string, Omit<HorarioDB, 'id_horario' | 'created_at' | 'updated_at'>>();
+            const horariosToCreate: Array<Omit<HorarioDB, 'id_horario' | 'created_at' | 'updated_at'>> = [];
+            const horariosToDelete: string[] = [];
+
+            // Process each item in the current schedule
+            for (const horario of currentSchedule) {
+                const key = `${horario.dia_semana}-${horario.hora_inicio}`;
+                const newHorario = {
+                    grado: selectedGrade,
+                    semana: currentWeek,
+                    id_docente: horario.id_docente,
+                    id_clase: horario.id_clase,
+                    dia_semana: horario.dia_semana,
+                    hora_inicio: horario.hora_inicio,
+                    hora_fin: horario.hora_fin,
+                    evento_descripcion: horario.evento_descripcion
+                };
+                newHorariosMap.set(key, newHorario);
+
+                const existing = existingMap.get(key);
+                if (!existing) {
+                    // New horario to create
+                    horariosToCreate.push(newHorario);
+                } else {
+                    // Check if it needs updating
+                    if (existing.id_docente !== newHorario.id_docente || 
+                        existing.id_clase !== newHorario.id_clase ||
+                        existing.hora_fin !== newHorario.hora_fin ||
+                        existing.evento_descripcion !== newHorario.evento_descripcion) {
+                        await horariosService.update(existing.id_horario, {
+                            id_docente: newHorario.id_docente,
+                            id_clase: newHorario.id_clase,
+                            hora_fin: newHorario.hora_fin,
+                            evento_descripcion: newHorario.evento_descripcion
+                        });
+                    }
+                }
+            }
+
+            // Find horarios to delete (exist in DB but not in new schedule)
+            existingMap.forEach((horario, key) => {
+                if (!newHorariosMap.has(key)) {
+                    horariosToDelete.push(horario.id_horario);
+                }
+            });
+
+            // Delete removed horarios
+            if (horariosToDelete.length > 0) {
+                for (const id of horariosToDelete) {
+                    await horariosService.delete(id);
+                }
+            }
+
+            // Batch insert new horarios
+            if (horariosToCreate.length > 0) {
+                const batchSize = 100;
+                for (let i = 0; i < horariosToCreate.length; i += batchSize) {
+                    const batch = horariosToCreate.slice(i, i + batchSize);
+                    await supabase.from('horarios').insert(batch);
+                }
+            }
+
+            setSaveMessage({ type: 'success', text: `Horarios de la Semana ${currentWeek} guardados exitosamente` });
+            setTimeout(() => setSaveMessage(null), 3000);
+        } catch (error: any) {
+            console.error('Error saving schedule:', error);
+            setSaveMessage({ type: 'error', text: `Error al guardar: ${error.message || 'Error desconocido'}` });
+            setTimeout(() => setSaveMessage(null), 5000);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
         <div className="flex gap-6">
             <div className="flex-grow bg-white p-6 rounded-lg shadow-md">
@@ -2551,17 +2651,54 @@ const ScheduleView: React.FC<{
                      <select value={selectedGrade} onChange={e => setSelectedGrade(e.target.value)} className="p-2 border rounded-md">
                         {allGrades.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
-                    <select
-                        value={currentWeek || ''}
-                        onChange={(e) => setCurrentWeek(e.target.value ? parseInt(e.target.value) : null)}
-                        className="p-2 border border-gray-300 rounded-md shadow-sm min-w-[150px]"
-                    >
-                        <option value="">Elegir Semana</option>
-                        {Array.from({ length: 18 }, (_, i) => i + 1).map(week => (
-                            <option key={week} value={week}>Semana {week}</option>
-                        ))}
-                    </select>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium text-gray-700">Semana:</label>
+                            <select
+                                value={currentWeek || ''}
+                                onChange={(e) => setCurrentWeek(e.target.value ? parseInt(e.target.value) : null)}
+                                className="p-2 border border-gray-300 rounded-md shadow-sm min-w-[150px]"
+                            >
+                                <option value="">Elegir Semana</option>
+                                {Array.from({ length: 18 }, (_, i) => i + 1).map(week => (
+                                    <option key={week} value={week}>Semana {week}</option>
+                                ))}
+                            </select>
+                        </div>
+                        {currentWeek && (
+                            <button
+                                onClick={handleSaveSchedule}
+                                disabled={isSaving}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-sm text-sm font-medium transition-colors ${
+                                    isSaving 
+                                        ? 'bg-gray-400 text-white cursor-not-allowed' 
+                                        : 'bg-brand-primary text-white hover:bg-opacity-90'
+                                }`}
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <span className="animate-spin">⏳</span>
+                                        Guardando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <SaveIcon />
+                                        Guardar Horario
+                                    </>
+                                )}
+                            </button>
+                        )}
+                    </div>
                 </div>
+                {saveMessage && (
+                    <div className={`mb-4 p-3 rounded-md ${
+                        saveMessage.type === 'success' 
+                            ? 'bg-green-100 text-green-800 border border-green-300' 
+                            : 'bg-red-100 text-red-800 border border-red-300'
+                    }`}>
+                        {saveMessage.text}
+                    </div>
+                )}
                 {!currentWeek ? (
                     <div className="text-center py-12 text-gray-500">
                         <p className="text-lg font-medium">Seleccione una semana para ver el horario</p>
