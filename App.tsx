@@ -1104,57 +1104,212 @@ const TeacherFormModal: React.FC<{
     const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
     const [currentSubject, setCurrentSubject] = useState('');
     const [currentGrade, setCurrentGrade] = useState('');
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        // Limpiar error del campo cuando el usuario empiece a escribir
+        if (errors[name]) {
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[name];
+                return newErrors;
+            });
+        }
+    };
+
+    const validateForm = (): boolean => {
+        const newErrors: { [key: string]: string } = {};
+
+        if (!formData.nombres.trim()) {
+            newErrors.nombres = 'Los nombres son requeridos';
+        }
+        if (!formData.apellidos.trim()) {
+            newErrors.apellidos = 'Los apellidos son requeridos';
+        }
+        if (!formData.email.trim()) {
+            newErrors.email = 'El email es requerido';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            newErrors.email = 'El email no es válido';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
     };
 
     const handleAddAssignment = () => {
-        if (currentSubject && currentGrade && !assignments.some(a => a.subject === currentSubject && a.grade === currentGrade)) {
-            setAssignments(prev => [...prev, { subject: currentSubject, grade: currentGrade }]);
-            setCurrentSubject('');
-            setCurrentGrade('');
+        const subjectError = !currentSubject.trim() ? 'Seleccione una asignatura' : '';
+        const gradeError = !currentGrade.trim() ? 'Seleccione un grado' : '';
+        
+        if (subjectError || gradeError) {
+            setErrors(prev => ({
+                ...prev,
+                assignment: subjectError || gradeError
+            }));
+            return;
         }
+
+        // Verificar si ya existe esta combinación
+        if (assignments.some(a => a.subject === currentSubject && a.grade === currentGrade)) {
+            setErrors(prev => ({
+                ...prev,
+                assignment: 'Esta asignatura y grado ya están agregados'
+            }));
+            return;
+        }
+
+        // Agregar la asignatura
+        setAssignments(prev => [...prev, { 
+            subject: currentSubject.trim(), 
+            grade: currentGrade.trim() 
+        }]);
+        setCurrentSubject('');
+        setCurrentGrade('');
+        setErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors.assignment;
+            return newErrors;
+        });
     };
     
     const handleRemoveAssignment = (index: number) => {
         setAssignments(prev => prev.filter((_, i) => i !== index));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const finalTeacherData: Docente = {
-            ...formData,
-            id_docente: teacher?.id_docente || `docente-${Date.now()}`,
-            id_usuario: teacher?.id_usuario || undefined
-        };
-        onSave(finalTeacherData, assignments);
+        
+        // Validar formulario
+        if (!validateForm()) {
+            return;
+        }
+
+        // Validar que haya al menos una asignatura
+        if (assignments.length === 0) {
+            setErrors(prev => ({
+                ...prev,
+                assignment: 'Debe agregar al menos una asignatura y grado'
+            }));
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const finalTeacherData: Docente = {
+                ...formData,
+                id_docente: teacher?.id_docente || `docente-${Date.now()}`,
+                id_usuario: teacher?.id_usuario || undefined
+            };
+            await onSave(finalTeacherData, assignments);
+        } catch (error) {
+            console.error('Error in form submission:', error);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50" onClick={onClose}>
+            <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold">{teacher ? 'Editar Docente' : 'Añadir Docente'}</h2>
-                    <button onClick={onClose}><CloseIcon /></button>
+                    <h2 className="text-2xl font-bold text-gray-800">{teacher ? 'Editar Docente' : 'Añadir Docente'}</h2>
+                    <button 
+                        onClick={onClose} 
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        disabled={isSubmitting}
+                    >
+                        <CloseIcon />
+                    </button>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <InputField label="Nombres" name="nombres" value={formData.nombres} onChange={handleChange} required />
-                        <InputField label="Apellidos" name="apellidos" value={formData.apellidos} onChange={handleChange} required />
-                        <InputField label="Email" name="email" type="email" value={formData.email} onChange={handleChange} required />
-                        <InputField label="Teléfono" name="telefono" value={formData.telefono} onChange={handleChange} />
-                        <InputField label="Especialidad (General)" name="especialidad" value={formData.especialidad} onChange={handleChange} />
+                    {/* Información Personal */}
+                    <div>
+                        <h3 className="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Información Personal</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <InputField 
+                                    label="Nombres" 
+                                    name="nombres" 
+                                    value={formData.nombres} 
+                                    onChange={handleChange} 
+                                    required 
+                                />
+                                {errors.nombres && (
+                                    <p className="mt-1 text-sm text-red-600">{errors.nombres}</p>
+                                )}
+                            </div>
+                            <div>
+                                <InputField 
+                                    label="Apellidos" 
+                                    name="apellidos" 
+                                    value={formData.apellidos} 
+                                    onChange={handleChange} 
+                                    required 
+                                />
+                                {errors.apellidos && (
+                                    <p className="mt-1 text-sm text-red-600">{errors.apellidos}</p>
+                                )}
+                            </div>
+                            <div>
+                                <InputField 
+                                    label="Email" 
+                                    name="email" 
+                                    type="email" 
+                                    value={formData.email} 
+                                    onChange={handleChange} 
+                                    required 
+                                />
+                                {errors.email && (
+                                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                                )}
+                            </div>
+                            <div>
+                                <InputField 
+                                    label="Teléfono" 
+                                    name="telefono" 
+                                    value={formData.telefono} 
+                                    onChange={handleChange} 
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <InputField 
+                                    label="Especialidad (General)" 
+                                    name="especialidad" 
+                                    value={formData.especialidad} 
+                                    onChange={handleChange} 
+                                />
+                            </div>
+                        </div>
                     </div>
                     
+                    {/* Asignaturas y Grados */}
                     <div className="border-t pt-6">
-                         <h3 className="text-lg font-semibold mb-4 text-text-main">Asignaturas y Grados</h3>
-                         <div className="bg-gray-50 p-4 rounded-lg">
+                        <h3 className="text-lg font-semibold mb-4 text-gray-700">Asignaturas y Grados</h3>
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                             <div className="flex flex-wrap items-end gap-4 mb-4">
-                                <div className="flex-grow">
-                                    <label className="block text-sm font-medium text-gray-700">Asignatura</label>
-                                    <select value={currentSubject} onChange={e => setCurrentSubject(e.target.value)} className="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                <div className="flex-grow min-w-[200px]">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Asignatura <span className="text-red-500">*</span>
+                                    </label>
+                                    <select 
+                                        value={currentSubject} 
+                                        onChange={e => {
+                                            setCurrentSubject(e.target.value);
+                                            if (errors.assignment) {
+                                                setErrors(prev => {
+                                                    const newErrors = { ...prev };
+                                                    delete newErrors.assignment;
+                                                    return newErrors;
+                                                });
+                                            }
+                                        }}
+                                        className={`mt-1 block w-full p-2 border rounded-md ${
+                                            errors.assignment ? 'border-red-500' : 'border-gray-300'
+                                        } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                                        disabled={isSubmitting}
+                                    >
                                         <option value="">Seleccione una asignatura</option>
                                         {Object.entries(ASIGNATURAS_POR_NIVEL).map(([nivel, materias]) => (
                                             <optgroup label={nivel} key={nivel}>
@@ -1163,31 +1318,94 @@ const TeacherFormModal: React.FC<{
                                         ))}
                                     </select>
                                 </div>
-                                <div className="flex-grow">
-                                     <label className="block text-sm font-medium text-gray-700">Grado</label>
-                                    <select value={currentGrade} onChange={e => setCurrentGrade(e.target.value)} className="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                <div className="flex-grow min-w-[150px]">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Grado <span className="text-red-500">*</span>
+                                    </label>
+                                    <select 
+                                        value={currentGrade} 
+                                        onChange={e => {
+                                            setCurrentGrade(e.target.value);
+                                            if (errors.assignment) {
+                                                setErrors(prev => {
+                                                    const newErrors = { ...prev };
+                                                    delete newErrors.assignment;
+                                                    return newErrors;
+                                                });
+                                            }
+                                        }}
+                                        className={`mt-1 block w-full p-2 border rounded-md ${
+                                            errors.assignment ? 'border-red-500' : 'border-gray-300'
+                                        } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                                        disabled={isSubmitting}
+                                    >
                                         <option value="">Seleccione un grado</option>
                                         {GRADOS.map(grado => <option key={grado} value={grado}>{grado}</option>)}
                                     </select>
                                 </div>
-                                <button type="button" onClick={handleAddAssignment} className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Añadir</button>
+                                <button 
+                                    type="button" 
+                                    onClick={handleAddAssignment} 
+                                    className="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                    disabled={isSubmitting}
+                                >
+                                    Añadir
+                                </button>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                                {assignments.map((a, index) => (
-                                    <span key={index} className="flex items-center gap-2 bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
-                                        {a.subject} ({a.grade})
-                                        <button type="button" onClick={() => handleRemoveAssignment(index)} className="text-blue-600 hover:text-blue-800">
-                                            <CloseIcon />
-                                        </button>
-                                    </span>
-                                ))}
-                            </div>
-                         </div>
+                            {errors.assignment && (
+                                <p className="mb-3 text-sm text-red-600 bg-red-50 p-2 rounded">{errors.assignment}</p>
+                            )}
+                            {assignments.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {assignments.map((a, index) => (
+                                        <span 
+                                            key={index} 
+                                            className="flex items-center gap-2 bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1.5 rounded-full border border-blue-200"
+                                        >
+                                            <span className="font-semibold">{a.subject}</span>
+                                            <span className="text-blue-600">({a.grade})</span>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => handleRemoveAssignment(index)} 
+                                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                                                disabled={isSubmitting}
+                                                title="Eliminar"
+                                            >
+                                                <CloseIcon />
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-500 italic">No hay asignaturas agregadas. Agregue al menos una asignatura y grado.</p>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="flex justify-end gap-4 mt-8">
-                        <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded-md">Cancelar</button>
-                        <button type="submit" className="px-4 py-2 bg-brand-primary text-white rounded-md">Guardar Cambios</button>
+                    {/* Botones de acción */}
+                    <div className="flex justify-end gap-4 mt-8 pt-6 border-t">
+                        <button 
+                            type="button" 
+                            onClick={onClose} 
+                            className="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            disabled={isSubmitting}
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            type="submit" 
+                            className="px-6 py-2 bg-brand-primary text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <span className="animate-spin">⏳</span>
+                                    Guardando...
+                                </>
+                            ) : (
+                                'Guardar Cambios'
+                            )}
+                        </button>
                     </div>
                 </form>
             </div>
@@ -1303,9 +1521,17 @@ const TeachersView: React.FC<{
                     // Si falla la recarga, al menos actualizar con las clases creadas
                     setClases([...otherTeachersClasses, ...createdClasses]);
                 }
+                
+                // Mostrar mensaje de éxito
+                if (createdClasses.length === newAssignments.length) {
+                    alert(`✅ Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente con ${createdClasses.length} asignatura(s).`);
+                } else if (createdClasses.length > 0) {
+                    alert(`⚠️ Docente ${teacherExists ? 'actualizado' : 'creado'} pero solo ${createdClasses.length} de ${newAssignments.length} asignaturas se guardaron correctamente.`);
+                }
             } else {
                 // Si no hay asignaturas, solo actualizar el estado local
                 setClases(otherTeachersClasses);
+                alert(`✅ Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente. Nota: No se agregaron asignaturas.`);
             }
             
             handleCloseModal();
