@@ -2272,34 +2272,35 @@ const PlanningView: React.FC<{
         )
     };
 
+    // Move useMemo hooks to component level (not inside renderHistoryView)
+    const filteredHistory = useMemo(() => {
+        let plans = [...planificaciones];
+
+        if (currentUser.role === 'docente') {
+            plans = plans.filter(p => p.id_docente === currentUser.docenteId);
+        }
+
+        return plans.filter(p => {
+            const { ano_escolar, lapso, status, grado, id_docente } = historyFilters;
+            if (ano_escolar !== 'all' && p.ano_escolar !== ano_escolar) return false;
+            if (lapso !== 'all' && p.lapso !== lapso) return false;
+            if (status !== 'all' && p.status !== status) return false;
+            if (id_docente !== 'all' && p.id_docente !== id_docente) return false;
+            
+            const clase = clases.find(c => c.id_clase === p.id_clase);
+            if (grado !== 'all' && clase?.grado_asignado !== grado) return false;
+
+            return true;
+        }).sort((a, b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime());
+    }, [planificaciones, historyFilters, currentUser, clases]);
+
+    const uniqueGrades = useMemo(() => [...new Set(clases.map(c => c.grado_asignado))].sort(), [clases]);
+
     const renderHistoryView = () => {
         const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
             const { name, value } = e.target;
             setHistoryFilters(prev => ({ ...prev, [name]: value }));
         };
-
-        const filteredHistory = useMemo(() => {
-            let plans = [...planificaciones];
-
-            if (currentUser.role === 'docente') {
-                plans = plans.filter(p => p.id_docente === currentUser.docenteId);
-            }
-
-            return plans.filter(p => {
-                const { ano_escolar, lapso, status, grado, id_docente } = historyFilters;
-                if (ano_escolar !== 'all' && p.ano_escolar !== ano_escolar) return false;
-                if (lapso !== 'all' && p.lapso !== lapso) return false;
-                if (status !== 'all' && p.status !== status) return false;
-                if (id_docente !== 'all' && p.id_docente !== id_docente) return false;
-                
-                const clase = clases.find(c => c.id_clase === p.id_clase);
-                if (grado !== 'all' && clase?.grado_asignado !== grado) return false;
-
-                return true;
-            }).sort((a, b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime());
-        }, [planificaciones, historyFilters, currentUser, clases]);
-
-        const uniqueGrades = useMemo(() => [...new Set(clases.map(c => c.grado_asignado))].sort(), [clases]);
         const statusStyles: { [key in Planificacion['status']]: string } = {
             Borrador: 'bg-gray-100 text-gray-800', Enviado: 'bg-blue-100 text-blue-800',
             Revisado: 'bg-yellow-100 text-yellow-800', Aprobado: 'bg-green-100 text-green-800',
