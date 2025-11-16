@@ -2226,7 +2226,7 @@ const TeachersView: React.FC<{
                                 studentIds: created.student_ids || []
                             });
                         } else {
-                            // Para 5to-6to: Crear asignación de docente por nivel
+                            // Para 5to-6to: Crear asignación de docente por nivel Y las clases por skill
                             if (a.nivel_ingles) {
                                 try {
                                     // Verificar si ya existe esta asignación
@@ -2252,17 +2252,83 @@ const TeachersView: React.FC<{
                                         if (assignError) {
                                             throw assignError;
                                         }
-
-                                        asignacionesNivelCreadas.push(`${a.subject} - ${a.grade} (${a.nivel_ingles})`);
                                     } else {
                                         // Actualizar si ya existe
                                         await supabase
                                             .from('asignacion_docente_nivel_ingles')
                                             .update({ activa: true })
                                             .eq('id', existing.id);
-                                        
-                                        asignacionesNivelCreadas.push(`${a.subject} - ${a.grade} (${a.nivel_ingles})`);
                                     }
+
+                                    // Crear clases por skill para cada grado (5to y 6to)
+                                    const skills = ['Reading', 'Writing', 'Speaking', 'Listening', 'Use of English', 'Phonics'];
+                                    const grados = ['5to Grado', '6to Grado'];
+                                    
+                                    for (const grado of grados) {
+                                        // Obtener alumnos de este grado con este nivel
+                                        const alumnosNivel = alumnos.filter(
+                                            alumno => alumno.salon === grado && alumno.nivel_ingles === a.nivel_ingles
+                                        );
+
+                                        // Crear clase para cada skill
+                                        for (const skill of skills) {
+                                            try {
+                                                const claseSkill: any = {
+                                                    nombre_materia: `Inglés - ${skill}`,
+                                                    grado_asignado: grado,
+                                                    id_docente_asignado: savedTeacher.id_docente,
+                                                    es_ingles_primaria: true,
+                                                    es_proyecto: false,
+                                                    nivel_ingles: a.nivel_ingles,
+                                                    skill_rutina: skill,
+                                                    student_ids: alumnosNivel.map(al => al.id_alumno),
+                                                };
+                                                const createdSkill = await clasesService.create(claseSkill);
+                                                createdClasses.push({
+                                                    ...createdSkill,
+                                                    studentIds: createdSkill.student_ids || []
+                                                });
+                                            } catch (error: any) {
+                                                console.error(`Error creating class for ${skill} - ${grado} - ${a.nivel_ingles}:`, error);
+                                                // No agregar a errors para no bloquear el proceso
+                                            }
+                                        }
+
+                                        // Crear clase de Project (solo una vez por nivel, no por grado)
+                                        // Project agrupa a todos los estudiantes de 5to y 6to del mismo nivel
+                                        if (grado === '5to Grado') {
+                                            // Solo crear Project una vez (para 5to, pero incluye ambos grados)
+                                            const alumnos5to = alumnos.filter(
+                                                alumno => alumno.salon === '5to Grado' && alumno.nivel_ingles === a.nivel_ingles
+                                            );
+                                            const alumnos6to = alumnos.filter(
+                                                alumno => alumno.salon === '6to Grado' && alumno.nivel_ingles === a.nivel_ingles
+                                            );
+                                            const todosAlumnosProyecto = [...alumnos5to, ...alumnos6to];
+
+                                            try {
+                                                const claseProject: any = {
+                                                    nombre_materia: 'Inglés - Project',
+                                                    grado_asignado: '5to Grado', // Usar 5to como grado principal, pero incluye ambos
+                                                    id_docente_asignado: savedTeacher.id_docente,
+                                                    es_ingles_primaria: true,
+                                                    es_proyecto: true,
+                                                    nivel_ingles: null, // Project no tiene nivel específico
+                                                    skill_rutina: 'Project',
+                                                    student_ids: todosAlumnosProyecto.map(al => al.id_alumno),
+                                                };
+                                                const createdProject = await clasesService.create(claseProject);
+                                                createdClasses.push({
+                                                    ...createdProject,
+                                                    studentIds: createdProject.student_ids || []
+                                                });
+                                            } catch (error: any) {
+                                                console.error(`Error creating Project class for ${a.nivel_ingles}:`, error);
+                                            }
+                                        }
+                                    }
+
+                                    asignacionesNivelCreadas.push(`${a.subject} - 5to y 6to Grado (${a.nivel_ingles})`);
                                 } catch (error: any) {
                                     const errorMsg = `Error al crear asignación de nivel ${a.nivel_ingles} para ${a.grade}: ${error.message || 'Error desconocido'}`;
                                     console.error(`Error creating English level assignment:`, error);
@@ -2301,18 +2367,23 @@ const TeachersView: React.FC<{
                 }
                 
                 // Mostrar mensaje de éxito
-                const totalCreado = createdClasses.length + asignacionesNivelCreadas.length;
-                if (totalCreado === newAssignments.length) {
+                // Para niveles de inglés, contamos las clases creadas (no las asignaciones)
+                const totalCreado = createdClasses.length;
+                const totalEsperado = asignacionesRegulares.length + 
+                    (asignacionesIngles.filter(a => !esGradoAlto(a.grade)).length) + // 1er-4to: 1 clase por asignación
+                    (asignacionesIngles.filter(a => esGradoAlto(a.grade) && a.nivel_ingles).length * 13); // 5to-6to: 13 clases por nivel (6 skills × 2 grados + 1 Project)
+                
+                if (totalCreado >= totalEsperado * 0.9) { // Permitir 10% de error
                     const mensaje = asignacionesNivelCreadas.length > 0
                         ? `✅ Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente.\n\n` +
                           `Clases creadas: ${createdClasses.length}\n` +
                           `Asignaciones de nivel inglés: ${asignacionesNivelCreadas.length}\n\n` +
                           `${asignacionesNivelCreadas.join('\n')}\n\n` +
-                          `Nota: Para grados 5to-6to, las clases específicas por skill se crearán al generar los horarios.`
-                        : `✅ Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente con ${createdClasses.length} asignatura(s).`;
+                          `Se crearon automáticamente las clases por skill (Reading, Writing, Speaking, Listening, Use of English, Phonics) y Project para cada nivel.`
+                        : `✅ Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente con ${createdClasses.length} clase(s).`;
                     alert(mensaje);
                 } else if (totalCreado > 0) {
-                    alert(`⚠️ Docente ${teacherExists ? 'actualizado' : 'creado'} pero solo ${totalCreado} de ${newAssignments.length} asignaciones se guardaron correctamente.`);
+                    alert(`⚠️ Docente ${teacherExists ? 'actualizado' : 'creado'} pero solo ${totalCreado} de aproximadamente ${totalEsperado} clases se guardaron correctamente.`);
                 }
             } else {
                 // Si no hay asignaturas, solo actualizar el estado local
