@@ -3476,12 +3476,10 @@ const ScheduleView: React.FC<{
                                                                         <div className="text-[10px] space-y-0.5">
                                                                             {englishGroup.map((h) => {
                                                                                 const c = clases.find(cl => cl.id_clase === h.id_clase);
-                                                                                const d = docentes.find(doc => doc.id_docente === h.id_docente);
                                                                                 const aula = aulas.find(a => a.id_aula === h.id_aula);
                                                                                 return (
                                                                                     <div key={h.id_clase} className="text-gray-700 border-b border-gray-300 pb-0.5 last:border-0">
-                                                                                        <span className="font-semibold">{c?.nivel_ingles}:</span>{' '}
-                                                                                        {d ? `${d.nombres} ${d.apellidos}` : 'N/A'}
+                                                                                        <span className="font-semibold">{c?.nivel_ingles}</span>
                                                                                         {aula && <span className="text-gray-500"> - {aula.nombre}</span>}
                                                                                     </div>
                                                                                 );
