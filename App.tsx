@@ -837,6 +837,9 @@ const Sidebar: React.FC<{
     isOpen: boolean;
     onClose: () => void;
 }> = ({ activeView, onNavigate, userRole, isOpen, onClose }) => {
+    // Normalizar el rol a minúsculas para comparación
+    const normalizedRole = userRole?.toLowerCase() as UserRole;
+    
     const navLinks = [
         { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon, roles: ['directivo', 'coordinador', 'docente', 'administrativo'] },
         { id: 'students', label: 'Alumnos', icon: StudentsIcon, roles: ['directivo', 'coordinador', 'administrativo'] },
@@ -849,7 +852,24 @@ const Sidebar: React.FC<{
         { id: 'evaluation', label: 'Evaluación', icon: EvaluationIcon, roles: ['directivo', 'coordinador'] },
         { id: 'authorized-users', label: 'Usuarios Autorizados', icon: UsersIcon, roles: ['directivo'] },
         { id: 'lapsos-admin', label: 'Gestión de Lapsos', icon: CalendarIcon, roles: ['coordinador', 'directivo'] },
-    ].filter(link => link.roles.includes(userRole));
+    ];
+    
+    // Debug: verificar el rol y los links
+    console.log('Sidebar - userRole recibido:', userRole, 'normalizedRole:', normalizedRole);
+    console.log('Sidebar - Todos los navLinks antes del filtro:', navLinks.map(l => ({ id: l.id, label: l.label, roles: l.roles })));
+    
+    const filteredLinks = navLinks.filter(link => {
+        const hasAccess = link.roles.some(role => role.toLowerCase() === normalizedRole);
+        // Debug: solo para lapsos-admin
+        if (link.id === 'lapsos-admin') {
+            console.log('Lapsos Admin - userRole:', userRole, 'normalizedRole:', normalizedRole, 'link.roles:', link.roles, 'hasAccess:', hasAccess);
+        }
+        return hasAccess;
+    });
+    
+    console.log('Sidebar - Links filtrados:', filteredLinks.map(l => ({ id: l.id, label: l.label })));
+    
+    const navLinksToRender = filteredLinks;
 
     const handleNavigate = (view: string) => {
         onNavigate(view);
@@ -885,7 +905,7 @@ const Sidebar: React.FC<{
                     </button>
                 </div>
                 <nav className="flex-1 px-2 lg:px-4 overflow-y-auto">
-                    {navLinks.map(({ id, label, icon: Icon }) => (
+                    {navLinksToRender.map(({ id, label, icon: Icon }) => (
                         <a
                             key={id}
                             href="#"
