@@ -123,6 +123,7 @@ interface Horario {
   id_horario: string;
   id_docente: string | null; // Can be null for events
   id_clase: string | null; // Can be null for events
+  id_aula?: string | null; // Aula/salón asignado
   dia_semana: number; // 1: Lunes, 2: Martes, ..., 5: Viernes
   hora_inicio: string; // e.g., "08:00"
   hora_fin: string; // e.g., "09:00"
@@ -3541,6 +3542,7 @@ const ScheduleView: React.FC<{
                 id_horario: `h-${selectedGrade.replace(/\s+/g, '-')}-${currentWeek}-${day}-${hora_inicio.replace(':', '')}-${draggedItem.id}`,
                 id_docente: isConsolidatedEnglish ? null : draggedItem.docenteId, // null para clases consolidadas
                 id_clase: draggedItem.id,
+                id_aula: clase?.id_aula || null, // Incluir aula de la clase
                 dia_semana: day,
                 hora_inicio: hora_inicio,
                 hora_fin: hora_fin,
@@ -3691,29 +3693,39 @@ const ScheduleView: React.FC<{
             // Get current horarios for this grade and week from DB
             const existingHorarios = await horariosService.getByGradeAndWeek(selectedGrade, currentWeek);
             
-            // Create a map of existing horarios by key (dia_semana-hora_inicio)
+            // Create a map of existing horarios by key (dia_semana-hora_inicio-id_clase o evento_descripcion)
+            // Usar una clave más específica para evitar conflictos
             const existingMap = new Map<string, HorarioDB>();
             existingHorarios.forEach(h => {
-                const key = `${h.dia_semana}-${h.hora_inicio}`;
+                // Para eventos, usar evento_descripcion como parte de la clave
+                // Para clases, usar id_clase
+                const key = h.evento_descripcion 
+                    ? `${h.dia_semana}-${h.hora_inicio}-event-${h.evento_descripcion}`
+                    : `${h.dia_semana}-${h.hora_inicio}-class-${h.id_clase || 'null'}`;
                 existingMap.set(key, h);
             });
 
             // Get current schedule for this week
             const currentSchedule = schedules[selectedGrade]?.[currentWeek] || [];
             
-            // Create a map of new horarios
+            // Create a map of new horarios con la misma clave
             const newHorariosMap = new Map<string, Omit<HorarioDB, 'id_horario' | 'created_at' | 'updated_at'>>();
             const horariosToCreate: Array<Omit<HorarioDB, 'id_horario' | 'created_at' | 'updated_at'>> = [];
             const horariosToDelete: string[] = [];
 
             // Process each item in the current schedule
             for (const horario of currentSchedule) {
-                const key = `${horario.dia_semana}-${horario.hora_inicio}`;
+                // Usar la misma lógica de clave
+                const key = horario.evento_descripcion 
+                    ? `${horario.dia_semana}-${horario.hora_inicio}-event-${horario.evento_descripcion}`
+                    : `${horario.dia_semana}-${horario.hora_inicio}-class-${horario.id_clase || 'null'}`;
+                
                 const newHorario = {
                     grado: selectedGrade,
                     semana: currentWeek,
                     id_docente: horario.id_docente,
                     id_clase: horario.id_clase,
+                    id_aula: horario.id_aula || null, // Incluir aula al guardar
                     dia_semana: horario.dia_semana,
                     hora_inicio: horario.hora_inicio,
                     hora_fin: horario.hora_fin,
@@ -3729,11 +3741,13 @@ const ScheduleView: React.FC<{
                     // Check if it needs updating
                     if (existing.id_docente !== newHorario.id_docente || 
                         existing.id_clase !== newHorario.id_clase ||
+                        existing.id_aula !== newHorario.id_aula ||
                         existing.hora_fin !== newHorario.hora_fin ||
                         existing.evento_descripcion !== newHorario.evento_descripcion) {
                         await horariosService.update(existing.id_horario, {
                             id_docente: newHorario.id_docente,
                             id_clase: newHorario.id_clase,
+                            id_aula: newHorario.id_aula,
                             hora_fin: newHorario.hora_fin,
                             evento_descripcion: newHorario.evento_descripcion
                         });
@@ -3760,9 +3774,34 @@ const ScheduleView: React.FC<{
                 const batchSize = 100;
                 for (let i = 0; i < horariosToCreate.length; i += batchSize) {
                     const batch = horariosToCreate.slice(i, i + batchSize);
-                    await supabase.from('horarios').insert(batch);
+                    const { error: insertError } = await supabase.from('horarios').insert(batch);
+                    if (insertError) {
+                        throw new Error(`Error al insertar horarios: ${insertError.message}`);
+                    }
                 }
             }
+
+            // Recargar horarios desde la base de datos para asegurar consistencia
+            const reloadedHorarios = await horariosService.getByGradeAndWeek(selectedGrade, currentWeek);
+            const reloadedSchedulesMap: WeeklySchedules = {};
+            if (!reloadedSchedulesMap[selectedGrade]) {
+                reloadedSchedulesMap[selectedGrade] = {};
+            }
+            if (!reloadedSchedulesMap[selectedGrade][currentWeek]) {
+                reloadedSchedulesMap[selectedGrade][currentWeek] = [];
+            }
+            reloadedHorarios.forEach(h => {
+                reloadedSchedulesMap[selectedGrade][currentWeek].push(convertHorario(h));
+            });
+            
+            // Actualizar el estado con los horarios recargados
+            setSchedules(prev => ({
+                ...prev,
+                [selectedGrade]: {
+                    ...prev[selectedGrade],
+                    [currentWeek]: reloadedSchedulesMap[selectedGrade][currentWeek]
+                }
+            }));
 
             setSaveMessage({ type: 'success', text: `Horarios de la Semana ${currentWeek} guardados exitosamente` });
             setTimeout(() => setSaveMessage(null), 3000);
@@ -3984,18 +4023,20 @@ const ScheduleView: React.FC<{
                                                         >
                                                         {(clase => {
                                                             const docente = docentes.find(d => d.id_docente === item.id_docente);
-                                                            const aula = clase?.id_aula ? aulas.find(a => a.id_aula === clase.id_aula) : undefined;
+                                                            // Priorizar aula del horario, si no tiene, usar la de la clase
+                                                            const aulaId = item.id_aula || clase?.id_aula;
+                                                            const aula = aulaId ? aulas.find(a => a.id_aula === aulaId) : undefined;
                                                             
                                                             return (
                                                                 <div className="p-2 rounded-md h-full" style={{backgroundColor: subjectColors[clase?.nombre_materia || 'default'] || getSubjectColor(clase?.nombre_materia || '')}}>
-                                                                    <div className="font-bold text-sm">{clase?.nombre_materia}</div>
+                                                                    <div className="font-bold text-xs">{clase?.nombre_materia}</div>
                                                                     {docente && (
-                                                                        <div className="text-gray-600 text-xs mt-0.5">
+                                                                        <div className="text-gray-700 text-[10px] mt-0.5 font-semibold">
                                                                             {docente.nombres.split(' ')[0]} {docente.apellidos.split(' ')[0]}
                                                                         </div>
                                                                     )}
                                                                     {aula && (
-                                                                        <div className="text-gray-500 text-xs mt-0.5">
+                                                                        <div className="text-gray-600 text-[10px] mt-0.5">
                                                                             📍 {aula.nombre}
                                                                         </div>
                                                                     )}
@@ -6457,11 +6498,14 @@ const App: React.FC = () => {
     };
   };
 
-  const convertHorario = (db: HorarioDB): Horario => {
+  const convertHorario = (db: any): Horario => {
     // HorarioDB has grado and semana, but Horario interface doesn't
     // These are handled separately in WeeklySchedules structure
     const { created_at, updated_at, grado, semana, ...horario } = db;
-    return horario as Horario;
+    return {
+      ...horario,
+      id_aula: horario.id_aula || null // Asegurar que id_aula se preserve
+    } as Horario;
   };
 
   // Helper to convert App types to DB types for saving
