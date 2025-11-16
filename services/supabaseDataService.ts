@@ -77,6 +77,7 @@ export interface Horario {
   id_horario: string;
   id_docente: string | null;
   id_clase: string | null;
+  id_aula?: string | null; // Nueva columna para aula
   grado: string;
   semana: number;
   dia_semana: number;
@@ -128,6 +129,111 @@ export interface Notification {
     params?: any;
   } | string; // Can be JSON string or object
   created_at?: string;
+}
+
+// ============================================
+// SCHEDULE OPTIMIZER TYPES
+// ============================================
+
+export interface Aula {
+  id_aula: string;
+  nombre: string;
+  tipo_aula: 'Aula Regular' | 'Laboratorio' | 'Sala de Computación' | 'Gimnasio' | 'Biblioteca' | 'Auditorio' | 'Taller';
+  capacidad: number;
+  equipamiento: Record<string, any>;
+  activa: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DocenteMateria {
+  id: string;
+  id_docente: string;
+  nombre_materia: string;
+  nivel_prioridad: 1 | 2 | 3; // 1 = puede dar, 2 = prefiere, 3 = especialidad
+  created_at?: string;
+}
+
+export interface ClaseRequisito {
+  id: string;
+  id_clase: string;
+  tipo_aula_requerida?: string;
+  id_aula_especifica?: string;
+  equipamiento_requerido: Record<string, any>;
+  max_alumnos?: number;
+  created_at?: string;
+}
+
+export interface ConfiguracionHorario {
+  id: string;
+  ano_escolar: string;
+  bloques_horarios: Array<{
+    inicio: string;
+    fin: string;
+    nombre: string;
+  }>;
+  dias_semana: string[];
+  semanas_totales: number;
+  activa: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RestriccionDura {
+  id: string;
+  tipo: 'docente_no_disponible' | 'aula_no_disponible' | 'clase_fija' | 
+        'docente_max_horas_dia' | 'docente_min_horas_dia' | 'grado_no_disponible' |
+        'docente_max_horas_semana' | 'docente_min_horas_semana';
+  id_docente?: string;
+  id_clase?: string;
+  id_aula?: string;
+  grado?: string;
+  dia_semana?: number; // 1-5
+  hora_inicio?: string;
+  hora_fin?: string;
+  valor?: number; // Para max/min horas
+  activa: boolean;
+  ano_escolar: string;
+  descripcion?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RestriccionSuave {
+  id: string;
+  tipo: 'docente_preferencia_horario' | 'docente_preferencia_dia' | 
+        'materia_preferencia_orden' | 'docente_agrupar_horas' | 
+        'materia_preferencia_horario' | 'docente_evitar_huecos';
+  id_docente?: string;
+  id_clase?: string;
+  nombre_materia?: string;
+  dia_semana?: number; // 1-5
+  hora_inicio?: string;
+  hora_fin?: string;
+  preferencia?: 'prefiere' | 'evita';
+  peso: number; // 1-10
+  relacion_materia?: string;
+  activa: boolean;
+  ano_escolar: string;
+  descripcion?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GeneracionHorario {
+  id: string;
+  ano_escolar: string;
+  semana: number;
+  estado: 'generando' | 'completado' | 'fallido' | 'aplicado' | 'cancelado';
+  configuracion: Record<string, any>;
+  resultado?: Record<string, any>;
+  errores?: string[];
+  advertencias?: string[];
+  tiempo_ejecucion_ms?: number;
+  estadisticas?: Record<string, any>;
+  creado_por?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ============================================
@@ -542,11 +648,236 @@ export const notificacionesService = {
       link_to: typeof data.link_to === 'string' ? JSON.parse(data.link_to) : data.link_to
     };
   },
+};
 
-  async update(id: string, updates: Partial<Notification>): Promise<Notification> {
+// ============================================
+// AULAS (Classrooms)
+// ============================================
+
+export const aulasService = {
+  async getAll(): Promise<Aula[]> {
     const { data, error } = await supabase
-      .from('notificaciones')
-      .update(updates)
+      .from('aulas')
+      .select('*')
+      .order('nombre', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getById(id: string): Promise<Aula | null> {
+    const { data, error } = await supabase
+      .from('aulas')
+      .select('*')
+      .eq('id_aula', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async create(aula: Omit<Aula, 'id_aula' | 'created_at' | 'updated_at'>): Promise<Aula> {
+    const { data, error } = await supabase
+      .from('aulas')
+      .insert([aula])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, aula: Partial<Omit<Aula, 'id_aula' | 'created_at' | 'updated_at'>>): Promise<Aula> {
+    const { data, error } = await supabase
+      .from('aulas')
+      .update(aula)
+      .eq('id_aula', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('aulas')
+      .delete()
+      .eq('id_aula', id);
+    
+    if (error) throw error;
+  }
+};
+
+// ============================================
+// DOCENTE_MATERIAS (Teacher Subject Capabilities)
+// ============================================
+
+export const docenteMateriasService = {
+  async getByDocente(idDocente: string): Promise<DocenteMateria[]> {
+    const { data, error } = await supabase
+      .from('docente_materias')
+      .select('*')
+      .eq('id_docente', idDocente)
+      .order('nivel_prioridad', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(docenteMateria: Omit<DocenteMateria, 'id' | 'created_at'>): Promise<DocenteMateria> {
+    const { data, error } = await supabase
+      .from('docente_materias')
+      .insert([docenteMateria])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('docente_materias')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+};
+
+// ============================================
+// CLASE_REQUISITOS (Class Requirements)
+// ============================================
+
+export const claseRequisitosService = {
+  async getByClase(idClase: string): Promise<ClaseRequisito | null> {
+    const { data, error } = await supabase
+      .from('clase_requisitos')
+      .select('*')
+      .eq('id_clase', idClase)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
+    return data || null;
+  },
+
+  async createOrUpdate(requisito: Omit<ClaseRequisito, 'id' | 'created_at'>): Promise<ClaseRequisito> {
+    // Check if exists
+    const existing = await this.getByClase(requisito.id_clase);
+    
+    if (existing) {
+      const { data, error } = await supabase
+        .from('clase_requisitos')
+        .update(requisito)
+        .eq('id', existing.id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    } else {
+      const { data, error } = await supabase
+        .from('clase_requisitos')
+        .insert([requisito])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    }
+  },
+
+  async delete(idClase: string): Promise<void> {
+    const { error } = await supabase
+      .from('clase_requisitos')
+      .delete()
+      .eq('id_clase', idClase);
+    
+    if (error) throw error;
+  }
+};
+
+// ============================================
+// CONFIGURACION_HORARIOS (Schedule Configuration)
+// ============================================
+
+export const configuracionHorariosService = {
+  async getActive(anoEscolar: string): Promise<ConfiguracionHorario | null> {
+    const { data, error } = await supabase
+      .from('configuracion_horarios')
+      .select('*')
+      .eq('ano_escolar', anoEscolar)
+      .eq('activa', true)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') throw error;
+    return data || null;
+  },
+
+  async create(config: Omit<ConfiguracionHorario, 'id' | 'created_at' | 'updated_at'>): Promise<ConfiguracionHorario> {
+    // Deactivate other configs for the same year
+    await supabase
+      .from('configuracion_horarios')
+      .update({ activa: false })
+      .eq('ano_escolar', config.ano_escolar)
+      .eq('activa', true);
+
+    const { data, error } = await supabase
+      .from('configuracion_horarios')
+      .insert([config])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, config: Partial<Omit<ConfiguracionHorario, 'id' | 'created_at' | 'updated_at'>>): Promise<ConfiguracionHorario> {
+    const { data, error } = await supabase
+      .from('configuracion_horarios')
+      .update(config)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+};
+
+// ============================================
+// RESTRICCIONES_DURAS (Hard Constraints)
+// ============================================
+
+export const restriccionesDurasService = {
+  async getByAnoEscolar(anoEscolar: string): Promise<RestriccionDura[]> {
+    const { data, error } = await supabase
+      .from('restricciones_duras')
+      .select('*')
+      .eq('ano_escolar', anoEscolar)
+      .eq('activa', true)
+      .order('tipo', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(restriccion: Omit<RestriccionDura, 'id' | 'created_at' | 'updated_at'>): Promise<RestriccionDura> {
+    const { data, error } = await supabase
+      .from('restricciones_duras')
+      .insert([restriccion])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, restriccion: Partial<Omit<RestriccionDura, 'id' | 'created_at' | 'updated_at'>>): Promise<RestriccionDura> {
+    const { data, error } = await supabase
+      .from('restricciones_duras')
+      .update(restriccion)
       .eq('id', id)
       .select()
       .single();
@@ -555,22 +886,114 @@ export const notificacionesService = {
     return data;
   },
 
-  async markAsRead(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('notificaciones')
-      .update({ is_read: true })
-      .eq('id', id);
-    
-    if (error) throw error;
-  },
-
   async delete(id: string): Promise<void> {
     const { error } = await supabase
-      .from('notificaciones')
+      .from('restricciones_duras')
       .delete()
       .eq('id', id);
     
     if (error) throw error;
+  }
+};
+
+// ============================================
+// RESTRICCIONES_SUAVES (Soft Constraints)
+// ============================================
+
+export const restriccionesSuavesService = {
+  async getByAnoEscolar(anoEscolar: string): Promise<RestriccionSuave[]> {
+    const { data, error } = await supabase
+      .from('restricciones_suaves')
+      .select('*')
+      .eq('ano_escolar', anoEscolar)
+      .eq('activa', true)
+      .order('peso', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(restriccion: Omit<RestriccionSuave, 'id' | 'created_at' | 'updated_at'>): Promise<RestriccionSuave> {
+    const { data, error } = await supabase
+      .from('restricciones_suaves')
+      .insert([restriccion])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, restriccion: Partial<Omit<RestriccionSuave, 'id' | 'created_at' | 'updated_at'>>): Promise<RestriccionSuave> {
+    const { data, error } = await supabase
+      .from('restricciones_suaves')
+      .update(restriccion)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('restricciones_suaves')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+};
+
+// ============================================
+// GENERACIONES_HORARIOS (Schedule Generation History)
+// ============================================
+
+export const generacionesHorariosService = {
+  async getByAnoEscolar(anoEscolar: string): Promise<GeneracionHorario[]> {
+    const { data, error } = await supabase
+      .from('generaciones_horarios')
+      .select('*')
+      .eq('ano_escolar', anoEscolar)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(generacion: Omit<GeneracionHorario, 'id' | 'created_at' | 'updated_at'>): Promise<GeneracionHorario> {
+    const { data, error } = await supabase
+      .from('generaciones_horarios')
+      .insert([generacion])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, generacion: Partial<Omit<GeneracionHorario, 'id' | 'created_at' | 'updated_at'>>): Promise<GeneracionHorario> {
+    const { data, error } = await supabase
+      .from('generaciones_horarios')
+      .update(generacion)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getById(id: string): Promise<GeneracionHorario | null> {
+    const { data, error } = await supabase
+      .from('generaciones_horarios')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') throw error;
+    return data || null;
   }
 };
 
