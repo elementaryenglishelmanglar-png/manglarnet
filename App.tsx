@@ -1516,6 +1516,24 @@ const TeacherFormModal: React.FC<{
         return grade === '5to Grado' || grade === '6to Grado';
     };
 
+    const esNivelIngles = (subject: string): boolean => {
+        const lowerSubject = subject.toLowerCase();
+        return lowerSubject.includes('inglés basic') || 
+               lowerSubject.includes('inglés lower') || 
+               lowerSubject.includes('inglés upper') ||
+               lowerSubject.includes('ingles basic') || 
+               lowerSubject.includes('ingles lower') || 
+               lowerSubject.includes('ingles upper');
+    };
+
+    const extraerNivelDeMateria = (subject: string): string | null => {
+        const lowerSubject = subject.toLowerCase();
+        if (lowerSubject.includes('basic')) return 'Basic';
+        if (lowerSubject.includes('lower')) return 'Lower';
+        if (lowerSubject.includes('upper')) return 'Upper';
+        return null;
+    };
+
     const requiereNivelIngles = (subject: string, grade: string): boolean => {
         return esInglesPrimaria(subject) && esGradoAlto(grade);
     };
@@ -1602,71 +1620,125 @@ const TeacherFormModal: React.FC<{
 
     const handleAddAssignment = () => {
         const subjectError = !currentSubject.trim() ? 'Seleccione una asignatura' : '';
-        const gradeError = !currentGrade.trim() ? 'Seleccione un grado' : '';
         
-        if (subjectError || gradeError) {
-            setErrors(prev => ({
-                ...prev,
-                assignment: subjectError || gradeError
-            }));
-            return;
-        }
-
-        // Validación especial para inglés en 5to-6to
-        if (requiereNivelIngles(currentSubject, currentGrade)) {
-            if (!currentNivelIngles || currentNivelIngles === '') {
+        // Si es un nivel de inglés, no requiere selección de grado manual
+        if (!esNivelIngles(currentSubject)) {
+            const gradeError = !currentGrade.trim() ? 'Seleccione un grado' : '';
+            if (subjectError || gradeError) {
                 setErrors(prev => ({
                     ...prev,
-                    assignment: 'Para inglés en 5to y 6to grado, debe seleccionar un nivel'
+                    assignment: subjectError || gradeError
                 }));
                 return;
             }
         }
 
-        // Validar asignación de inglés
-        const validacion = validarAsignacionIngles(
-            currentSubject, 
-            currentGrade, 
-            currentNivelIngles,
-            assignments
-        );
-        
-        if (!validacion.valida) {
-            setErrors(prev => ({
-                ...prev,
-                assignment: validacion.error || 'Error en la asignación'
-            }));
-            return;
+        // Si es un nivel de inglés, extraer el nivel y agregar ambos grados automáticamente
+        if (esNivelIngles(currentSubject)) {
+            const nivel = extraerNivelDeMateria(currentSubject);
+            if (!nivel) {
+                setErrors(prev => ({
+                    ...prev,
+                    assignment: 'Error al detectar el nivel de inglés'
+                }));
+                return;
+            }
+
+            // Validar que no exista este nivel ya asignado
+            // Buscar por "Inglés" como subject y nivel_ingles
+            const existeNivel5to = assignments.some(a => 
+                (a.subject === 'Inglés' || a.subject === currentSubject) && 
+                a.grade === '5to Grado' && 
+                a.nivel_ingles === nivel
+            );
+            const existeNivel6to = assignments.some(a => 
+                (a.subject === 'Inglés' || a.subject === currentSubject) && 
+                a.grade === '6to Grado' && 
+                a.nivel_ingles === nivel
+            );
+
+            if (existeNivel5to || existeNivel6to) {
+                setErrors(prev => ({
+                    ...prev,
+                    assignment: `Ya existe un docente asignado al nivel ${nivel} para 5to o 6to grado`
+                }));
+                return;
+            }
+
+            // Agregar ambos grados automáticamente
+            // Usar "Inglés" como subject base y el nivel en nivel_ingles
+            setAssignments(prev => [...prev, 
+                { 
+                    subject: 'Inglés', 
+                    grade: '5to Grado',
+                    nivel_ingles: nivel
+                },
+                { 
+                    subject: 'Inglés', 
+                    grade: '6to Grado',
+                    nivel_ingles: nivel
+                }
+            ]);
+        } else {
+            // Para inglés regular (1er-4to) o otras materias
+            // Validación especial para inglés en 5to-6to
+            if (requiereNivelIngles(currentSubject, currentGrade)) {
+                if (!currentNivelIngles || currentNivelIngles === '') {
+                    setErrors(prev => ({
+                        ...prev,
+                        assignment: 'Para inglés en 5to y 6to grado, debe seleccionar un nivel'
+                    }));
+                    return;
+                }
+            }
+
+            // Validar asignación de inglés
+            const validacion = validarAsignacionIngles(
+                currentSubject, 
+                currentGrade, 
+                currentNivelIngles,
+                assignments
+            );
+            
+            if (!validacion.valida) {
+                setErrors(prev => ({
+                    ...prev,
+                    assignment: validacion.error || 'Error en la asignación'
+                }));
+                return;
+            }
+
+            // Verificar si ya existe esta combinación (considerando nivel para inglés en 5to-6to)
+            const exists = requiereNivelIngles(currentSubject, currentGrade)
+                ? assignments.some(a => 
+                    a.subject === currentSubject && 
+                    a.grade === currentGrade && 
+                    a.nivel_ingles === currentNivelIngles
+                  )
+                : assignments.some(a => 
+                    a.subject === currentSubject && 
+                    a.grade === currentGrade
+                  );
+
+            if (exists) {
+                setErrors(prev => ({
+                    ...prev,
+                    assignment: 'Esta asignación ya está agregada'
+                }));
+                return;
+            }
+
+            // Agregar la asignatura normal
+            setAssignments(prev => [...prev, { 
+                subject: currentSubject.trim(), 
+                grade: currentGrade.trim(),
+                nivel_ingles: requiereNivelIngles(currentSubject, currentGrade) 
+                    ? currentNivelIngles 
+                    : undefined
+            }]);
         }
 
-        // Verificar si ya existe esta combinación (considerando nivel para inglés en 5to-6to)
-        const exists = requiereNivelIngles(currentSubject, currentGrade)
-            ? assignments.some(a => 
-                a.subject === currentSubject && 
-                a.grade === currentGrade && 
-                a.nivel_ingles === currentNivelIngles
-              )
-            : assignments.some(a => 
-                a.subject === currentSubject && 
-                a.grade === currentGrade
-              );
-
-        if (exists) {
-            setErrors(prev => ({
-                ...prev,
-                assignment: 'Esta asignación ya está agregada'
-            }));
-            return;
-        }
-
-        // Agregar la asignatura
-        setAssignments(prev => [...prev, { 
-            subject: currentSubject.trim(), 
-            grade: currentGrade.trim(),
-            nivel_ingles: requiereNivelIngles(currentSubject, currentGrade) 
-                ? currentNivelIngles 
-                : undefined
-        }]);
+        // Limpiar campos
         setCurrentSubject('');
         setCurrentGrade('');
         setCurrentNivelIngles('');
@@ -1778,11 +1850,17 @@ const TeacherFormModal: React.FC<{
                             </div>
                             <div className="md:col-span-2">
                                 <InputField 
-                                    label="Especialidad (General)" 
+                                    label="Especialidad" 
                                     name="especialidad" 
                                     value={formData.especialidad} 
-                                    onChange={handleChange} 
-                                />
+                                    onChange={handleChange}
+                                    as="select"
+                                >
+                                    <option value="">Seleccione una especialidad</option>
+                                    <option value="Docente Guía">Docente Guía</option>
+                                    <option value="Teacher">Teacher</option>
+                                    <option value="Especialista">Especialista</option>
+                                </InputField>
                             </div>
                         </div>
                     </div>
@@ -1799,11 +1877,20 @@ const TeacherFormModal: React.FC<{
                                     <select 
                                         value={currentSubject} 
                                         onChange={e => {
-                                            setCurrentSubject(e.target.value);
-                                            // Reset nivel if subject changes and it's not inglés in 5to-6to
-                                            if (!requiereNivelIngles(e.target.value, currentGrade)) {
+                                            const selectedSubject = e.target.value;
+                                            setCurrentSubject(selectedSubject);
+                                            
+                                            // Si es un nivel de inglés, extraer el nivel y auto-seleccionar grados
+                                            if (esNivelIngles(selectedSubject)) {
+                                                const nivel = extraerNivelDeMateria(selectedSubject);
+                                                if (nivel) {
+                                                    setCurrentNivelIngles(nivel);
+                                                    // Auto-seleccionar ambos grados (se hará en handleAddAssignment)
+                                                }
+                                            } else {
                                                 setCurrentNivelIngles('');
                                             }
+                                            
                                             if (errors.assignment) {
                                                 setErrors(prev => {
                                                     const newErrors = { ...prev };
@@ -1818,51 +1905,27 @@ const TeacherFormModal: React.FC<{
                                         disabled={isSubmitting}
                                     >
                                         <option value="">Seleccione una asignatura</option>
-                                        {Object.entries(ASIGNATURAS_POR_NIVEL).map(([nivel, materias]) => (
-                                            <optgroup label={nivel} key={nivel}>
-                                                {materias.map(materia => <option key={materia} value={materia}>{materia}</option>)}
-                                            </optgroup>
-                                        ))}
+                                        <optgroup label="Inglés">
+                                            <option value="Inglés">Inglés</option>
+                                            <option value="Inglés Basic">Inglés Basic</option>
+                                            <option value="Inglés Lower">Inglés Lower</option>
+                                            <option value="Inglés Upper">Inglés Upper</option>
+                                        </optgroup>
                                     </select>
                                 </div>
-                                <div className="flex-grow min-w-[150px]">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Grado <span className="text-red-500">*</span>
-                                    </label>
-                                    <select 
-                                        value={currentGrade} 
-                                        onChange={e => {
-                                            setCurrentGrade(e.target.value);
-                                            // Reset nivel if grade changes and it's not 5to-6to
-                                            if (!esGradoAlto(e.target.value) || !esInglesPrimaria(currentSubject)) {
-                                                setCurrentNivelIngles('');
-                                            }
-                                            if (errors.assignment) {
-                                                setErrors(prev => {
-                                                    const newErrors = { ...prev };
-                                                    delete newErrors.assignment;
-                                                    return newErrors;
-                                                });
-                                            }
-                                        }}
-                                        className={`mt-1 block w-full p-2 border rounded-md ${
-                                            errors.assignment ? 'border-red-500' : 'border-gray-300'
-                                        } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                                        disabled={isSubmitting}
-                                    >
-                                        <option value="">Seleccione un grado</option>
-                                        {GRADOS.map(grado => <option key={grado} value={grado}>{grado}</option>)}
-                                    </select>
-                                </div>
-                                {requiereNivelIngles(currentSubject, currentGrade) && (
+                                {!esNivelIngles(currentSubject) && (
                                     <div className="flex-grow min-w-[150px]">
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Nivel de Inglés <span className="text-red-500">*</span>
+                                            Grado <span className="text-red-500">*</span>
                                         </label>
                                         <select 
-                                            value={currentNivelIngles} 
+                                            value={currentGrade} 
                                             onChange={e => {
-                                                setCurrentNivelIngles(e.target.value);
+                                                setCurrentGrade(e.target.value);
+                                                // Reset nivel if grade changes and it's not 5to-6to
+                                                if (!esGradoAlto(e.target.value) || !esInglesPrimaria(currentSubject)) {
+                                                    setCurrentNivelIngles('');
+                                                }
                                                 if (errors.assignment) {
                                                     setErrors(prev => {
                                                         const newErrors = { ...prev };
@@ -1876,11 +1939,19 @@ const TeacherFormModal: React.FC<{
                                             } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                                             disabled={isSubmitting}
                                         >
-                                            <option value="">Seleccione un nivel</option>
-                                            <option value="Basic">Basic</option>
-                                            <option value="Lower">Lower</option>
-                                            <option value="Upper">Upper</option>
+                                            <option value="">Seleccione un grado</option>
+                                            {GRADOS.map(grado => <option key={grado} value={grado}>{grado}</option>)}
                                         </select>
+                                    </div>
+                                )}
+                                {esNivelIngles(currentSubject) && (
+                                    <div className="flex-grow min-w-[200px]">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Grados (se asignarán automáticamente) <span className="text-green-600">*</span>
+                                        </label>
+                                        <div className="mt-1 p-2 border border-green-300 rounded-md bg-green-50 text-sm text-green-700 font-medium">
+                                            5to Grado y 6to Grado
+                                        </div>
                                     </div>
                                 )}
                                 <button 
@@ -1897,28 +1968,78 @@ const TeacherFormModal: React.FC<{
                             )}
                             {assignments.length > 0 ? (
                                 <div className="flex flex-wrap gap-2">
-                                    {assignments.map((a, index) => (
-                                        <span 
-                                            key={index} 
-                                            className="flex items-center gap-2 bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1.5 rounded-full border border-blue-200"
-                                        >
-                                            <span className="font-semibold">{a.subject}</span>
-                                            <span className="text-blue-600">({a.grade}</span>
-                                            {a.nivel_ingles && (
-                                                <span className="text-blue-700 font-bold"> - {a.nivel_ingles}</span>
-                                            )}
-                                            <span className="text-blue-600">)</span>
-                                            <button 
-                                                type="button" 
-                                                onClick={() => handleRemoveAssignment(index)} 
-                                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
-                                                disabled={isSubmitting}
-                                                title="Eliminar"
+                                    {assignments.map((a, index) => {
+                                        // Para niveles de inglés, mostrar de forma agrupada si es posible
+                                        const esParteDeNivel = a.nivel_ingles && esGradoAlto(a.grade);
+                                        const siguienteEsMismoNivel = index < assignments.length - 1 && 
+                                            assignments[index + 1].nivel_ingles === a.nivel_ingles &&
+                                            assignments[index + 1].subject === a.subject &&
+                                            ((a.grade === '5to Grado' && assignments[index + 1].grade === '6to Grado') ||
+                                             (a.grade === '6to Grado' && assignments[index + 1].grade === '5to Grado'));
+                                        
+                                        // Si es 5to y el siguiente es 6to del mismo nivel, mostrar ambos juntos
+                                        if (esParteDeNivel && siguienteEsMismoNivel && a.grade === '5to Grado') {
+                                            return (
+                                                <span 
+                                                    key={index} 
+                                                    className="flex items-center gap-2 bg-purple-100 text-purple-800 text-sm font-medium px-3 py-1.5 rounded-full border border-purple-200"
+                                                >
+                                                    <span className="font-semibold">{a.subject}</span>
+                                                    <span className="text-purple-600">(5to y 6to Grado</span>
+                                                    {a.nivel_ingles && (
+                                                        <span className="text-purple-700 font-bold"> - {a.nivel_ingles}</span>
+                                                    )}
+                                                    <span className="text-purple-600">)</span>
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => {
+                                                            // Eliminar ambos (5to y 6to)
+                                                            const indicesAEliminar = [index, index + 1];
+                                                            setAssignments(prev => prev.filter((_, i) => !indicesAEliminar.includes(i)));
+                                                        }} 
+                                                        className="text-purple-600 hover:text-purple-800 hover:bg-purple-200 rounded-full p-0.5 transition-colors"
+                                                        disabled={isSubmitting}
+                                                        title="Eliminar ambos grados"
+                                                    >
+                                                        <CloseIcon />
+                                                    </button>
+                                                </span>
+                                            );
+                                        }
+                                        
+                                        // Si es 6to y el anterior fue 5to del mismo nivel, no mostrar (ya se mostró agrupado)
+                                        if (esParteDeNivel && index > 0 && 
+                                            assignments[index - 1].nivel_ingles === a.nivel_ingles &&
+                                            assignments[index - 1].subject === a.subject &&
+                                            assignments[index - 1].grade === '5to Grado' &&
+                                            a.grade === '6to Grado') {
+                                            return null;
+                                        }
+                                        
+                                        // Mostrar asignación normal
+                                        return (
+                                            <span 
+                                                key={index} 
+                                                className="flex items-center gap-2 bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1.5 rounded-full border border-blue-200"
                                             >
-                                                <CloseIcon />
-                                            </button>
-                                        </span>
-                                    ))}
+                                                <span className="font-semibold">{a.subject}</span>
+                                                <span className="text-blue-600">({a.grade}</span>
+                                                {a.nivel_ingles && (
+                                                    <span className="text-blue-700 font-bold"> - {a.nivel_ingles}</span>
+                                                )}
+                                                <span className="text-blue-600">)</span>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => handleRemoveAssignment(index)} 
+                                                    className="text-blue-600 hover:text-blue-800 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                                                    disabled={isSubmitting}
+                                                    title="Eliminar"
+                                                >
+                                                    <CloseIcon />
+                                                </button>
+                                            </span>
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <p className="text-sm text-gray-500 italic">No hay asignaturas agregadas. Agregue al menos una asignatura y grado.</p>
