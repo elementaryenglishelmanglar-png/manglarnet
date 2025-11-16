@@ -100,9 +100,14 @@ SELECT
   ]'::jsonb AS bloques_horarios,
   ARRAY['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'] AS dias_semana,
   18 AS semanas_totales,
-  false AS activa -- Inactiva por defecto, se activa cuando se necesite
+  true AS activa -- Activa por defecto para facilitar el uso
 WHERE NOT EXISTS (
   SELECT 1 FROM configuracion_horarios 
   WHERE ano_escolar = '2025-2026'
 );
+
+-- Activate existing 2025-2026 configuration if it exists but is inactive
+UPDATE configuracion_horarios
+SET activa = true
+WHERE ano_escolar = '2025-2026' AND activa = false;
 

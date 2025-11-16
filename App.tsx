@@ -3199,8 +3199,14 @@ const ScheduleGeneratorView: React.FC<{
             try {
                 const config = await configuracionHorariosService.getActive(anoEscolar);
                 setConfiguracion(config);
+                if (!config) {
+                    setError(`No hay configuración activa para ${anoEscolar}. Ejecuta el script SQL 010_seed_initial_data.sql o crea una configuración manualmente.`);
+                } else {
+                    setError(null);
+                }
             } catch (err: any) {
                 console.error('Error loading configuration:', err);
+                setError(`Error al cargar configuración: ${err.message}`);
             }
         };
         loadConfig();
@@ -3361,7 +3367,7 @@ const ScheduleGeneratorView: React.FC<{
                     </div>
                 </div>
 
-                {configuracion && (
+                {configuracion ? (
                     <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                         <h3 className="font-semibold text-gray-800 mb-2">Configuración Actual</h3>
                         <div className="text-sm text-gray-600 space-y-1">
@@ -3370,12 +3376,29 @@ const ScheduleGeneratorView: React.FC<{
                             <p><strong>Semanas totales:</strong> {configuracion.semanas_totales}</p>
                         </div>
                     </div>
+                ) : (
+                    <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <h3 className="font-semibold text-yellow-800 mb-2">⚠️ Configuración Requerida</h3>
+                        <div className="text-sm text-yellow-700 space-y-2">
+                            <p>No hay una configuración de horarios activa para el año escolar <strong>{anoEscolar}</strong>.</p>
+                            <p>Para generar horarios, necesitas:</p>
+                            <ul className="list-disc list-inside ml-2 space-y-1">
+                                <li>Crear una configuración de horarios en la base de datos</li>
+                                <li>Definir los bloques horarios (horas de inicio y fin)</li>
+                                <li>Marcar la configuración como activa</li>
+                            </ul>
+                            <p className="mt-2 text-xs">
+                                <strong>Nota:</strong> Puedes crear la configuración ejecutando el script SQL <code className="bg-yellow-100 px-1 rounded">010_seed_initial_data.sql</code> en Supabase, o crearla manualmente.
+                            </p>
+                        </div>
+                    </div>
                 )}
 
                 <button
                     onClick={handleGenerate}
                     disabled={isGenerating || !configuracion}
                     className={`w-full sm:w-auto px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base font-medium min-h-[44px]`}
+                    title={!configuracion ? 'Primero debes crear una configuración de horarios para el año escolar seleccionado' : ''}
                 >
                     {isGenerating ? (
                         <>
