@@ -721,6 +721,28 @@ const getWeekNumber = (startDate: Date): number => {
     return Math.min(18, Math.max(1, calculatedWeek));
 };
 
+// Función helper para obtener el color del grado según la especificación
+const getGradeColor = (grade: string): string => {
+    const gradeColors: { [key: string]: string } = {
+        '1er Grado': '#00ff01',
+        '2do Grado': '#99cdff',
+        '3er Grado': '#ff00fe',
+        '4to Grado': '#99cdff',
+        '5to Grado': '#3e85c7',
+        '6to Grado': '#00ffff',
+    };
+    
+    return gradeColors[grade] || '#F3F4F6'; // Color por defecto si no se encuentra
+};
+
+// Función helper para convertir hex a rgba con opacidad
+const hexToRgba = (hex: string, opacity: number): string => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+};
+
 
 // --- UI COMPONENTS ---
 
@@ -953,28 +975,28 @@ const DashboardView: React.FC<{
         return GRADOS.filter(g => gradeSet.has(g));
     }, [studentsByGrade]);
 
-    const cardColors = [
-        'bg-blue-500', 'bg-green-500', 'bg-indigo-500', 
-        'bg-pink-500', 'bg-purple-500', 'bg-yellow-600',
-        'bg-red-500', 'bg-cyan-500', 'bg-teal-500',
-        'bg-orange-500', 'bg-lime-500', 'bg-emerald-500'
-    ];
-
     return (
         <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-2xl font-bold text-text-main mb-6">Resumen de Alumnos por Grado</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                {sortedGrades.map((grade, index) => (
-                    <div key={grade} className={`p-6 rounded-lg shadow-lg text-white ${cardColors[index % cardColors.length]}`}>
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <p className="text-4xl font-bold">{studentsByGrade[grade]}</p>
-                                <p className="text-lg font-semibold">{grade}</p>
+                {sortedGrades.map((grade) => {
+                    const gradeColor = getGradeColor(grade);
+                    return (
+                        <div 
+                            key={grade} 
+                            className="p-6 rounded-lg shadow-lg text-white"
+                            style={{ backgroundColor: gradeColor }}
+                        >
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-4xl font-bold">{studentsByGrade[grade]}</p>
+                                    <p className="text-lg font-semibold">{grade}</p>
+                                </div>
+                                <UsersIcon className="h-10 w-10 opacity-75" />
                             </div>
-                            <UsersIcon className="h-10 w-10 opacity-75" />
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
                  <div className="bg-gray-50 p-6 rounded-lg shadow-md flex justify-between items-center">
@@ -1059,18 +1081,42 @@ const TeacherScheduleDashboard: React.FC<{
         }
     }, [selectedGrade, currentWeek]);
 
+    const selectedGradeColor = getGradeColor(selectedGrade);
+
     return (
         <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
-                <h3 className="text-xl font-bold text-text-main">Mi Horario de Clases</h3>
+                <div className="flex items-center gap-3">
+                    <h3 className="text-xl font-bold text-text-main">Mi Horario de Clases</h3>
+                    {selectedGrade && (
+                        <div className="flex items-center gap-2">
+                            <div 
+                                className="w-4 h-4 rounded-full shadow-sm border-2 border-white"
+                                style={{ backgroundColor: selectedGradeColor }}
+                                title={`Color del ${selectedGrade}`}
+                            ></div>
+                            <span className="text-sm font-medium text-gray-600">{selectedGrade}</span>
+                        </div>
+                    )}
+                </div>
                 <div className="flex items-center gap-4">
-                    <select
-                        value={selectedGrade}
-                        onChange={(e) => setSelectedGrade(e.target.value)}
-                        className="p-2 border border-gray-300 rounded-md shadow-sm"
-                    >
-                        {allGrades.map(grade => <option key={grade} value={grade}>{grade}</option>)}
-                    </select>
+                    <div className="relative">
+                        <select
+                            value={selectedGrade}
+                            onChange={(e) => setSelectedGrade(e.target.value)}
+                            className="p-2 border-2 rounded-md shadow-sm pr-10 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                            style={{ 
+                                borderColor: selectedGradeColor,
+                                paddingRight: '2.5rem'
+                            }}
+                        >
+                            {allGrades.map(grade => <option key={grade} value={grade}>{grade}</option>)}
+                        </select>
+                        <div 
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 rounded-full border border-gray-300"
+                            style={{ backgroundColor: selectedGradeColor }}
+                        ></div>
+                    </div>
                     <select
                         value={currentWeek || ''}
                         onChange={(e) => setCurrentWeek(e.target.value ? parseInt(e.target.value) : null)}
@@ -1111,11 +1157,39 @@ const TeacherScheduleDashboard: React.FC<{
                 </div>
             ) : (
             <div className="overflow-x-auto mt-4" >
+                <div 
+                    className="mb-3 p-3 rounded-lg flex items-center gap-2 shadow-sm"
+                    style={{ 
+                        backgroundColor: `${selectedGradeColor}15`, // 15% de opacidad
+                        borderLeft: `4px solid ${selectedGradeColor}`
+                    }}
+                >
+                    <div 
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: selectedGradeColor }}
+                    ></div>
+                    <span className="text-sm font-medium text-gray-700">
+                        Horario de <strong>{selectedGrade}</strong>
+                    </span>
+                </div>
                 <table ref={scheduleTableRef} className="min-w-full divide-y divide-gray-200 border bg-white">
                     <thead className="bg-gray-50">
                         <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Hora</th>
-                            {WEEK_DAYS.map(day => <th key={day} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{day}</th>)}
+                            <th 
+                                className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider w-32"
+                                style={{ backgroundColor: selectedGradeColor }}
+                            >
+                                Hora
+                            </th>
+                            {WEEK_DAYS.map(day => (
+                                <th 
+                                    key={day} 
+                                    className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider"
+                                    style={{ backgroundColor: selectedGradeColor }}
+                                >
+                                    {day}
+                                </th>
+                            ))}
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -4471,13 +4545,40 @@ const ScheduleView: React.FC<{
         }
     };
 
+    const selectedGradeColor = getGradeColor(selectedGrade);
+
     return (
         <div className="flex gap-6">
             <div className="flex-grow bg-white p-6 rounded-lg shadow-md">
                 <div className="flex justify-between items-center mb-4">
-                     <select value={selectedGrade} onChange={e => setSelectedGrade(e.target.value)} className="p-2 border rounded-md">
-                        {allGrades.map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
+                    <div className="flex items-center gap-3">
+                        <div className="relative">
+                            <select 
+                                value={selectedGrade} 
+                                onChange={e => setSelectedGrade(e.target.value)} 
+                                className="p-2 border-2 rounded-md shadow-sm pr-10 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 font-medium"
+                                style={{ 
+                                    borderColor: selectedGradeColor,
+                                    paddingRight: '2.5rem'
+                                }}
+                            >
+                                {allGrades.map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                            <div 
+                                className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 rounded-full border border-gray-300 shadow-sm"
+                                style={{ backgroundColor: selectedGradeColor }}
+                            ></div>
+                        </div>
+                        {selectedGrade && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md shadow-sm" style={{ backgroundColor: hexToRgba(selectedGradeColor, 0.15) }}>
+                                <div 
+                                    className="w-3 h-3 rounded-full border-2 border-white shadow-sm"
+                                    style={{ backgroundColor: selectedGradeColor }}
+                                ></div>
+                                <span className="text-sm font-semibold text-gray-700">{selectedGrade}</span>
+                            </div>
+                        )}
+                    </div>
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2">
                             <label className="text-sm font-medium text-gray-700">Lapso:</label>
@@ -4549,21 +4650,71 @@ const ScheduleView: React.FC<{
                 {!currentWeek ? (
                     <div className="text-center py-12 text-gray-500">
                         <p className="text-lg font-medium">Seleccione una semana para ver el horario</p>
-                        <p className="text-sm mt-2">Use el menú desplegable arriba para elegir una semana (1-18)</p>
+                        <p className="text-sm mt-2">Use el menú desplegable arriba para elegir una semana</p>
                     </div>
                 ) : (
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 border">
-                        <thead className="bg-gray-50">
+                    {/* Banner informativo con color del grado */}
+                    {selectedGrade && (
+                        <div 
+                            className="mb-4 p-4 rounded-lg flex items-center justify-between shadow-sm border-l-4"
+                            style={{ 
+                                backgroundColor: hexToRgba(selectedGradeColor, 0.1), // 10% de opacidad
+                                borderLeftColor: selectedGradeColor
+                            }}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div 
+                                    className="w-4 h-4 rounded-full shadow-sm border-2 border-white"
+                                    style={{ backgroundColor: selectedGradeColor }}
+                                ></div>
+                                <div>
+                                    <span className="text-sm font-semibold text-gray-700">
+                                        Horario de <strong>{selectedGrade}</strong>
+                                    </span>
+                                    {selectedLapso && semanasInfo.size > 0 && currentWeek && (
+                                        <span className="text-xs text-gray-500 ml-2">
+                                            • {selectedLapso} • Semana {currentWeek}
+                                            {semanasInfo.get(currentWeek) && (
+                                                <span className="ml-1">
+                                                    ({formatDateRange(semanasInfo.get(currentWeek)!.fecha_inicio, semanasInfo.get(currentWeek)!.fecha_fin)})
+                                                </span>
+                                            )}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <table className="min-w-full divide-y divide-gray-200 border shadow-sm">
+                        <thead>
                             <tr>
-                                <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Hora</th>
-                                {WEEK_DAYS.map(d => <th key={d} className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{d}</th>)}
+                                <th 
+                                    className="px-2 py-3 text-left text-xs font-medium text-white uppercase tracking-wider w-40 border-r border-white/20"
+                                    style={{ backgroundColor: selectedGradeColor }}
+                                >
+                                    Hora
+                                </th>
+                                {WEEK_DAYS.map(d => (
+                                    <th 
+                                        key={d} 
+                                        className="px-2 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-white/20 last:border-r-0"
+                                        style={{ backgroundColor: selectedGradeColor }}
+                                    >
+                                        {d}
+                                    </th>
+                                ))}
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {timeSlots.map(slot => (
                                 <tr key={slot}>
-                                    <td className="px-2 py-2 whitespace-nowrap text-sm font-medium text-gray-900 border-r">{slot.replace('-', ' - ')}</td>
+                                    <td 
+                                        className="px-2 py-2 whitespace-nowrap text-sm font-medium text-white border-r border-gray-300"
+                                        style={{ backgroundColor: hexToRgba(selectedGradeColor, 0.8) }} // 80% de opacidad para la columna de hora
+                                    >
+                                        {slot.replace('-', ' - ')}
+                                    </td>
                                     {WEEK_DAYS.map((_, dayIndex) => {
                                         const day = dayIndex + 1;
                                         const [horaInicio] = slot.split(' - ');
