@@ -4029,16 +4029,21 @@ const ScheduleView: React.FC<{
                                                             const aula = aulaId ? aulas.find(a => a.id_aula === aulaId) : undefined;
                                                             
                                                             return (
-                                                                <div className="p-2 rounded-md h-full" style={{backgroundColor: subjectColors[clase?.nombre_materia || 'default'] || getSubjectColor(clase?.nombre_materia || '')}}>
-                                                                    <div className="font-bold text-xs">{clase?.nombre_materia}</div>
+                                                                <div className="p-1.5 rounded-md h-full overflow-y-auto" style={{backgroundColor: subjectColors[clase?.nombre_materia || 'default'] || getSubjectColor(clase?.nombre_materia || '')}}>
+                                                                    <div className="font-bold text-xs mb-0.5">{clase?.nombre_materia}</div>
                                                                     {docente && (
-                                                                        <div className="text-gray-700 text-[10px] mt-0.5 font-semibold">
+                                                                        <div className="text-gray-700 text-[10px] font-semibold">
                                                                             {docente.nombres.split(' ')[0]} {docente.apellidos.split(' ')[0]}
                                                                         </div>
                                                                     )}
                                                                     {aula && (
                                                                         <div className="text-gray-600 text-[10px] mt-0.5">
                                                                             📍 {aula.nombre}
+                                                                        </div>
+                                                                    )}
+                                                                    {!aula && clase?.id_aula && (
+                                                                        <div className="text-gray-500 text-[10px] mt-0.5 italic">
+                                                                            Sin aula asignada
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -4217,20 +4222,31 @@ const TeamScheduleView: React.FC<{
 
     const teacherSchedule = useMemo(() => {
         if (!selectedTeacherId) return [];
-        const MASTER_WEEK = 1; // using week 1 as the master schedule for all teachers
+        // Buscar en todas las semanas, no solo la semana 1
         const scheduleWithGrade: (Horario & { grade: string })[] = [];
         for (const grade in schedules) {
-            const weekSchedule = schedules[grade]?.[MASTER_WEEK] || [];
-            for (const item of weekSchedule) {
-                // A single check for any item (class or event) assigned to the selected teacher
-                if (item.id_docente === selectedTeacherId) {
-                    const clase = clases.find(c => c.id_clase === item.id_clase);
-                    // For classes, use the class's grade. For events (guardias), use the grade of the schedule it's in.
-                    scheduleWithGrade.push({ ...item, grade: clase?.grado_asignado || grade });
+            for (const week in schedules[grade]) {
+                const weekSchedule = schedules[grade][parseInt(week)] || [];
+                for (const item of weekSchedule) {
+                    // A single check for any item (class or event) assigned to the selected teacher
+                    if (item.id_docente === selectedTeacherId) {
+                        const clase = clases.find(c => c.id_clase === item.id_clase);
+                        // For classes, use the class's grade. For events (guardias), use the grade of the schedule it's in.
+                        scheduleWithGrade.push({ ...item, grade: clase?.grado_asignado || grade });
+                    }
                 }
             }
         }
-        return scheduleWithGrade;
+        // Eliminar duplicados basados en dia_semana, hora_inicio, id_clase
+        const uniqueSchedule = scheduleWithGrade.filter((item, index, self) => 
+            index === self.findIndex(t => 
+                t.dia_semana === item.dia_semana && 
+                t.hora_inicio === item.hora_inicio && 
+                t.id_clase === item.id_clase &&
+                t.id_horario === item.id_horario
+            )
+        );
+        return uniqueSchedule;
     }, [selectedTeacherId, schedules, clases]);
 
     const timeSlots = useMemo(() => {
@@ -4344,7 +4360,21 @@ const TeamScheduleView: React.FC<{
                                     <td className="px-2 py-2 whitespace-nowrap text-sm font-medium text-gray-900 border-r">{slot}</td>
                                     {WEEK_DAYS.map((_, dayIndex) => {
                                         const day = dayIndex + 1;
-                                        const item = teacherSchedule.find(s => s.dia_semana === day && s.hora_inicio.startsWith(slot.split(' - ')[0]));
+                                        const slotStartTime = slot.split(' - ')[0];
+                                        // Normalizar formato de hora para comparación (HH:MM)
+                                        const normalizeTime = (time: string) => {
+                                            if (!time) return '';
+                                            const parts = time.split(':');
+                                            if (parts.length >= 2) {
+                                                return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+                                            }
+                                            return time;
+                                        };
+                                        const normalizedSlotTime = normalizeTime(slotStartTime);
+                                        const item = teacherSchedule.find(s => 
+                                            s.dia_semana === day && 
+                                            normalizeTime(s.hora_inicio) === normalizedSlotTime
+                                        );
                                         return (
                                             <td key={`${day}-${slot}`} className="border p-1 align-top text-xs relative h-24"
                                                 onDoubleClick={() => !item && handleOpenGuardiaModal(day, slot)}>
@@ -4357,12 +4387,28 @@ const TeamScheduleView: React.FC<{
                                                         <div className="text-gray-500 text-[10px] mt-1">({item.grade})</div>
                                                     </div>
                                                 ) : item.id_clase && (
-                                                    (clase => clase ? (
-                                                        <div className="p-2 rounded-md h-full" style={{backgroundColor: subjectColors[clase.nombre_materia] || getSubjectColor(clase.nombre_materia)}}>
-                                                            <div className="font-bold">{clase.nombre_materia}</div>
-                                                            <div className="text-gray-600">{clase.grado_asignado}</div>
-                                                        </div>
-                                                    ) : null)(clases.find(c => c.id_clase === item.id_clase))
+                                                    (clase => {
+                                                        if (!clase) return null;
+                                                        const docente = docentes.find(d => d.id_docente === item.id_docente);
+                                                        const aulaId = item.id_aula || clase.id_aula;
+                                                        const aula = aulaId ? aulas?.find(a => a.id_aula === aulaId) : undefined;
+                                                        return (
+                                                            <div className="p-1.5 rounded-md h-full overflow-y-auto" style={{backgroundColor: subjectColors[clase.nombre_materia] || getSubjectColor(clase.nombre_materia)}}>
+                                                                <div className="font-bold text-xs mb-0.5">{clase.nombre_materia}</div>
+                                                                <div className="text-gray-600 text-[10px]">{clase.grado_asignado}</div>
+                                                                {docente && (
+                                                                    <div className="text-gray-700 text-[10px] mt-0.5 font-semibold">
+                                                                        {docente.nombres.split(' ')[0]} {docente.apellidos.split(' ')[0]}
+                                                                    </div>
+                                                                )}
+                                                                {aula && (
+                                                                    <div className="text-gray-600 text-[10px] mt-0.5">
+                                                                        📍 {aula.nombre}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })(clases.find(c => c.id_clase === item.id_clase))
                                                 ))}
                                             </td>
                                         );
@@ -6975,7 +7021,7 @@ const App: React.FC = () => {
       case 'schedules':
         return <ScheduleView schedules={schedules} setSchedules={setSchedules} clases={clases} docentes={docentes} currentUser={currentUser!} alumnos={alumnos} aulas={aulas} convertHorario={convertHorario} />;
       case 'team-schedules':
-        return <TeamScheduleView docentes={docentes} schedules={schedules} setSchedules={setSchedules} clases={clases} alumnos={alumnos}/>;
+        return <TeamScheduleView docentes={docentes} schedules={schedules} setSchedules={setSchedules} clases={clases} alumnos={alumnos} aulas={aulas}/>;
       case 'schedule-generator':
         return <ScheduleGeneratorView currentUser={currentUser!} />;
       case 'evaluation':
