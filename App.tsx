@@ -4160,8 +4160,6 @@ const ScheduleView: React.FC<{
         if (currentUser.role === 'docente') return; // Docentes no pueden editar
         if (!draggedItem || !currentWeek) return;
 
-        const [hora_inicio, hora_fin] = slot.split(' - ');
-        
         // Remove the item from its current position
         const updatedSchedule = weeklySchedule.filter(item => 
             !(draggedItem.type === 'class' && item.id_clase === draggedItem.id) &&
