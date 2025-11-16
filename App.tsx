@@ -4249,25 +4249,8 @@ const TeamScheduleView: React.FC<{
         return uniqueSchedule;
     }, [selectedTeacherId, schedules, clases]);
 
-    const timeSlots = useMemo(() => {
-        if (!selectedTeacherId) {
-            return TIME_SLOTS_STANDARD;
-        }
-
-        const teacherClasses = clases.filter(c => c.id_docente_asignado === selectedTeacherId);
-        if (teacherClasses.length === 0) {
-            return TIME_SLOTS_STANDARD;
-        }
-
-        const primaryClassCount = teacherClasses.filter(c => {
-            const gradeNum = parseInt(c.grado_asignado.match(/\d+/)?.[0] || '0');
-            return gradeNum >= 1 && gradeNum <= 6;
-        }).length;
-
-        const nonPrimaryClassCount = teacherClasses.length - primaryClassCount;
-        
-        return primaryClassCount > nonPrimaryClassCount ? TIME_SLOTS_PRIMARIA : TIME_SLOTS_STANDARD;
-    }, [selectedTeacherId, clases]);
+    // Usar siempre los mismos time slots que ScheduleView (primaria: 07:30 - 15:30 con bloques de 45 minutos)
+    const timeSlots = TIME_SLOTS_PRIMARIA;
 
     const handleOpenGuardiaModal = (dia: number, hora: string, existingEvent: (Horario & { grade: string }) | null = null) => {
         setGuardiaData({
