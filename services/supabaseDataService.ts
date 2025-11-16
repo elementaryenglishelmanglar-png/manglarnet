@@ -80,6 +80,28 @@ export interface Planificacion {
   apellidos_docente?: string; // Preserved docente last name
 }
 
+export interface Lapso {
+  id_lapso: string;
+  ano_escolar: string;
+  lapso: 'I Lapso' | 'II Lapso' | 'III Lapso';
+  fecha_inicio: string;
+  fecha_fin: string;
+  semanas_totales: number;
+  activo: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SemanaLapso {
+  id_semana_lapso: string;
+  id_lapso: string;
+  numero_semana: number;
+  fecha_inicio: string;
+  fecha_fin: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Horario {
   id_horario: string;
   id_docente: string | null;
@@ -87,6 +109,8 @@ export interface Horario {
   id_aula?: string | null; // Nueva columna para aula
   grado: string;
   semana: number;
+  lapso?: string | null; // NUEVO: Lapso académico
+  ano_escolar?: string | null; // NUEVO: Año escolar
   dia_semana: number;
   hora_inicio: string;
   hora_fin: string;
@@ -548,6 +572,173 @@ export const horariosService = {
       .eq('semana', semana);
     
     if (error) throw error;
+  },
+
+  async getByGradeWeekAndLapso(grado: string, semana: number, lapso: string, anoEscolar: string): Promise<Horario[]> {
+    const { data, error } = await supabase
+      .from('horarios')
+      .select('*')
+      .eq('grado', grado)
+      .eq('semana', semana)
+      .eq('lapso', lapso)
+      .eq('ano_escolar', anoEscolar)
+      .order('dia_semana', { ascending: true })
+      .order('hora_inicio', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  }
+};
+
+// ============================================
+// LAPSOS (Academic Periods)
+// ============================================
+
+export const lapsosService = {
+  async getAll(anoEscolar?: string): Promise<Lapso[]> {
+    let query = supabase
+      .from('lapsos')
+      .select('*')
+      .eq('activo', true)
+      .order('lapso', { ascending: true });
+    
+    if (anoEscolar) {
+      query = query.eq('ano_escolar', anoEscolar);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getById(id: string): Promise<Lapso | null> {
+    const { data, error } = await supabase
+      .from('lapsos')
+      .select('*')
+      .eq('id_lapso', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getByAnoEscolar(anoEscolar: string): Promise<Lapso[]> {
+    const { data, error } = await supabase
+      .from('lapsos')
+      .select('*')
+      .eq('ano_escolar', anoEscolar)
+      .eq('activo', true)
+      .order('lapso', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(lapso: Omit<Lapso, 'id_lapso' | 'created_at' | 'updated_at'>): Promise<Lapso> {
+    const { data, error } = await supabase
+      .from('lapsos')
+      .insert([lapso])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, updates: Partial<Lapso>): Promise<Lapso> {
+    const { data, error } = await supabase
+      .from('lapsos')
+      .update(updates)
+      .eq('id_lapso', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('lapsos')
+      .delete()
+      .eq('id_lapso', id);
+    
+    if (error) throw error;
+  }
+};
+
+// ============================================
+// SEMANAS_LAPSO (Weeks within a Lapso)
+// ============================================
+
+export const semanasLapsoService = {
+  async getByLapso(idLapso: string): Promise<SemanaLapso[]> {
+    const { data, error } = await supabase
+      .from('semanas_lapso')
+      .select('*')
+      .eq('id_lapso', idLapso)
+      .order('numero_semana', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByLapsoAndWeek(idLapso: string, numeroSemana: number): Promise<SemanaLapso | null> {
+    const { data, error } = await supabase
+      .from('semanas_lapso')
+      .select('*')
+      .eq('id_lapso', idLapso)
+      .eq('numero_semana', numeroSemana)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getByDate(date: Date, anoEscolar: string): Promise<SemanaLapso | null> {
+    const dateStr = date.toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('semanas_lapso')
+      .select(`
+        *,
+        lapsos!inner(ano_escolar, lapso)
+      `)
+      .eq('lapsos.ano_escolar', anoEscolar)
+      .lte('fecha_inicio', dateStr)
+      .gte('fecha_fin', dateStr)
+      .single();
+    
+    if (error) {
+      // Si no se encuentra, retornar null en lugar de lanzar error
+      if (error.code === 'PGRST116') return null;
+      throw error;
+    }
+    return data;
+  },
+
+  async getAll(anoEscolar?: string): Promise<Array<SemanaLapso & { lapso?: string; ano_escolar?: string }>> {
+    let query = supabase
+      .from('semanas_lapso')
+      .select(`
+        *,
+        lapsos!inner(ano_escolar, lapso, activo)
+      `)
+      .eq('lapsos.activo', true)
+      .order('fecha_inicio', { ascending: true });
+    
+    if (anoEscolar) {
+      query = query.eq('lapsos.ano_escolar', anoEscolar);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    
+    // Transformar los datos para incluir información del lapso
+    return (data || []).map((item: any) => ({
+      ...item,
+      lapso: item.lapsos?.lapso,
+      ano_escolar: item.lapsos?.ano_escolar
+    }));
   }
 };
 

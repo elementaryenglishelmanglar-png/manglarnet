@@ -8,6 +8,8 @@ import { AuthorizedUsersView } from './components/AuthorizedUsersView';
 import { marked } from 'marked';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { lapsosService, semanasLapsoService } from './services/supabaseDataService';
+import { getWeekFromDate, getAllWeeksForAnoEscolar, formatDateRange } from './services/weekCalculator';
 import {
   alumnosService,
   docentesService,
@@ -124,10 +126,33 @@ interface Horario {
   id_docente: string | null; // Can be null for events
   id_clase: string | null; // Can be null for events
   id_aula?: string | null; // Aula/salón asignado
+  lapso?: string | null; // NUEVO: Lapso académico (I Lapso, II Lapso, III Lapso)
+  ano_escolar?: string | null; // NUEVO: Año escolar
   dia_semana: number; // 1: Lunes, 2: Martes, ..., 5: Viernes
   hora_inicio: string; // e.g., "08:00"
   hora_fin: string; // e.g., "09:00"
   evento_descripcion?: string; // For non-class events
+}
+
+interface Lapso {
+  id_lapso: string;
+  ano_escolar: string;
+  lapso: 'I Lapso' | 'II Lapso' | 'III Lapso';
+  fecha_inicio: string;
+  fecha_fin: string;
+  semanas_totales: number;
+  activo: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface SemanaInfo {
+  numero_semana: number;
+  fecha_inicio: string;
+  fecha_fin: string;
+  lapso: string;
+  ano_escolar: string;
+  id_lapso?: string;
 }
 
 interface EventoCalendario {
@@ -823,6 +848,7 @@ const Sidebar: React.FC<{
         { id: 'planning', label: 'Planificaciones', icon: PlanningIcon, roles: ['directivo', 'coordinador', 'docente'] },
         { id: 'evaluation', label: 'Evaluación', icon: EvaluationIcon, roles: ['directivo', 'coordinador'] },
         { id: 'authorized-users', label: 'Usuarios Autorizados', icon: UsersIcon, roles: ['directivo'] },
+        { id: 'lapsos-admin', label: 'Gestión de Lapsos', icon: CalendarIcon, roles: ['coordinador', 'directivo'] },
     ].filter(link => link.roles.includes(userRole));
 
     const handleNavigate = (view: string) => {
@@ -2915,6 +2941,535 @@ const TeachersView: React.FC<{
     );
 };
 
+const LapsosAdminView: React.FC<{
+    currentUser: Usuario;
+}> = ({ currentUser }) => {
+    const anoEscolar = '2025-2026'; // TODO: Obtener del contexto/configuración
+    const [lapsos, setLapsos] = useState<Lapso[]>([]);
+    const [semanasMap, setSemanasMap] = useState<Map<string, SemanaInfo[]>>(new Map());
+    const [isLoading, setIsLoading] = useState(true);
+    const [isModalOpen, setModalOpen] = useState(false);
+    const [editingLapso, setEditingLapso] = useState<Lapso | null>(null);
+    const [expandedLapso, setExpandedLapso] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
+
+    const [formData, setFormData] = useState({
+        lapso: '' as 'I Lapso' | 'II Lapso' | 'III Lapso' | '',
+        fecha_inicio: '',
+        fecha_fin: '',
+        semanas_totales: 15,
+        activo: true
+    });
+
+    // Cargar lapsos y semanas
+    useEffect(() => {
+        loadLapsos();
+    }, []);
+
+    const loadLapsos = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const lapsosData = await lapsosService.getByAnoEscolar(anoEscolar);
+            setLapsos(lapsosData);
+
+            // Cargar semanas para cada lapso
+            const semanasPromises = lapsosData.map(async (lapso) => {
+                const semanas = await semanasLapsoService.getByLapso(lapso.id_lapso);
+                return { lapsoId: lapso.id_lapso, semanas };
+            });
+
+            const semanasResults = await Promise.all(semanasPromises);
+            const newSemanasMap = new Map<string, SemanaInfo[]>();
+            
+            semanasResults.forEach(({ lapsoId, semanas }) => {
+                newSemanasMap.set(lapsoId, semanas.map(s => ({
+                    numero_semana: s.numero_semana,
+                    fecha_inicio: s.fecha_inicio,
+                    fecha_fin: s.fecha_fin,
+                    lapso: lapsosData.find(l => l.id_lapso === lapsoId)?.lapso || '',
+                    ano_escolar: anoEscolar,
+                    id_lapso: lapsoId
+                })));
+            });
+
+            setSemanasMap(newSemanasMap);
+        } catch (err: any) {
+            console.error('Error loading lapsos:', err);
+            setError('Error al cargar los lapsos: ' + (err.message || 'Error desconocido'));
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleOpenModal = (lapso: Lapso | null = null) => {
+        if (lapso) {
+            setEditingLapso(lapso);
+            setFormData({
+                lapso: lapso.lapso,
+                fecha_inicio: lapso.fecha_inicio,
+                fecha_fin: lapso.fecha_fin,
+                semanas_totales: lapso.semanas_totales,
+                activo: lapso.activo
+            });
+        } else {
+            setEditingLapso(null);
+            setFormData({
+                lapso: '',
+                fecha_inicio: '',
+                fecha_fin: '',
+                semanas_totales: 15,
+                activo: true
+            });
+        }
+        setModalOpen(true);
+        setError(null);
+        setSuccess(null);
+    };
+
+    const handleCloseModal = () => {
+        setModalOpen(false);
+        setEditingLapso(null);
+        setFormData({
+            lapso: '',
+            fecha_inicio: '',
+            fecha_fin: '',
+            semanas_totales: 15,
+            activo: true
+        });
+        setError(null);
+        setSuccess(null);
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value, type } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : 
+                    type === 'number' ? parseInt(value) || 0 : value
+        }));
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        setSuccess(null);
+
+        // Validaciones
+        if (!formData.lapso) {
+            setError('Debe seleccionar un lapso');
+            return;
+        }
+
+        if (!formData.fecha_inicio || !formData.fecha_fin) {
+            setError('Debe ingresar fechas de inicio y fin');
+            return;
+        }
+
+        if (new Date(formData.fecha_inicio) >= new Date(formData.fecha_fin)) {
+            setError('La fecha de inicio debe ser anterior a la fecha de fin');
+            return;
+        }
+
+        if (formData.semanas_totales < 1) {
+            setError('El número de semanas debe ser mayor a 0');
+            return;
+        }
+
+        // Verificar que no exista otro lapso del mismo tipo para el mismo año
+        const existingLapso = lapsos.find(l => 
+            l.lapso === formData.lapso && 
+            (!editingLapso || l.id_lapso !== editingLapso.id_lapso)
+        );
+        if (existingLapso) {
+            setError(`Ya existe un ${formData.lapso} para el año ${anoEscolar}`);
+            return;
+        }
+
+        try {
+            if (editingLapso) {
+                // Actualizar lapso existente
+                const updated = await lapsosService.update(editingLapso.id_lapso, {
+                    ...formData,
+                    ano_escolar: anoEscolar
+                } as any);
+                
+                setLapsos(prev => prev.map(l => l.id_lapso === updated.id_lapso ? updated : l));
+                setSuccess(`Lapso ${updated.lapso} actualizado exitosamente. Las semanas se regenerarán automáticamente.`);
+                
+                // Recargar semanas después de un breve delay para que el trigger se ejecute
+                setTimeout(() => {
+                    loadLapsos();
+                }, 1000);
+            } else {
+                // Crear nuevo lapso
+                const created = await lapsosService.create({
+                    ...formData,
+                    ano_escolar: anoEscolar
+                } as any);
+                
+                setLapsos(prev => [...prev, created]);
+                setSuccess(`Lapso ${created.lapso} creado exitosamente. Las semanas se generarán automáticamente.`);
+                
+                // Recargar semanas después de un breve delay
+                setTimeout(() => {
+                    loadLapsos();
+                }, 1000);
+            }
+            
+            handleCloseModal();
+        } catch (err: any) {
+            console.error('Error saving lapso:', err);
+            setError('Error al guardar el lapso: ' + (err.message || 'Error desconocido'));
+        }
+    };
+
+    const handleDelete = async (lapso: Lapso) => {
+        if (!window.confirm(`¿Está seguro de que desea eliminar el ${lapso.lapso}?\n\nEsta acción eliminará todas las semanas asociadas y puede afectar los horarios vinculados.`)) {
+            return;
+        }
+
+        try {
+            await lapsosService.delete(lapso.id_lapso);
+            setLapsos(prev => prev.filter(l => l.id_lapso !== lapso.id_lapso));
+            setSemanasMap(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(lapso.id_lapso);
+                return newMap;
+            });
+            setSuccess(`Lapso ${lapso.lapso} eliminado exitosamente`);
+        } catch (err: any) {
+            console.error('Error deleting lapso:', err);
+            setError('Error al eliminar el lapso: ' + (err.message || 'Error desconocido'));
+        }
+    };
+
+    const handleRegenerateWeeks = async (lapso: Lapso) => {
+        if (!window.confirm(`¿Regenerar las semanas para el ${lapso.lapso}?\n\nEsto actualizará todas las semanas basándose en las fechas actuales del lapso.`)) {
+            return;
+        }
+
+        try {
+            // Llamar a la función SQL para regenerar semanas
+            const { error } = await supabase.rpc('generar_semanas_lapso', {
+                p_id_lapso: lapso.id_lapso
+            });
+
+            if (error) throw error;
+
+            setSuccess(`Semanas del ${lapso.lapso} regeneradas exitosamente`);
+            
+            // Recargar semanas
+            const semanas = await semanasLapsoService.getByLapso(lapso.id_lapso);
+            setSemanasMap(prev => {
+                const newMap = new Map(prev);
+                newMap.set(lapso.id_lapso, semanas.map(s => ({
+                    numero_semana: s.numero_semana,
+                    fecha_inicio: s.fecha_inicio,
+                    fecha_fin: s.fecha_fin,
+                    lapso: lapso.lapso,
+                    ano_escolar: anoEscolar,
+                    id_lapso: lapso.id_lapso
+                })));
+                return newMap;
+            });
+        } catch (err: any) {
+            console.error('Error regenerating weeks:', err);
+            setError('Error al regenerar las semanas: ' + (err.message || 'Error desconocido'));
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="bg-white p-6 rounded-lg shadow-md flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800">Gestión de Lapsos Académicos</h2>
+                    <p className="text-gray-600 mt-1">Año Escolar: {anoEscolar}</p>
+                </div>
+                <button
+                    onClick={() => handleOpenModal(null)}
+                    className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-green-600"
+                >
+                    <PlusIcon className="h-5 w-5" />
+                    Nuevo Lapso
+                </button>
+            </div>
+
+            {/* Messages */}
+            {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                    {error}
+                </div>
+            )}
+            {success && (
+                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
+                    {success}
+                </div>
+            )}
+
+            {/* Lapsos List */}
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lapso</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Inicio</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Fin</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Semanas</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {lapsos.length === 0 ? (
+                            <tr>
+                                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                                    No hay lapsos configurados. Crea uno nuevo para comenzar.
+                                </td>
+                            </tr>
+                        ) : (
+                            lapsos.map((lapso) => {
+                                const semanas = semanasMap.get(lapso.id_lapso) || [];
+                                const isExpanded = expandedLapso === lapso.id_lapso;
+
+                                return (
+                                    <React.Fragment key={lapso.id_lapso}>
+                                        <tr className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                                                {lapso.lapso}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {new Date(lapso.fecha_inicio).toLocaleDateString('es-VE', {
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric'
+                                                })}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {new Date(lapso.fecha_fin).toLocaleDateString('es-VE', {
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric'
+                                                })}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {semanas.length} / {lapso.semanas_totales}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                                    lapso.activo 
+                                                        ? 'bg-green-100 text-green-800' 
+                                                        : 'bg-gray-100 text-gray-800'
+                                                }`}>
+                                                    {lapso.activo ? 'Activo' : 'Inactivo'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => setExpandedLapso(isExpanded ? null : lapso.id_lapso)}
+                                                        className="text-blue-600 hover:text-blue-800"
+                                                        title="Ver semanas"
+                                                    >
+                                                        {isExpanded ? 'Ocultar' : 'Ver'} Semanas
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleRegenerateWeeks(lapso)}
+                                                        className="text-purple-600 hover:text-purple-800"
+                                                        title="Regenerar semanas"
+                                                    >
+                                                        Regenerar
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleOpenModal(lapso)}
+                                                        className="text-blue-600 hover:text-blue-800"
+                                                    >
+                                                        <EditIcon />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(lapso)}
+                                                        className="text-red-600 hover:text-red-800"
+                                                    >
+                                                        <DeleteIcon />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {isExpanded && (
+                                            <tr>
+                                                <td colSpan={6} className="px-6 py-4 bg-gray-50">
+                                                    <div className="max-h-64 overflow-y-auto">
+                                                        <h4 className="font-semibold text-gray-700 mb-3">Semanas del {lapso.lapso}</h4>
+                                                        {semanas.length === 0 ? (
+                                                            <p className="text-sm text-gray-500">No hay semanas generadas. Haz clic en "Regenerar" para generarlas.</p>
+                                                        ) : (
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                                                {semanas.map((semana) => (
+                                                                    <div
+                                                                        key={semana.numero_semana}
+                                                                        className="bg-white p-3 rounded border border-gray-200"
+                                                                    >
+                                                                        <div className="font-medium text-sm text-gray-900">
+                                                                            Semana {semana.numero_semana}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-500 mt-1">
+                                                                            {formatDateRange(semana.fecha_inicio, semana.fecha_fin)}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Modal para crear/editar lapso */}
+            {isModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl max-h-[95vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold">
+                                {editingLapso ? 'Editar Lapso' : 'Nuevo Lapso'}
+                            </h2>
+                            <button onClick={handleCloseModal}>
+                                <CloseIcon />
+                            </button>
+                        </div>
+
+                        {error && (
+                            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                                {error}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Lapso <span className="text-red-500">*</span>
+                                </label>
+                                <select
+                                    name="lapso"
+                                    value={formData.lapso}
+                                    onChange={handleChange}
+                                    required
+                                    disabled={!!editingLapso}
+                                    className="w-full p-2 border border-gray-300 rounded-md disabled:bg-gray-100"
+                                >
+                                    <option value="">Seleccionar...</option>
+                                    <option value="I Lapso">I Lapso</option>
+                                    <option value="II Lapso">II Lapso</option>
+                                    <option value="III Lapso">III Lapso</option>
+                                </select>
+                                {editingLapso && (
+                                    <p className="text-xs text-gray-500 mt-1">El tipo de lapso no puede modificarse</p>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Fecha de Inicio <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="date"
+                                        name="fecha_inicio"
+                                        value={formData.fecha_inicio}
+                                        onChange={handleChange}
+                                        required
+                                        className="w-full p-2 border border-gray-300 rounded-md"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Lunes de la primera semana</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Fecha de Fin <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="date"
+                                        name="fecha_fin"
+                                        value={formData.fecha_fin}
+                                        onChange={handleChange}
+                                        required
+                                        className="w-full p-2 border border-gray-300 rounded-md"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Viernes de la última semana</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Número de Semanas <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    name="semanas_totales"
+                                    value={formData.semanas_totales}
+                                    onChange={handleChange}
+                                    required
+                                    min="1"
+                                    max="20"
+                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Número total de semanas del lapso</p>
+                            </div>
+
+                            <div className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    name="activo"
+                                    checked={formData.activo}
+                                    onChange={handleChange}
+                                    className="h-4 w-4 text-brand-primary focus:ring-brand-primary border-gray-300 rounded"
+                                />
+                                <label className="ml-2 block text-sm text-gray-700">
+                                    Lapso activo
+                                </label>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-4 border-t">
+                                <button
+                                    type="button"
+                                    onClick={handleCloseModal}
+                                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-green-600"
+                                >
+                                    {editingLapso ? 'Actualizar' : 'Crear'} Lapso
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const InputField: React.FC<{
     label: string;
     name: string;
@@ -3368,11 +3923,73 @@ const ScheduleView: React.FC<{
         aula?: Aula
     }>>([]);
     
+    // Estados para lapsos y semanas
+    const anoEscolar = '2025-2026'; // TODO: Obtener del contexto/configuración
+    const [lapsos, setLapsos] = useState<Lapso[]>([]);
+    const [selectedLapso, setSelectedLapso] = useState<string>('');
+    const [semanasInfo, setSemanasInfo] = useState<Map<number, SemanaInfo>>(new Map());
+    
+    // Cargar lapsos al montar
+    useEffect(() => {
+        const loadLapsos = async () => {
+            try {
+                const lapsosData = await lapsosService.getByAnoEscolar(anoEscolar);
+                setLapsos(lapsosData);
+                if (lapsosData.length > 0) {
+                    setSelectedLapso(lapsosData[0].lapso);
+                }
+            } catch (error) {
+                console.error('Error loading lapsos:', error);
+            }
+        };
+        loadLapsos();
+    }, [anoEscolar]);
+    
+    // Cargar información de semanas cuando cambia el lapso
+    useEffect(() => {
+        const loadSemanasInfo = async () => {
+            if (!selectedLapso) return;
+            
+            const lapso = lapsos.find(l => l.lapso === selectedLapso);
+            if (!lapso) return;
+            
+            try {
+                const semanasData = await semanasLapsoService.getByLapso(lapso.id_lapso);
+                const semanasMap = new Map<number, SemanaInfo>();
+                
+                semanasData.forEach(s => {
+                    semanasMap.set(s.numero_semana, {
+                        numero_semana: s.numero_semana,
+                        fecha_inicio: s.fecha_inicio,
+                        fecha_fin: s.fecha_fin,
+                        lapso: lapso.lapso,
+                        ano_escolar: lapso.ano_escolar,
+                        id_lapso: lapso.id_lapso
+                    });
+                });
+                
+                setSemanasInfo(semanasMap);
+                
+                // Si la semana actual no está en el nuevo lapso, resetear a la primera semana
+                if (currentWeek && !semanasMap.has(currentWeek)) {
+                    const primeraSemana = Math.min(...Array.from(semanasMap.keys()));
+                    setCurrentWeek(primeraSemana);
+                } else if (!currentWeek && semanasMap.size > 0) {
+                    const primeraSemana = Math.min(...Array.from(semanasMap.keys()));
+                    setCurrentWeek(primeraSemana);
+                }
+            } catch (error) {
+                console.error('Error loading semanas info:', error);
+            }
+        };
+        
+        loadSemanasInfo();
+    }, [selectedLapso, lapsos]);
+    
     // Cargar asignaciones de niveles de inglés con información de docentes y aulas
     useEffect(() => {
         const loadEnglishAssignments = async () => {
             try {
-                const anoEscolar = '2025-2026'; // TODO: Obtener del contexto
                 
                 // Cargar asignaciones de docentes
                 const { data: docenteAssignments, error: docenteError } = await supabase
@@ -3538,6 +4155,10 @@ const ScheduleView: React.FC<{
                                       clase?.nivel_ingles === null && 
                                       clase?.skill_rutina;
         
+        const slotParts = slot.split(' - ');
+        const hora_inicio = slotParts[0];
+        const hora_fin = slotParts[1] || hora_inicio;
+        
         const newItem: Horario = draggedItem.type === 'class'
             ? {
                 id_horario: `h-${selectedGrade.replace(/\s+/g, '-')}-${currentWeek}-${day}-${hora_inicio.replace(':', '')}-${draggedItem.id}`,
@@ -3545,12 +4166,17 @@ const ScheduleView: React.FC<{
                 id_docente: isConsolidatedEnglish ? null : (draggedItem.docenteId || clase?.id_docente_asignado || null),
                 id_clase: draggedItem.id,
                 id_aula: clase?.id_aula || null, // Incluir aula de la clase
+                lapso: selectedLapso || null, // NUEVO: Incluir lapso
+                ano_escolar: anoEscolar, // NUEVO: Incluir año escolar
                 dia_semana: day,
                 hora_inicio: hora_inicio,
                 hora_fin: hora_fin,
+                evento_descripcion: null
             }
             : {
                 ...draggedItem.data,
+                lapso: selectedLapso || null, // NUEVO: Incluir lapso
+                ano_escolar: anoEscolar, // NUEVO: Incluir año escolar
                 dia_semana: day,
                 hora_inicio: hora_inicio,
                 hora_fin: hora_fin,
@@ -3656,6 +4282,8 @@ const ScheduleView: React.FC<{
                 id_horario: `evt-${Date.now()}`,
                 id_docente: null,
                 id_clase: null,
+                lapso: selectedLapso || null, // NUEVO: Incluir lapso
+                ano_escolar: anoEscolar, // NUEVO: Incluir año escolar
                 dia_semana: eventData.dia,
                 hora_inicio,
                 hora_fin,
@@ -3729,6 +4357,8 @@ const ScheduleView: React.FC<{
                 const newHorario = {
                     grado: selectedGrade,
                     semana: currentWeek,
+                    lapso: selectedLapso || null, // NUEVO: Incluir lapso
+                    ano_escolar: anoEscolar, // NUEVO: Incluir año escolar
                     id_docente: correctedIdDocente, // Usar el docente corregido
                     id_clase: horario.id_clase,
                     id_aula: horario.id_aula || null, // Incluir aula al guardar
@@ -3788,7 +4418,10 @@ const ScheduleView: React.FC<{
             }
 
             // Recargar horarios desde la base de datos para asegurar consistencia
-            const reloadedHorarios = await horariosService.getByGradeAndWeek(selectedGrade, currentWeek);
+            // Usar el método que filtra por lapso y ano_escolar si están disponibles
+            const reloadedHorarios = selectedLapso 
+                ? await horariosService.getByGradeWeekAndLapso(selectedGrade, currentWeek, selectedLapso, anoEscolar)
+                : await horariosService.getByGradeAndWeek(selectedGrade, currentWeek);
             const reloadedSchedulesMap: WeeklySchedules = {};
             if (!reloadedSchedulesMap[selectedGrade]) {
                 reloadedSchedulesMap[selectedGrade] = {};
@@ -7077,6 +7710,8 @@ const App: React.FC = () => {
         return <EvaluationView alumnos={alumnos} clases={clases} minutas={minutas} setMinutas={setMinutas} />;
       case 'authorized-users':
         return <AuthorizedUsersView currentUser={currentUser!} />;
+      case 'lapsos-admin':
+        return <LapsosAdminView currentUser={currentUser!} />;
       default:
         return <div className="bg-white p-6 rounded-lg shadow-md"><h2>Vista no implementada</h2><p>La funcionalidad para "{activeView}" estará disponible próximamente.</p></div>;
     }
@@ -7093,6 +7728,7 @@ const App: React.FC = () => {
       planning: 'Planificaciones',
       evaluation: 'Seguimiento Pedagógico',
       'authorized-users': 'Usuarios Autorizados',
+      'lapsos-admin': 'Gestión de Lapsos',
   };
 
   if (!currentUser) {
