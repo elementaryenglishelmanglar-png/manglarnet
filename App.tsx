@@ -3351,7 +3351,8 @@ const ScheduleView: React.FC<{
     currentUser: Usuario;
     alumnos: Alumno[];
     aulas: Aula[];
-}> = ({ schedules, setSchedules, clases, docentes, currentUser, alumnos, aulas }) => {
+    convertHorario: (db: any) => Horario;
+}> = ({ schedules, setSchedules, clases, docentes, currentUser, alumnos, aulas, convertHorario }) => {
     const allGrades = useMemo(() => Array.from(new Set(alumnos.map(a => a.salon))).sort(), [alumnos]);
     const [selectedGrade, setSelectedGrade] = useState(allGrades[0] || '');
     const [currentWeek, setCurrentWeek] = useState<number | null>(null);
@@ -6464,6 +6465,17 @@ const App: React.FC = () => {
   const [activeView, setActiveView] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
+  // Helper function to convert HorarioDB to Horario
+  const convertHorario = (db: any): Horario => {
+    // HorarioDB has grado and semana, but Horario interface doesn't
+    // These are handled separately in WeeklySchedules structure
+    const { created_at, updated_at, grado, semana, ...horario } = db;
+    return {
+      ...horario,
+      id_aula: horario.id_aula || null // Asegurar que id_aula se preserve
+    } as Horario;
+  };
+
   // Data states - loaded from Supabase
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
   const [docentes, setDocentes] = useState<Docente[]>([]);
@@ -6496,16 +6508,6 @@ const App: React.FC = () => {
       ...clase,
       studentIds: student_ids || []
     };
-  };
-
-  const convertHorario = (db: any): Horario => {
-    // HorarioDB has grado and semana, but Horario interface doesn't
-    // These are handled separately in WeeklySchedules structure
-    const { created_at, updated_at, grado, semana, ...horario } = db;
-    return {
-      ...horario,
-      id_aula: horario.id_aula || null // Asegurar que id_aula se preserve
-    } as Horario;
   };
 
   // Helper to convert App types to DB types for saving
@@ -6971,7 +6973,7 @@ const App: React.FC = () => {
       case 'calendar':
         return <CalendarView currentUser={currentUser!} />;
       case 'schedules':
-        return <ScheduleView schedules={schedules} setSchedules={setSchedules} clases={clases} docentes={docentes} currentUser={currentUser!} alumnos={alumnos} aulas={aulas} />;
+        return <ScheduleView schedules={schedules} setSchedules={setSchedules} clases={clases} docentes={docentes} currentUser={currentUser!} alumnos={alumnos} aulas={aulas} convertHorario={convertHorario} />;
       case 'team-schedules':
         return <TeamScheduleView docentes={docentes} schedules={schedules} setSchedules={setSchedules} clases={clases} alumnos={alumnos}/>;
       case 'schedule-generator':
