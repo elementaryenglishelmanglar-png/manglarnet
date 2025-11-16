@@ -3236,28 +3236,61 @@ const ScheduleView: React.FC<{
     const [eventData, setEventData] = useState<{dia: number, hora: string, desc: string, id: string | null}>({dia: 0, hora: '', desc: '', id: null});
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
-    const [englishLevelAssignments, setEnglishLevelAssignments] = useState<Array<{id_docente: string, nivel_ingles: string}>>([]);
+    const [englishLevelAssignments, setEnglishLevelAssignments] = useState<Array<{
+        id_docente: string, 
+        nivel_ingles: string,
+        docente?: Docente,
+        aula?: Aula
+    }>>([]);
     
-    // Cargar asignaciones de niveles de inglés
+    // Cargar asignaciones de niveles de inglés con información de docentes y aulas
     useEffect(() => {
         const loadEnglishAssignments = async () => {
             try {
                 const anoEscolar = '2025-2026'; // TODO: Obtener del contexto
-                const { data, error } = await supabase
+                
+                // Cargar asignaciones de docentes
+                const { data: docenteAssignments, error: docenteError } = await supabase
                     .from('asignacion_docente_nivel_ingles')
                     .select('id_docente, nivel_ingles')
                     .eq('ano_escolar', anoEscolar)
                     .eq('activa', true);
                 
-                if (error) throw error;
-                setEnglishLevelAssignments(data || []);
+                if (docenteError) throw docenteError;
+                
+                // Cargar asignaciones de aulas
+                const { data: aulaAssignments, error: aulaError } = await supabase
+                    .from('asignacion_aula_nivel_ingles')
+                    .select('nivel_ingles, id_aula')
+                    .eq('ano_escolar', anoEscolar)
+                    .eq('activa', true);
+                
+                if (aulaError) {
+                    console.warn('Error loading aula assignments:', aulaError);
+                    // Continuar sin aulas si hay error
+                }
+                
+                // Combinar información
+                const assignmentsWithInfo = (docenteAssignments || []).map(assignment => {
+                    const docente = docentes.find(d => d.id_docente === assignment.id_docente);
+                    const aulaAssignment = aulaAssignments?.find(a => a.nivel_ingles === assignment.nivel_ingles);
+                    const aula = aulaAssignment ? aulas.find(a => a.id_aula === aulaAssignment.id_aula) : undefined;
+                    
+                    return {
+                        ...assignment,
+                        docente,
+                        aula
+                    };
+                });
+                
+                setEnglishLevelAssignments(assignmentsWithInfo);
             } catch (error) {
                 console.error('Error loading English level assignments:', error);
             }
         };
         
         loadEnglishAssignments();
-    }, []);
+    }, [docentes, aulas]);
 
     const isPrimaryGrade = useMemo(() => {
         const gradeNum = parseInt(selectedGrade.match(/\d+/)?.[0] || '0');
@@ -3784,22 +3817,33 @@ const ScheduleView: React.FC<{
                                                                 const firstClase = clases.find(c => c.id_clase === englishGroup![0].id_clase);
                                                                 const skill = firstClase?.skill_rutina || 'Inglés';
                                                                 
+                                                                // Agrupar por nivel para mostrar como en el panel de asignaturas
+                                                                const niveles = ['Basic', 'Lower', 'Upper'];
+                                                                const nivelesInfo = niveles.map(nivel => {
+                                                                    const assignment = englishLevelAssignments.find(a => a.nivel_ingles === nivel);
+                                                                    return {
+                                                                        nivel,
+                                                                        docente: assignment?.docente,
+                                                                        aula: assignment?.aula
+                                                                    };
+                                                                }).filter(info => info.docente); // Solo mostrar niveles con docente asignado
+                                                                
                                                                 return (
                                                                     <div className="p-1.5 rounded-md h-full overflow-y-auto" style={{
                                                                         backgroundColor: subjectColors['Inglés'] || getSubjectColor('Inglés')
                                                                     }}>
                                                                         <div className="font-bold text-xs mb-1">{skill}</div>
                                                                         <div className="text-[10px] space-y-0.5">
-                                                                            {englishGroup.map((h) => {
-                                                                                // Para horarios virtuales, obtener nivel_ingles de la asignación
-                                                                                const assignment = englishLevelAssignments.find(a => a.id_docente === h.id_docente);
-                                                                                const nivel = assignment?.nivel_ingles || 
-                                                                                             clases.find(cl => cl.id_clase === h.id_clase)?.nivel_ingles;
-                                                                                const aula = aulas.find(a => a.id_aula === h.id_aula);
+                                                                            {nivelesInfo.map((info) => {
+                                                                                const docenteNombre = info.docente ? 
+                                                                                    `${info.docente.nombres.split(' ')[0]}` : 'N/A';
+                                                                                const aulaNombre = info.aula?.nombre || '';
+                                                                                
                                                                                 return (
-                                                                                    <div key={h.id_horario} className="text-gray-700 border-b border-gray-300 pb-0.5 last:border-0">
-                                                                                        <span className="font-semibold">{nivel}</span>
-                                                                                        {aula && <span className="text-gray-500"> - {aula.nombre}</span>}
+                                                                                    <div key={info.nivel} className="text-gray-700 border-b border-gray-300 pb-0.5 last:border-0">
+                                                                                        <span className="font-semibold">{info.nivel}:</span>
+                                                                                        <span className="text-gray-600"> {docenteNombre}</span>
+                                                                                        {aulaNombre && <span className="text-gray-500"> - {aulaNombre}</span>}
                                                                                     </div>
                                                                                 );
                                                                             })}
@@ -3815,14 +3859,26 @@ const ScheduleView: React.FC<{
                                                             onDragStart={(e) => handleDragStart(e, item, 'event')} 
                                                             className={`h-full ${currentUser.role !== 'docente' ? 'cursor-grab' : 'cursor-default'}`}
                                                         >
-                                                        {(clase => (
-                                                            <div className="p-2 rounded-md h-full" style={{backgroundColor: subjectColors[clase?.nombre_materia || 'default'] || getSubjectColor(clase?.nombre_materia || '')}}>
-                                                                <div className="font-bold">{clase?.nombre_materia}</div>
-                                                                <div className="text-gray-600">
-                                                                    {(docente => docente ? `${docente.nombres} ${docente.apellidos}` : 'N/A')(docentes.find(d => d.id_docente === item.id_docente))}
+                                                        {(clase => {
+                                                            const docente = docentes.find(d => d.id_docente === item.id_docente);
+                                                            const aula = clase?.id_aula ? aulas.find(a => a.id_aula === clase.id_aula) : undefined;
+                                                            
+                                                            return (
+                                                                <div className="p-2 rounded-md h-full" style={{backgroundColor: subjectColors[clase?.nombre_materia || 'default'] || getSubjectColor(clase?.nombre_materia || '')}}>
+                                                                    <div className="font-bold text-sm">{clase?.nombre_materia}</div>
+                                                                    {docente && (
+                                                                        <div className="text-gray-600 text-xs mt-0.5">
+                                                                            {docente.nombres.split(' ')[0]} {docente.apellidos.split(' ')[0]}
+                                                                        </div>
+                                                                    )}
+                                                                    {aula && (
+                                                                        <div className="text-gray-500 text-xs mt-0.5">
+                                                                            📍 {aula.nombre}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
-                                                            </div>
-                                                        ))(clases.find(c => c.id_clase === item.id_clase))}
+                                                            );
+                                                        })(clases.find(c => c.id_clase === item.id_clase))}
                                                         </div>
                                                     )
                                                 )}
@@ -3893,11 +3949,20 @@ const ScheduleView: React.FC<{
                                                 >
                                                     <div className="font-bold">{claseConsolidada.nombre_materia}</div>
                                                     {assignmentsForSkill.length > 0 && (
-                                                        <div className="text-xs text-gray-600 mt-1">
+                                                        <div className="text-xs text-gray-600 mt-1 space-y-0.5">
                                                             {assignmentsForSkill.map(a => {
-                                                                const docente = docentes.find(d => d.id_docente === a.id_docente);
-                                                                return `${a.nivel_ingles}: ${docente?.nombres || 'N/A'}`;
-                                                            }).join(' | ')}
+                                                                const docente = a.docente || docentes.find(d => d.id_docente === a.id_docente);
+                                                                const aula = a.aula;
+                                                                const docenteNombre = docente ? docente.nombres.split(' ')[0] : 'N/A';
+                                                                const aulaNombre = aula?.nombre || '';
+                                                                return (
+                                                                    <div key={a.nivel_ingles}>
+                                                                        <span className="font-semibold">{a.nivel_ingles}:</span>
+                                                                        <span> {docenteNombre}</span>
+                                                                        {aulaNombre && <span className="text-gray-500"> - {aulaNombre}</span>}
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     )}
                                                 </div>
@@ -3905,17 +3970,31 @@ const ScheduleView: React.FC<{
                                         })}
                                         
                                         {/* Mostrar otras clases normalmente */}
-                                        {otherClasses.map(clase => (
-                                            <div key={clase.id_clase}
-                                                draggable
-                                                onDragStart={(e) => handleDragStart(e, clase, 'class')}
-                                                className="p-2 rounded-md cursor-grab hover:shadow-md transition-shadow"
-                                                style={{backgroundColor: subjectColors[clase.nombre_materia] || getSubjectColor(clase.nombre_materia)}}
-                                            >
-                                                <div className="font-bold">{clase.nombre_materia}</div>
-                                                <div className="text-sm text-gray-600">{docentes.find(d => d.id_docente === clase.id_docente_asignado)?.nombres}</div>
-                                            </div>
-                                        ))}
+                                        {otherClasses.map(clase => {
+                                            const docente = docentes.find(d => d.id_docente === clase.id_docente_asignado);
+                                            const aula = clase.id_aula ? aulas.find(a => a.id_aula === clase.id_aula) : undefined;
+                                            
+                                            return (
+                                                <div key={clase.id_clase}
+                                                    draggable
+                                                    onDragStart={(e) => handleDragStart(e, clase, 'class')}
+                                                    className="p-2 rounded-md cursor-grab hover:shadow-md transition-shadow"
+                                                    style={{backgroundColor: subjectColors[clase.nombre_materia] || getSubjectColor(clase.nombre_materia)}}
+                                                >
+                                                    <div className="font-bold">{clase.nombre_materia}</div>
+                                                    {docente && (
+                                                        <div className="text-xs text-gray-600 mt-0.5">
+                                                            {docente.nombres.split(' ')[0]} {docente.apellidos.split(' ')[0]}
+                                                        </div>
+                                                    )}
+                                                    {aula && (
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            📍 {aula.nombre}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                     </>
                                 );
                             })()}
