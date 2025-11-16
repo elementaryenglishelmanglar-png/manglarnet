@@ -3247,11 +3247,39 @@ const ScheduleGeneratorView: React.FC<{
 
             // Load the generation record
             if (data.generacion_id) {
-                const generacion = await generacionesHorariosService.getById(data.generacion_id);
-                setGeneracionActual(generacion);
+                // Poll for updates
+                const pollGeneration = async () => {
+                    const maxAttempts = 30; // 30 seconds max
+                    let attempts = 0;
+                    
+                    const interval = setInterval(async () => {
+                        attempts++;
+                        const generacion = await generacionesHorariosService.getById(data.generacion_id);
+                        
+                        if (generacion) {
+                            setGeneracionActual(generacion);
+                            
+                            if (generacion.estado === 'completado' || generacion.estado === 'fallido' || generacion.estado === 'aplicado') {
+                                clearInterval(interval);
+                                if (generacion.estado === 'completado') {
+                                    setSuccess(data.mensaje || 'Horarios generados exitosamente');
+                                } else if (generacion.estado === 'fallido') {
+                                    setError('La generación falló. Revisa los errores.');
+                                }
+                            }
+                        }
+                        
+                        if (attempts >= maxAttempts) {
+                            clearInterval(interval);
+                            setError('Tiempo de espera agotado. La generación puede estar aún en proceso.');
+                        }
+                    }, 1000); // Poll every second
+                };
+                
+                pollGeneration();
             }
 
-            setSuccess('Generación iniciada. Revisa el estado en el historial.');
+            setSuccess('Generación iniciada. Esperando resultados...');
         } catch (err: any) {
             console.error('Error generating schedule:', err);
             setError(err.message || 'Error al generar horarios');
@@ -3363,23 +3391,117 @@ const ScheduleGeneratorView: React.FC<{
                 </button>
 
                 {generacionActual && (
-                    <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <h3 className="font-semibold text-blue-800 mb-2">Estado de Generación</h3>
-                        <div className="text-sm text-blue-700 space-y-1">
-                            <p><strong>Estado:</strong> {generacionActual.estado}</p>
-                            {generacionActual.tiempo_ejecucion_ms && (
-                                <p><strong>Tiempo:</strong> {generacionActual.tiempo_ejecucion_ms}ms</p>
-                            )}
-                            {generacionActual.errores && generacionActual.errores.length > 0 && (
-                                <div>
-                                    <strong>Errores:</strong>
-                                    <ul className="list-disc list-inside ml-2">
-                                        {generacionActual.errores.map((err, i) => (
-                                            <li key={i}>{err}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
+                    <div className="mt-6 space-y-4">
+                        <div className={`p-4 border rounded-lg ${
+                            generacionActual.estado === 'completado' 
+                                ? 'bg-green-50 border-green-200' 
+                                : generacionActual.estado === 'fallido'
+                                ? 'bg-red-50 border-red-200'
+                                : 'bg-blue-50 border-blue-200'
+                        }`}>
+                            <h3 className="font-semibold mb-2 text-lg">
+                                {generacionActual.estado === 'completado' ? '✅ Generación Completada' :
+                                 generacionActual.estado === 'fallido' ? '❌ Generación Fallida' :
+                                 '⏳ Generando...'}
+                            </h3>
+                            <div className="text-sm space-y-2">
+                                {generacionActual.estadisticas && (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div>
+                                            <p className="font-semibold text-gray-700">Asignaciones</p>
+                                            <p className="text-2xl font-bold">{generacionActual.estadisticas.total_asignaciones || 0}</p>
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-gray-700">Docentes</p>
+                                            <p className="text-2xl font-bold">{generacionActual.estadisticas.docentes_asignados || 0}</p>
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-gray-700">Aulas</p>
+                                            <p className="text-2xl font-bold">{generacionActual.estadisticas.aulas_utilizadas || 0}</p>
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-gray-700">Tiempo</p>
+                                            <p className="text-lg font-bold">{generacionActual.tiempo_ejecucion_ms || 0}ms</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {generacionActual.estadisticas?.conflictos && generacionActual.estadisticas.conflictos.length > 0 && (
+                                    <div className="mt-4">
+                                        <strong className="text-red-800">Conflictos encontrados:</strong>
+                                        <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+                                            {generacionActual.estadisticas.conflictos.map((conflicto: string, i: number) => (
+                                                <li key={i} className="text-red-700">{conflicto}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                                {generacionActual.errores && generacionActual.errores.length > 0 && (
+                                    <div className="mt-4">
+                                        <strong className="text-red-800">Errores:</strong>
+                                        <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+                                            {generacionActual.errores.map((err: string, i: number) => (
+                                                <li key={i} className="text-red-700">{err}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                                {generacionActual.estado === 'completado' && generacionActual.resultado && Array.isArray(generacionActual.resultado) && generacionActual.resultado.length > 0 && (
+                                    <div className="mt-4">
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    // Apply generated schedules to database
+                                                    const horarios = generacionActual.resultado
+                                                    if (!horarios || !Array.isArray(horarios)) return
+
+                                                    // Delete existing schedules for this week and grade
+                                                    const grado = horarios[0]?.grado
+                                                    if (grado) {
+                                                        const { error: deleteError } = await supabase
+                                                            .from('horarios')
+                                                            .delete()
+                                                            .eq('grado', grado)
+                                                            .eq('semana', semana)
+
+                                                        if (deleteError) throw deleteError
+                                                    }
+
+                                                    // Insert new schedules
+                                                    const horariosToInsert = horarios.map((h: any) => ({
+                                                        id_docente: h.id_docente,
+                                                        id_clase: h.id_clase,
+                                                        id_aula: h.id_aula,
+                                                        grado: h.grado,
+                                                        semana: h.semana,
+                                                        dia_semana: h.dia_semana,
+                                                        hora_inicio: h.hora_inicio,
+                                                        hora_fin: h.hora_fin
+                                                    }))
+
+                                                    const { error: insertError } = await supabase
+                                                        .from('horarios')
+                                                        .insert(horariosToInsert)
+
+                                                    if (insertError) throw insertError
+
+                                                    // Update generation status
+                                                    await generacionesHorariosService.update(generacionActual.id, {
+                                                        estado: 'aplicado'
+                                                    })
+
+                                                    setSuccess(`✅ ${horarios.length} horarios aplicados exitosamente`)
+                                                    setGeneracionActual({ ...generacionActual, estado: 'aplicado' })
+                                                } catch (err: any) {
+                                                    setError('Error al aplicar horarios: ' + err.message)
+                                                }
+                                            }}
+                                            className="mt-4 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                                        >
+                                            Aplicar Horarios Generados
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
@@ -3394,9 +3516,9 @@ const ScheduleGeneratorView: React.FC<{
                         (docentes, aulas, grados) y maximizan las preferencias configuradas.
                     </p>
                     <p>
-                        <strong>Próximos pasos:</strong><br />
-                        El solver OR-Tools está en desarrollo. La estructura de base de datos está lista.
-                        Una vez implementado, podrás generar horarios automáticamente sin conflictos.
+                        <strong>Estado actual:</strong><br />
+                        El solver básico está implementado y funcional. Genera horarios respetando todas las restricciones duras
+                        (docentes, aulas, grados) y optimiza las preferencias configuradas. Puedes generar horarios ahora mismo.
                     </p>
                 </div>
             </div>

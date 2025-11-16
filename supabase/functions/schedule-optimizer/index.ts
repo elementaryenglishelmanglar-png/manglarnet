@@ -78,7 +78,9 @@ Deno.serve(async (req) => {
         { data: claseRequisitos, error: claseRequisitosError }
       ] = await Promise.all([
         supabase.from('docentes').select('*'),
-        supabase.from('clases').select('*').eq('grado_asignado', grado || ''),
+        grado 
+          ? supabase.from('clases').select('*').eq('grado_asignado', grado)
+          : supabase.from('clases').select('*'),
         supabase.from('aulas').select('*').eq('activa', true),
         configuracion_id 
           ? supabase.from('configuracion_horarios').select('*').eq('id', configuracion_id).single()
@@ -89,7 +91,7 @@ Deno.serve(async (req) => {
         supabase.from('clase_requisitos').select('*')
       ])
 
-      // Check for errors
+      // Check for errors (allow empty results for some)
       if (docentesError) throw new Error(`Error loading docentes: ${docentesError.message}`)
       if (clasesError) throw new Error(`Error loading clases: ${clasesError.message}`)
       if (aulasError) throw new Error(`Error loading aulas: ${aulasError.message}`)
@@ -98,49 +100,102 @@ Deno.serve(async (req) => {
       if (restSuavesError) throw new Error(`Error loading restricciones_suaves: ${restSuavesError.message}`)
       if (docenteMateriasError) throw new Error(`Error loading docente_materias: ${docenteMateriasError.message}`)
       if (claseRequisitosError) throw new Error(`Error loading clase_requisitos: ${claseRequisitosError.message}`)
+      
+      // Validate we have minimum required data
+      if (!docentes || docentes.length === 0) {
+        throw new Error('No hay docentes registrados')
+      }
+      if (!aulas || aulas.length === 0) {
+        throw new Error('No hay aulas registradas. Por favor, crea al menos una aula.')
+      }
 
       if (!config) {
         throw new Error('No configuration found for the specified year')
       }
 
-        // TODO: Implement OR-Tools solver here
-        // For now, return a placeholder response
-        const tiempoEjecucion = Date.now() - startTime
+      // Import solver
+      const { solveSchedule } = await import('./solver.ts')
 
-        const resultado = {
-          horarios: [], // Will be populated by solver
-          estadisticas: {
-            factible: false,
-            violaciones_restricciones_suaves: 0,
-            tiempo_ejecucion_ms: tiempoEjecucion,
-            mensaje: 'Solver not yet implemented. This is a placeholder response.'
-          }
+      // Filter clases by grado if specified
+      let clasesFiltradas = clases || []
+      if (grado) {
+        clasesFiltradas = clasesFiltradas.filter(c => c.grado_asignado === grado)
+      }
+
+      if (clasesFiltradas.length === 0) {
+        throw new Error(`No hay clases para el grado ${grado || 'seleccionado'}`)
+      }
+
+      // Run solver
+      const solucion = solveSchedule(
+        docentes || [],
+        clasesFiltradas,
+        aulas || [],
+        config.bloques_horarios || [],
+        restriccionesDuras || [],
+        restriccionesSuaves || [],
+        docenteMaterias || [],
+        claseRequisitos || [],
+        grado
+      )
+
+      const tiempoEjecucion = Date.now() - startTime
+
+      // Convert assignments to horarios format
+      const horariosGenerados = solucion.asignaciones.map(asig => {
+        const bloque = config.bloques_horarios[asig.bloque]
+        return {
+          id_clase: asig.id_clase,
+          id_docente: asig.id_docente,
+          id_aula: asig.id_aula,
+          grado: asig.grado,
+          semana: semana,
+          dia_semana: asig.dia_semana,
+          hora_inicio: bloque?.inicio || '08:00',
+          hora_fin: bloque?.fin || '09:00'
         }
+      })
 
-        // Update generation record
-        await supabase
-          .from('generaciones_horarios')
-          .update({
-            estado: 'completado',
-            resultado: resultado.horarios,
-            estadisticas: resultado.estadisticas,
-            tiempo_ejecucion_ms: tiempoEjecucion,
-            advertencias: ['Solver implementation pending']
-          })
-          .eq('id', generacion.id)
+      const resultado = {
+        horarios: horariosGenerados,
+        estadisticas: {
+          factible: solucion.factible,
+          violaciones_restricciones_suaves: solucion.violaciones_restricciones_suaves,
+          tiempo_ejecucion_ms: tiempoEjecucion,
+          total_asignaciones: solucion.estadisticas.total_asignaciones,
+          docentes_asignados: solucion.estadisticas.docentes_asignados,
+          aulas_utilizadas: solucion.estadisticas.aulas_utilizadas,
+          conflictos: solucion.estadisticas.conflictos
+        }
+      }
 
-        return new Response(
-          JSON.stringify({
-            success: true,
-            generacion_id: generacion.id,
-            resultado,
-            mensaje: 'Solver implementation pending. Database structure is ready.'
-          }),
-          { 
-            status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
+      // Update generation record
+      await supabase
+        .from('generaciones_horarios')
+        .update({
+          estado: solucion.factible ? 'completado' : 'fallido',
+          resultado: horariosGenerados,
+          estadisticas: resultado.estadisticas,
+          tiempo_ejecucion_ms: tiempoEjecucion,
+          errores: solucion.estadisticas.conflictos.length > 0 ? solucion.estadisticas.conflictos : null,
+          advertencias: solucion.factible ? null : ['Algunas clases no pudieron ser asignadas']
+        })
+        .eq('id', generacion.id)
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          generacion_id: generacion.id,
+          resultado,
+          mensaje: solucion.factible 
+            ? 'Horarios generados exitosamente' 
+            : 'Horarios generados con advertencias. Revisa los conflictos.'
+        }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
 
     } catch (error: any) {
       const tiempoEjecucion = Date.now() - startTime
