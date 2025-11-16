@@ -2543,30 +2543,119 @@ const TeachersView: React.FC<{
     };
 
     const handleDeleteTeacher = async (id_docente: string) => {
-        if (window.confirm('¿Está seguro de que desea eliminar a este docente? Esta acción también eliminará sus asignaturas.')) {
-            try {
-                // Get classes to delete
-                const classesToDelete = clases.filter(c => c.id_docente_asignado === id_docente);
-                
-                // Delete classes from Supabase
-                for (const clase of classesToDelete) {
-                    try {
-                        await clasesService.delete(clase.id_clase);
-                    } catch (error) {
-                        console.error('Error deleting class:', error);
-                    }
-                }
-                
-                // Delete teacher from Supabase
-                await docentesService.delete(id_docente);
-                
-                // Update local state
-                setDocentes(prev => prev.filter(d => d.id_docente !== id_docente));
-                setClases(prev => prev.filter(c => c.id_docente_asignado !== id_docente));
-            } catch (error: any) {
-                console.error('Error deleting teacher:', error);
-                alert('Error al eliminar el docente: ' + (error.message || 'Error desconocido'));
+        // Verificar que el usuario actual no se esté eliminando a sí mismo
+        if (currentUser?.docenteId === id_docente) {
+            alert('⚠️ No puedes eliminar tu propio perfil de docente. Contacta a un coordinador o directivo.');
+            return;
+        }
+
+        // Obtener información del docente a eliminar
+        const docenteToDelete = docentes.find(d => d.id_docente === id_docente);
+        const classesToDelete = clases.filter(c => c.id_docente_asignado === id_docente);
+        
+        // Mostrar advertencia detallada
+        const warningMessage = `¿Está seguro de que desea eliminar a este docente?\n\n` +
+            `Docente: ${docenteToDelete?.nombres || ''} ${docenteToDelete?.apellidos || ''}\n` +
+            `Email: ${docenteToDelete?.email || ''}\n\n` +
+            `⚠️ ADVERTENCIA: Esta acción eliminará:\n` +
+            `- El registro del docente\n` +
+            `- ${classesToDelete.length} clase(s) asignada(s)\n` +
+            `- Todas las planificaciones asociadas\n` +
+            `- Todas las notificaciones asociadas\n\n` +
+            `Esta acción NO se puede deshacer.\n\n` +
+            `¿Desea continuar?`;
+        
+        if (!window.confirm(warningMessage)) {
+            return;
+        }
+
+        try {
+            // Mostrar indicador de carga
+            const deleteButton = document.activeElement as HTMLElement;
+            const originalText = deleteButton?.textContent || '';
+            if (deleteButton) {
+                deleteButton.textContent = 'Eliminando...';
+                deleteButton.setAttribute('disabled', 'true');
             }
+
+            // Verificar si hay muchas clases (puede tomar tiempo)
+            if (classesToDelete.length > 10) {
+                console.warn(`Eliminando ${classesToDelete.length} clases, esto puede tomar un momento...`);
+            }
+
+            // Delete classes from Supabase
+            let deletedClasses = 0;
+            let failedClasses: string[] = [];
+            
+            for (const clase of classesToDelete) {
+                try {
+                    await clasesService.delete(clase.id_clase);
+                    deletedClasses++;
+                } catch (error: any) {
+                    console.error(`Error deleting class ${clase.id_clase}:`, error);
+                    failedClasses.push(clase.nombre_materia || clase.id_clase);
+                }
+            }
+
+            // Si algunas clases fallaron, mostrar advertencia
+            if (failedClasses.length > 0) {
+                const continueDelete = window.confirm(
+                    `⚠️ Advertencia: No se pudieron eliminar ${failedClasses.length} clase(s):\n` +
+                    `${failedClasses.slice(0, 5).join(', ')}${failedClasses.length > 5 ? '...' : ''}\n\n` +
+                    `¿Desea continuar eliminando el docente de todas formas?`
+                );
+                
+                if (!continueDelete) {
+                    if (deleteButton) {
+                        deleteButton.textContent = originalText;
+                        deleteButton.removeAttribute('disabled');
+                    }
+                    return;
+                }
+            }
+            
+            // Delete teacher from Supabase
+            await docentesService.delete(id_docente);
+            
+            // Update local state
+            setDocentes(prev => prev.filter(d => d.id_docente !== id_docente));
+            setClases(prev => prev.filter(c => c.id_docente_asignado !== id_docente));
+            
+            // Mostrar mensaje de éxito
+            alert(`✅ Docente eliminado exitosamente.\n\n` +
+                  `- ${deletedClasses} clase(s) eliminada(s)\n` +
+                  `${failedClasses.length > 0 ? `- ${failedClasses.length} clase(s) con errores\n` : ''}`);
+
+            // Restaurar botón
+            if (deleteButton) {
+                deleteButton.textContent = originalText;
+                deleteButton.removeAttribute('disabled');
+            }
+
+        } catch (error: any) {
+            console.error('Error deleting teacher:', error);
+            
+            // Restaurar botón
+            const deleteButton = document.activeElement as HTMLElement;
+            if (deleteButton) {
+                deleteButton.removeAttribute('disabled');
+            }
+            
+            // Manejar diferentes tipos de errores
+            let errorMessage = 'Error al eliminar el docente: ';
+            
+            if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('row-level security')) {
+                errorMessage += 'Error de permisos. Verifica que tengas los permisos necesarios.';
+            } else if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
+                errorMessage += 'Demasiadas solicitudes. Por favor, espera un momento e intenta nuevamente.';
+            } else if (error.message?.includes('406') || error.message?.includes('Not Acceptable')) {
+                errorMessage += 'Error de comunicación con el servidor. Por favor, recarga la página e intenta nuevamente.';
+            } else {
+                errorMessage += error.message || 'Error desconocido';
+            }
+            
+            alert(`❌ ${errorMessage}\n\n` +
+                  `Si el problema persiste, contacta al administrador del sistema.`);
         }
     };
 
@@ -6358,77 +6447,112 @@ const App: React.FC = () => {
   useEffect(() => {
     // Check for existing session
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user?.email) {
-        // Verify user is authorized and get their role
-        const { data: authorizedUser } = await supabase
-          .from('authorized_users')
-          .select('*')
-          .eq('email', session.user.email.toLowerCase())
-          .single();
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Error getting session:', sessionError);
+          // No hacer signOut por errores temporales de sesión
+          return;
+        }
+        
+        if (session?.user?.email) {
+          // Verify user is authorized and get their role
+          const { data: authorizedUser, error: authError } = await supabase
+            .from('authorized_users')
+            .select('*')
+            .eq('email', session.user.email.toLowerCase())
+            .maybeSingle(); // Usar maybeSingle para evitar errores si hay problemas temporales
 
-        if (authorizedUser) {
-          const fullName = session.user.user_metadata?.full_name || 
-                          session.user.user_metadata?.name ||
-                          session.user.email.split('@')[0];
-
-          // For docentes, try to link to existing docente record by email
-          let docenteId: string | undefined = undefined;
-          if (authorizedUser.role === 'docente') {
-            try {
-              // Try to find existing docente by email
-              const { data: docente } = await supabase
-                .from('docentes')
-                .select('id_docente, id_usuario')
-                .eq('email', session.user.email.toLowerCase())
-                .single();
-
-              if (docente) {
-                docenteId = docente.id_docente;
-                // If docente exists but id_usuario is not set, update it
-                if (!docente.id_usuario) {
-                  await supabase
-                    .from('docentes')
-                    .update({ id_usuario: session.user.id })
-                    .eq('id_docente', docente.id_docente);
-                }
-              } else {
-                // If no docente exists, create one automatically
-                const { data: newDocente } = await supabase
-                  .from('docentes')
-                  .insert({
-                    email: session.user.email.toLowerCase(),
-                    nombres: fullName.split(' ')[0] || '',
-                    apellidos: fullName.split(' ').slice(1).join(' ') || '',
-                    id_usuario: session.user.id,
-                    telefono: '',
-                    especialidad: '',
-                  })
-                  .select('id_docente')
-                  .single();
-
-                if (newDocente) {
-                  docenteId = newDocente.id_docente;
-                }
-              }
-            } catch (error) {
-              console.error('Error linking docente:', error);
-              // Continue even if linking fails
+          // Si hay un error de RLS, red o rate limiting, no hacer signOut
+          if (authError) {
+            console.error('Error checking authorization:', authError);
+            
+            // Si es un error 429 (Too Many Requests), 406 (Not Acceptable), o error de RLS,
+            // no hacer signOut - son errores temporales
+            if (authError.code === 'PGRST301' || 
+                authError.code === '42501' ||
+                authError.message?.includes('429') || 
+                authError.message?.includes('406') ||
+                authError.message?.includes('permission') ||
+                authError.message?.includes('row-level security')) {
+              console.warn('Temporary error checking authorization, will not sign out user');
+              // Mantener la sesión actual si existe
+              return;
             }
+            
+            // Para otros errores desconocidos, también no hacer signOut automáticamente
+            // Solo registrar el error
+            return;
           }
 
-          setCurrentUser({
-            id: session.user.id,
-            email: session.user.email,
-            role: authorizedUser.role as UserRole,
-            fullName: fullName,
-            docenteId: docenteId,
-          });
-        } else {
-          // User not authorized, sign them out
-          await supabase.auth.signOut();
+          if (authorizedUser) {
+            const fullName = session.user.user_metadata?.full_name || 
+                            session.user.user_metadata?.name ||
+                            session.user.email.split('@')[0];
+
+            // For docentes, try to link to existing docente record by email
+            let docenteId: string | undefined = undefined;
+            if (authorizedUser.role === 'docente') {
+              try {
+                // Try to find existing docente by email
+                const { data: docente } = await supabase
+                  .from('docentes')
+                  .select('id_docente, id_usuario')
+                  .eq('email', session.user.email.toLowerCase())
+                  .maybeSingle(); // Usar maybeSingle también aquí
+
+                if (docente) {
+                  docenteId = docente.id_docente;
+                  // If docente exists but id_usuario is not set, update it
+                  if (!docente.id_usuario) {
+                    await supabase
+                      .from('docentes')
+                      .update({ id_usuario: session.user.id })
+                      .eq('id_docente', docente.id_docente);
+                  }
+                } else {
+                  // If no docente exists, create one automatically
+                  const { data: newDocente } = await supabase
+                    .from('docentes')
+                    .insert({
+                      email: session.user.email.toLowerCase(),
+                      nombres: fullName.split(' ')[0] || '',
+                      apellidos: fullName.split(' ').slice(1).join(' ') || '',
+                      id_usuario: session.user.id,
+                      telefono: '',
+                      especialidad: '',
+                    })
+                    .select('id_docente')
+                    .single();
+
+                  if (newDocente) {
+                    docenteId = newDocente.id_docente;
+                  }
+                }
+              } catch (error) {
+                console.error('Error linking docente:', error);
+                // Continue even if linking fails
+              }
+            }
+
+            setCurrentUser({
+              id: session.user.id,
+              email: session.user.email,
+              role: authorizedUser.role as UserRole,
+              fullName: fullName,
+              docenteId: docenteId,
+            });
+          } else {
+            // Solo hacer signOut si realmente el usuario NO está autorizado
+            // (no si hay un error temporal)
+            console.log('User not found in authorized_users, signing out');
+            await supabase.auth.signOut();
+          }
         }
+      } catch (error) {
+        console.error('Error in checkSession:', error);
+        // No hacer signOut por errores inesperados - mantener la sesión
       }
     };
 
