@@ -3225,7 +3225,14 @@ const CalendarView: React.FC<{
     currentUser: Usuario;
 }> = ({ currentUser }) => {
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [viewType, setViewType] = useState<CalendarViewType>('month');
+    // Initialize with 'list' view on mobile, 'month' on desktop
+    const [viewType, setViewType] = useState<CalendarViewType>(() => {
+        // Check if window is available (SSR safety) and if it's mobile
+        if (typeof window !== 'undefined' && window.innerWidth < 768) {
+            return 'list';
+        }
+        return 'month';
+    });
     const [eventos, setEventos] = useState<EventoCalendario[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
