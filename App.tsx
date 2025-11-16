@@ -3937,9 +3937,14 @@ const ScheduleView: React.FC<{
                 setLapsos(lapsosData);
                 if (lapsosData.length > 0) {
                     setSelectedLapso(lapsosData[0].lapso);
+                } else {
+                    console.warn('No se encontraron lapsos para el año escolar', anoEscolar);
+                    console.warn('Por favor, ejecuta las migraciones SQL o crea lapsos desde la vista de administración');
                 }
             } catch (error) {
                 console.error('Error loading lapsos:', error);
+                // Si hay error, puede ser que las tablas no existan aún
+                console.warn('Asegúrate de haber ejecutado las migraciones SQL: 016, 017, 018');
             }
         };
         loadLapsos();
@@ -4462,16 +4467,36 @@ const ScheduleView: React.FC<{
                     </select>
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium text-gray-700">Lapso:</label>
+                            <select
+                                value={selectedLapso}
+                                onChange={(e) => setSelectedLapso(e.target.value)}
+                                className="p-2 border border-gray-300 rounded-md shadow-sm min-w-[150px]"
+                                disabled={lapsos.length === 0}
+                            >
+                                <option value="">Elegir Lapso</option>
+                                {lapsos.map(lapso => (
+                                    <option key={lapso.id_lapso} value={lapso.lapso}>{lapso.lapso}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex items-center gap-2">
                             <label className="text-sm font-medium text-gray-700">Semana:</label>
                             <select
                                 value={currentWeek || ''}
                                 onChange={(e) => setCurrentWeek(e.target.value ? parseInt(e.target.value) : null)}
-                                className="p-2 border border-gray-300 rounded-md shadow-sm min-w-[150px]"
+                                className="p-2 border border-gray-300 rounded-md shadow-sm min-w-[200px]"
+                                disabled={!selectedLapso || semanasInfo.size === 0}
                             >
                                 <option value="">Elegir Semana</option>
-                                {Array.from({ length: 18 }, (_, i) => i + 1).map(week => (
-                                    <option key={week} value={week}>Semana {week}</option>
-                                ))}
+                                {Array.from(semanasInfo.keys()).sort((a, b) => a - b).map(week => {
+                                    const semanaInfo = semanasInfo.get(week);
+                                    return (
+                                        <option key={week} value={week}>
+                                            Semana {week} {semanaInfo ? `(${formatDateRange(semanaInfo.fecha_inicio, semanaInfo.fecha_fin)})` : ''}
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
                         {currentWeek && (currentUser.role === 'coordinador' || currentUser.role === 'directivo') && (
