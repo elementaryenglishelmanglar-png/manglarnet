@@ -50,14 +50,23 @@
 
 ## 📝 Instrucciones para Continuar
 
-### 1. Ejecutar Migración SQL
+### 1. Ejecutar Migraciones SQL
 
-Ve a Supabase Dashboard y ejecuta la migración:
+Ve a Supabase Dashboard y ejecuta las migraciones en orden:
 
+**Migración 1: Estructura de Tablas**
 ```sql
 -- Copia y pega el contenido de:
 -- supabase/migrations/009_create_schedule_optimizer_tables.sql
 ```
+
+**Migración 2: Datos Iniciales (Opcional pero recomendado)**
+```sql
+-- Copia y pega el contenido de:
+-- supabase/migrations/010_seed_initial_data.sql
+```
+
+Esto creará aulas básicas y asignará capacidades a docentes existentes.
 
 ### 2. Verificar Tablas Creadas
 
@@ -116,8 +125,9 @@ En Supabase Dashboard > Edge Functions > schedule-optimizer:
 
 - ✅ **Base de Datos**: 100% completada
 - ✅ **Servicios TypeScript**: 100% completados
-- 🔄 **Backend (Edge Function)**: 30% completado (estructura básica)
-- ⏳ **Frontend**: 0% (pendiente)
+- ✅ **Datos Iniciales**: Script SQL creado (010_seed_initial_data.sql)
+- 🔄 **Backend (Edge Function)**: 30% completado (estructura básica, falta solver OR-Tools)
+- ✅ **Frontend**: 80% completado (componente básico creado, falta UI de restricciones)
 
 ## 📚 Recursos
 

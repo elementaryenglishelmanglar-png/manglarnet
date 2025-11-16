@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { DashboardIcon, StudentsIcon, TeachersIcon, ClassesIcon, PlusIcon, CloseIcon, EditIcon, DeleteIcon, ChevronDownIcon, LogoutIcon, PlanningIcon, GradesIcon, FilterIcon, CalendarIcon, SearchIcon, SpecialSubjectIcon, SparklesIcon, ArrowLeftIcon, UserCircleIcon, AcademicCapIcon, UsersIcon, IdentificationIcon, CakeIcon, LocationMarkerIcon, MailIcon, PhoneIcon, ClipboardCheckIcon, SendIcon, BellIcon, TagIcon, DownloadIcon, EvaluationIcon, SaveIcon, MenuIcon } from './components/Icons';
+import { DashboardIcon, StudentsIcon, TeachersIcon, ClassesIcon, PlusIcon, CloseIcon, EditIcon, DeleteIcon, ChevronDownIcon, LogoutIcon, PlanningIcon, GradesIcon, FilterIcon, CalendarIcon, SearchIcon, SpecialSubjectIcon, SparklesIcon, ArrowLeftIcon, UserCircleIcon, AcademicCapIcon, UsersIcon, IdentificationIcon, CakeIcon, LocationMarkerIcon, MailIcon, PhoneIcon, ClipboardCheckIcon, SendIcon, BellIcon, TagIcon, DownloadIcon, EvaluationIcon, SaveIcon, MenuIcon, MagicWandIcon } from './components/Icons';
 import { getAIPlanSuggestions, getAIEvaluationAnalysis } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
 import { LoginScreen } from './components/LoginScreen';
@@ -17,6 +17,9 @@ import {
   minutasService,
   notificacionesService,
   eventosCalendarioService,
+  aulasService,
+  configuracionHorariosService,
+  generacionesHorariosService,
   type Alumno as AlumnoDB,
   type Docente as DocenteDB,
   type Clase as ClaseDB,
@@ -24,7 +27,9 @@ import {
   type Horario as HorarioDB,
   type MinutaEvaluacion as MinutaEvaluacionDB,
   type Notification as NotificationDB,
-  type EventoCalendario as EventoCalendarioDB
+  type EventoCalendario as EventoCalendarioDB,
+  type ConfiguracionHorario,
+  type GeneracionHorario
 } from './services/supabaseDataService';
 
 
@@ -800,6 +805,7 @@ const Sidebar: React.FC<{
         { id: 'students', label: 'Alumnos', icon: StudentsIcon, roles: ['directivo', 'coordinador', 'administrativo'] },
         { id: 'teachers', label: 'Docentes', icon: TeachersIcon, roles: ['directivo', 'coordinador'] },
         { id: 'schedules', label: 'Horarios', icon: CalendarIcon, roles: ['coordinador', 'directivo', 'docente'] },
+        { id: 'schedule-generator', label: 'Generador de Horarios', icon: MagicWandIcon, roles: ['coordinador', 'directivo'] },
         { id: 'team-schedules', label: 'Horarios Equipo', icon: UsersIcon, roles: ['coordinador', 'directivo'] },
         { id: 'calendar', label: 'Calendario', icon: CalendarIcon, roles: ['directivo', 'coordinador', 'docente'] },
         { id: 'planning', label: 'Planificaciones', icon: PlanningIcon, roles: ['directivo', 'coordinador', 'docente'] },
@@ -3171,6 +3177,233 @@ const TeamScheduleView: React.FC<{
     );
 };
 
+// ============================================
+// SCHEDULE GENERATOR VIEW COMPONENT
+// ============================================
+
+const ScheduleGeneratorView: React.FC<{
+    currentUser: Usuario;
+}> = ({ currentUser }) => {
+    const [anoEscolar, setAnoEscolar] = useState('2024-2025');
+    const [semana, setSemana] = useState<number>(1);
+    const [grado, setGrado] = useState<string>('');
+    const [configuracion, setConfiguracion] = useState<ConfiguracionHorario | null>(null);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [generacionActual, setGeneracionActual] = useState<GeneracionHorario | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
+
+    // Load configuration
+    useEffect(() => {
+        const loadConfig = async () => {
+            try {
+                const config = await configuracionHorariosService.getActive(anoEscolar);
+                setConfiguracion(config);
+            } catch (err: any) {
+                console.error('Error loading configuration:', err);
+            }
+        };
+        loadConfig();
+    }, [anoEscolar]);
+
+    const handleGenerate = async () => {
+        if (!configuracion) {
+            setError('No hay configuración de horarios para el año seleccionado');
+            return;
+        }
+
+        setIsGenerating(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            // Get Supabase URL and anon key from environment
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+            if (!supabaseUrl || !supabaseKey) {
+                throw new Error('Configuración de Supabase no encontrada');
+            }
+
+            // Call Edge Function
+            const response = await fetch(`${supabaseUrl}/functions/v1/schedule-optimizer`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseKey}`,
+                },
+                body: JSON.stringify({
+                    ano_escolar: anoEscolar,
+                    semana: semana,
+                    grado: grado || undefined,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Error al generar horarios');
+            }
+
+            // Load the generation record
+            if (data.generacion_id) {
+                const generacion = await generacionesHorariosService.getById(data.generacion_id);
+                setGeneracionActual(generacion);
+            }
+
+            setSuccess('Generación iniciada. Revisa el estado en el historial.');
+        } catch (err: any) {
+            console.error('Error generating schedule:', err);
+            setError(err.message || 'Error al generar horarios');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const GRADOS = ['Preescolar', '1er Grado', '2do Grado', '3er Grado', '4to Grado', '5to Grado', 
+                    '6to Grado', '1er Año', '2do Año', '3er Año', '4to Año', '5to Año'];
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                <div className="flex items-center gap-3 mb-6">
+                    <MagicWandIcon className="h-8 w-8 text-purple-600" />
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Generador de Horarios</h2>
+                        <p className="text-gray-600">Genera horarios automáticamente usando optimización matemática</p>
+                    </div>
+                </div>
+
+                {error && (
+                    <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+                        <p className="text-red-800 text-sm">{error}</p>
+                    </div>
+                )}
+
+                {success && (
+                    <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md">
+                        <p className="text-green-800 text-sm">{success}</p>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Año Escolar
+                        </label>
+                        <select
+                            value={anoEscolar}
+                            onChange={(e) => setAnoEscolar(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent text-base"
+                        >
+                            <option value="2024-2025">2024-2025</option>
+                            <option value="2025-2026">2025-2026</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Semana
+                        </label>
+                        <select
+                            value={semana}
+                            onChange={(e) => setSemana(parseInt(e.target.value))}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent text-base"
+                        >
+                            {Array.from({ length: 18 }, (_, i) => i + 1).map(w => (
+                                <option key={w} value={w}>Semana {w}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Grado (Opcional)
+                        </label>
+                        <select
+                            value={grado}
+                            onChange={(e) => setGrado(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent text-base"
+                        >
+                            <option value="">Todos los Grados</option>
+                            {GRADOS.map(g => (
+                                <option key={g} value={g}>{g}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {configuracion && (
+                    <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <h3 className="font-semibold text-gray-800 mb-2">Configuración Actual</h3>
+                        <div className="text-sm text-gray-600 space-y-1">
+                            <p><strong>Bloques:</strong> {configuracion.bloques_horarios.length} bloques configurados</p>
+                            <p><strong>Días:</strong> {configuracion.dias_semana.join(', ')}</p>
+                            <p><strong>Semanas totales:</strong> {configuracion.semanas_totales}</p>
+                        </div>
+                    </div>
+                )}
+
+                <button
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !configuracion}
+                    className={`w-full sm:w-auto px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base font-medium min-h-[44px]`}
+                >
+                    {isGenerating ? (
+                        <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                            Generando...
+                        </>
+                    ) : (
+                        <>
+                            <MagicWandIcon className="h-5 w-5" />
+                            Generar Horarios
+                        </>
+                    )}
+                </button>
+
+                {generacionActual && (
+                    <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <h3 className="font-semibold text-blue-800 mb-2">Estado de Generación</h3>
+                        <div className="text-sm text-blue-700 space-y-1">
+                            <p><strong>Estado:</strong> {generacionActual.estado}</p>
+                            {generacionActual.tiempo_ejecucion_ms && (
+                                <p><strong>Tiempo:</strong> {generacionActual.tiempo_ejecucion_ms}ms</p>
+                            )}
+                            {generacionActual.errores && generacionActual.errores.length > 0 && (
+                                <div>
+                                    <strong>Errores:</strong>
+                                    <ul className="list-disc list-inside ml-2">
+                                        {generacionActual.errores.map((err, i) => (
+                                            <li key={i}>{err}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Información</h3>
+                <div className="space-y-3 text-sm text-gray-600">
+                    <p>
+                        <strong>¿Qué hace el Generador de Horarios?</strong><br />
+                        Utiliza algoritmos de optimización matemática para generar horarios que respetan todas las restricciones
+                        (docentes, aulas, grados) y maximizan las preferencias configuradas.
+                    </p>
+                    <p>
+                        <strong>Próximos pasos:</strong><br />
+                        El solver OR-Tools está en desarrollo. La estructura de base de datos está lista.
+                        Una vez implementado, podrás generar horarios automáticamente sin conflictos.
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- NEW EVALUATION VIEW COMPONENT ---
 
 // ============================================
@@ -5332,6 +5565,8 @@ const App: React.FC = () => {
         return <ScheduleView schedules={schedules} setSchedules={setSchedules} clases={clases} docentes={docentes} currentUser={currentUser!} alumnos={alumnos} />;
       case 'team-schedules':
         return <TeamScheduleView docentes={docentes} schedules={schedules} setSchedules={setSchedules} clases={clases} alumnos={alumnos}/>;
+      case 'schedule-generator':
+        return <ScheduleGeneratorView currentUser={currentUser!} />;
       case 'evaluation':
         return <EvaluationView alumnos={alumnos} clases={clases} minutas={minutas} setMinutas={setMinutas} />;
       case 'authorized-users':
@@ -5346,6 +5581,7 @@ const App: React.FC = () => {
       students: selectedStudent ? `Detalle de ${selectedStudent.nombres}` : 'Gestión de Alumnos',
       teachers: 'Gestión de Docentes',
       schedules: 'Gestión de Horarios',
+      'schedule-generator': 'Generador de Horarios',
       'team-schedules': 'Horarios de Equipo',
       calendar: 'Calendario',
       planning: 'Planificaciones',
