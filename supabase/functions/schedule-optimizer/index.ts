@@ -75,7 +75,11 @@ Deno.serve(async (req) => {
         { data: restriccionesDuras, error: restDurasError },
         { data: restriccionesSuaves, error: restSuavesError },
         { data: docenteMaterias, error: docenteMateriasError },
-        { data: claseRequisitos, error: claseRequisitosError }
+        { data: claseRequisitos, error: claseRequisitosError },
+        { data: alumnos, error: alumnosError },
+        { data: configInglesPrimaria, error: configInglesError },
+        { data: asignacionesDocenteNivel, error: asignacionesDocenteError },
+        { data: asignacionesAulaNivel, error: asignacionesAulaError }
       ] = await Promise.all([
         supabase.from('docentes').select('*'),
         grado 
@@ -88,7 +92,11 @@ Deno.serve(async (req) => {
         supabase.from('restricciones_duras').select('*').eq('ano_escolar', ano_escolar).eq('activa', true),
         supabase.from('restricciones_suaves').select('*').eq('ano_escolar', ano_escolar).eq('activa', true),
         supabase.from('docente_materias').select('*'),
-        supabase.from('clase_requisitos').select('*')
+        supabase.from('clase_requisitos').select('*'),
+        supabase.from('alumnos').select('id_alumno, salon, nivel_ingles'),
+        supabase.from('configuracion_ingles_primaria').select('*').eq('ano_escolar', ano_escolar).eq('activa', true),
+        supabase.from('asignacion_docente_nivel_ingles').select('*').eq('ano_escolar', ano_escolar).eq('activa', true),
+        supabase.from('asignacion_aula_nivel_ingles').select('*').eq('ano_escolar', ano_escolar).eq('activa', true)
       ])
 
       // Check for errors (allow empty results for some)
@@ -100,6 +108,11 @@ Deno.serve(async (req) => {
       if (restSuavesError) throw new Error(`Error loading restricciones_suaves: ${restSuavesError.message}`)
       if (docenteMateriasError) throw new Error(`Error loading docente_materias: ${docenteMateriasError.message}`)
       if (claseRequisitosError) throw new Error(`Error loading clase_requisitos: ${claseRequisitosError.message}`)
+      // Alumnos and English config are optional, log errors but don't fail
+      if (alumnosError) console.warn(`Warning loading alumnos: ${alumnosError.message}`)
+      if (configInglesError) console.warn(`Warning loading configInglesPrimaria: ${configInglesError.message}`)
+      if (asignacionesDocenteError) console.warn(`Warning loading asignacionesDocenteNivel: ${asignacionesDocenteError.message}`)
+      if (asignacionesAulaError) console.warn(`Warning loading asignacionesAulaNivel: ${asignacionesAulaError.message}`)
       
       // Validate we have minimum required data
       if (!docentes || docentes.length === 0) {
@@ -136,7 +149,11 @@ Deno.serve(async (req) => {
         restriccionesSuaves || [],
         docenteMaterias || [],
         claseRequisitos || [],
-        grado
+        grado,
+        alumnos || [],
+        configInglesPrimaria || [],
+        asignacionesDocenteNivel || [],
+        asignacionesAulaNivel || []
       )
 
       const tiempoEjecucion = Date.now() - startTime
@@ -144,7 +161,7 @@ Deno.serve(async (req) => {
       // Convert assignments to horarios format
       const horariosGenerados = solucion.asignaciones.map(asig => {
         const bloque = config.bloques_horarios[asig.bloque]
-        return {
+        const horario: any = {
           id_clase: asig.id_clase,
           id_docente: asig.id_docente,
           id_aula: asig.id_aula,
@@ -154,7 +171,34 @@ Deno.serve(async (req) => {
           hora_inicio: bloque?.inicio || '08:00',
           hora_fin: bloque?.fin || '09:00'
         }
+        
+        // For English classes, adjust duration to 45 minutes if needed
+        if (asig.es_ingles && bloque) {
+          const duracionMinutos = calcularDuracionMinutos(bloque.inicio, bloque.fin)
+          if (duracionMinutos === 60) {
+            // Adjust to 45 minutes: keep start time, end 15 minutes earlier
+            horario.hora_fin = agregarMinutos(bloque.inicio, 45)
+          }
+        }
+        
+        return horario
       })
+      
+      // Helper function to calculate duration in minutes
+      function calcularDuracionMinutos(inicio: string, fin: string): number {
+        const [hInicio, mInicio] = inicio.split(':').map(Number)
+        const [hFin, mFin] = fin.split(':').map(Number)
+        return (hFin * 60 + mFin) - (hInicio * 60 + mInicio)
+      }
+      
+      // Helper function to add minutes to time string
+      function agregarMinutos(tiempo: string, minutos: number): string {
+        const [h, m] = tiempo.split(':').map(Number)
+        const totalMinutos = h * 60 + m + minutos
+        const hResult = Math.floor(totalMinutos / 60)
+        const mResult = totalMinutos % 60
+        return `${hResult.toString().padStart(2, '0')}:${mResult.toString().padStart(2, '0')}`
+      }
 
       const resultado = {
         horarios: horariosGenerados,

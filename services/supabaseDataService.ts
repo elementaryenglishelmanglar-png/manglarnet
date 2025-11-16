@@ -51,6 +51,10 @@ export interface Clase {
   grado_asignado: string;
   id_docente_asignado: string;
   student_ids: string[];
+  nivel_ingles?: string | null; // 'Basic', 'Lower', 'Upper', null
+  skill_rutina?: string | null; // 'Reading', 'Writing', 'Speaking', 'Listening', 'Use of English', 'Phonics', 'Project', null
+  es_ingles_primaria?: boolean;
+  es_proyecto?: boolean;
   created_at?: string;
   updated_at?: string;
 }

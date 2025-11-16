@@ -91,6 +91,11 @@ interface Clase {
   id_docente_asignado: string; // UUID
   // Not in schema, but useful for frontend logic
   studentIds: string[];
+  // English-specific fields
+  nivel_ingles?: string | null; // 'Basic', 'Lower', 'Upper', null
+  skill_rutina?: string | null; // 'Reading', 'Writing', 'Speaking', 'Listening', 'Use of English', 'Phonics', 'Project', null
+  es_ingles_primaria?: boolean;
+  es_proyecto?: boolean;
 }
 
 interface Planificacion {
@@ -176,6 +181,7 @@ type WeeklySchedules = {
 interface Assignment {
     subject: string;
     grade: string;
+    nivel_ingles?: string; // Solo para inglés en 5to-6to (Basic, Lower, Upper)
 }
 
 interface Notification {
@@ -1472,16 +1478,95 @@ const TeacherFormModal: React.FC<{
     
     const initialAssignments = useMemo(() => {
         if (!teacher) return [];
+        // For English classes in 5to-6to, we need to get the nivel_ingles from asignacion_docente_nivel_ingles
+        // For now, we'll create assignments from classes, and the nivel_ingles will be set when loading
         return clases
             .filter(c => c.id_docente_asignado === teacher.id_docente)
-            .map(c => ({ subject: c.nombre_materia, grade: c.grado_asignado }));
+            .map(c => {
+                // Check if it's an English class for 5to-6to that has nivel_ingles
+                const isEnglishHighGrade = (c.nombre_materia?.toLowerCase().includes('inglés') || 
+                    c.nombre_materia?.toLowerCase().includes('ingles')) &&
+                    (c.grado_asignado === '5to Grado' || c.grado_asignado === '6to Grado');
+                
+                // For English 5to-6to, we'll need to load nivel_ingles from asignacion_docente_nivel_ingles
+                // For now, return without nivel_ingles and it will be set when user selects it again
+                return { 
+                    subject: c.nombre_materia, 
+                    grade: c.grado_asignado,
+                    nivel_ingles: isEnglishHighGrade ? (c as any).nivel_ingles : undefined
+                };
+            });
     }, [teacher, clases]);
 
     const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
     const [currentSubject, setCurrentSubject] = useState('');
     const [currentGrade, setCurrentGrade] = useState('');
+    const [currentNivelIngles, setCurrentNivelIngles] = useState('');
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Helper functions for English logic
+    const esInglesPrimaria = (subject: string): boolean => {
+        const lowerSubject = subject.toLowerCase();
+        return lowerSubject.includes('inglés') || lowerSubject.includes('ingles') || 
+               lowerSubject.includes('english');
+    };
+
+    const esGradoAlto = (grade: string): boolean => {
+        return grade === '5to Grado' || grade === '6to Grado';
+    };
+
+    const requiereNivelIngles = (subject: string, grade: string): boolean => {
+        return esInglesPrimaria(subject) && esGradoAlto(grade);
+    };
+
+    // Validation function for English assignments
+    const validarAsignacionIngles = (
+        subject: string, 
+        grade: string, 
+        nivelIngles: string,
+        assignments: Assignment[]
+    ): { valida: boolean; error?: string } => {
+        if (!esInglesPrimaria(subject)) {
+            return { valida: true };
+        }
+
+        // Para 1er-4to: Solo puede haber un docente de inglés por grado
+        if (!esGradoAlto(grade)) {
+            const existeDocente = assignments.some(
+                a => a.subject === subject && a.grade === grade
+            );
+            if (existeDocente) {
+                return { 
+                    valida: false, 
+                    error: `Ya existe un docente de inglés asignado a ${grade}. En grados 1er-4to solo puede haber un docente de inglés por grado.` 
+                };
+            }
+            return { valida: true };
+        }
+
+        // Para 5to-6to: Debe tener nivel y no puede haber duplicados del mismo nivel
+        if (!nivelIngles || nivelIngles === '') {
+            return { 
+                valida: false, 
+                error: 'Para grados 5to y 6to, debe seleccionar un nivel de inglés (Basic, Lower o Upper)' 
+            };
+        }
+
+        const existeNivel = assignments.some(
+            a => a.subject === subject && 
+                 a.grade === grade && 
+                 a.nivel_ingles === nivelIngles
+        );
+        if (existeNivel) {
+            return { 
+                valida: false, 
+                error: `Ya existe un docente asignado al nivel ${nivelIngles} para ${grade}` 
+            };
+        }
+
+        return { valida: true };
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -1527,11 +1612,49 @@ const TeacherFormModal: React.FC<{
             return;
         }
 
-        // Verificar si ya existe esta combinación
-        if (assignments.some(a => a.subject === currentSubject && a.grade === currentGrade)) {
+        // Validación especial para inglés en 5to-6to
+        if (requiereNivelIngles(currentSubject, currentGrade)) {
+            if (!currentNivelIngles || currentNivelIngles === '') {
+                setErrors(prev => ({
+                    ...prev,
+                    assignment: 'Para inglés en 5to y 6to grado, debe seleccionar un nivel'
+                }));
+                return;
+            }
+        }
+
+        // Validar asignación de inglés
+        const validacion = validarAsignacionIngles(
+            currentSubject, 
+            currentGrade, 
+            currentNivelIngles,
+            assignments
+        );
+        
+        if (!validacion.valida) {
             setErrors(prev => ({
                 ...prev,
-                assignment: 'Esta asignatura y grado ya están agregados'
+                assignment: validacion.error || 'Error en la asignación'
+            }));
+            return;
+        }
+
+        // Verificar si ya existe esta combinación (considerando nivel para inglés en 5to-6to)
+        const exists = requiereNivelIngles(currentSubject, currentGrade)
+            ? assignments.some(a => 
+                a.subject === currentSubject && 
+                a.grade === currentGrade && 
+                a.nivel_ingles === currentNivelIngles
+              )
+            : assignments.some(a => 
+                a.subject === currentSubject && 
+                a.grade === currentGrade
+              );
+
+        if (exists) {
+            setErrors(prev => ({
+                ...prev,
+                assignment: 'Esta asignación ya está agregada'
             }));
             return;
         }
@@ -1539,10 +1662,14 @@ const TeacherFormModal: React.FC<{
         // Agregar la asignatura
         setAssignments(prev => [...prev, { 
             subject: currentSubject.trim(), 
-            grade: currentGrade.trim() 
+            grade: currentGrade.trim(),
+            nivel_ingles: requiereNivelIngles(currentSubject, currentGrade) 
+                ? currentNivelIngles 
+                : undefined
         }]);
         setCurrentSubject('');
         setCurrentGrade('');
+        setCurrentNivelIngles('');
         setErrors(prev => {
             const newErrors = { ...prev };
             delete newErrors.assignment;
@@ -1673,6 +1800,10 @@ const TeacherFormModal: React.FC<{
                                         value={currentSubject} 
                                         onChange={e => {
                                             setCurrentSubject(e.target.value);
+                                            // Reset nivel if subject changes and it's not inglés in 5to-6to
+                                            if (!requiereNivelIngles(e.target.value, currentGrade)) {
+                                                setCurrentNivelIngles('');
+                                            }
                                             if (errors.assignment) {
                                                 setErrors(prev => {
                                                     const newErrors = { ...prev };
@@ -1702,6 +1833,10 @@ const TeacherFormModal: React.FC<{
                                         value={currentGrade} 
                                         onChange={e => {
                                             setCurrentGrade(e.target.value);
+                                            // Reset nivel if grade changes and it's not 5to-6to
+                                            if (!esGradoAlto(e.target.value) || !esInglesPrimaria(currentSubject)) {
+                                                setCurrentNivelIngles('');
+                                            }
                                             if (errors.assignment) {
                                                 setErrors(prev => {
                                                     const newErrors = { ...prev };
@@ -1719,6 +1854,35 @@ const TeacherFormModal: React.FC<{
                                         {GRADOS.map(grado => <option key={grado} value={grado}>{grado}</option>)}
                                     </select>
                                 </div>
+                                {requiereNivelIngles(currentSubject, currentGrade) && (
+                                    <div className="flex-grow min-w-[150px]">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Nivel de Inglés <span className="text-red-500">*</span>
+                                        </label>
+                                        <select 
+                                            value={currentNivelIngles} 
+                                            onChange={e => {
+                                                setCurrentNivelIngles(e.target.value);
+                                                if (errors.assignment) {
+                                                    setErrors(prev => {
+                                                        const newErrors = { ...prev };
+                                                        delete newErrors.assignment;
+                                                        return newErrors;
+                                                    });
+                                                }
+                                            }}
+                                            className={`mt-1 block w-full p-2 border rounded-md ${
+                                                errors.assignment ? 'border-red-500' : 'border-gray-300'
+                                            } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                                            disabled={isSubmitting}
+                                        >
+                                            <option value="">Seleccione un nivel</option>
+                                            <option value="Basic">Basic</option>
+                                            <option value="Lower">Lower</option>
+                                            <option value="Upper">Upper</option>
+                                        </select>
+                                    </div>
+                                )}
                                 <button 
                                     type="button" 
                                     onClick={handleAddAssignment} 
@@ -1739,7 +1903,11 @@ const TeacherFormModal: React.FC<{
                                             className="flex items-center gap-2 bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1.5 rounded-full border border-blue-200"
                                         >
                                             <span className="font-semibold">{a.subject}</span>
-                                            <span className="text-blue-600">({a.grade})</span>
+                                            <span className="text-blue-600">({a.grade}</span>
+                                            {a.nivel_ingles && (
+                                                <span className="text-blue-700 font-bold"> - {a.nivel_ingles}</span>
+                                            )}
+                                            <span className="text-blue-600">)</span>
                                             <button 
                                                 type="button" 
                                                 onClick={() => handleRemoveAssignment(index)} 
@@ -1812,8 +1980,22 @@ const TeachersView: React.FC<{
         setSelectedTeacher(null);
     };
 
+    // Helper functions for English logic
+    const esInglesPrimaria = (subject: string): boolean => {
+        const lowerSubject = subject.toLowerCase();
+        return lowerSubject.includes('inglés') || lowerSubject.includes('ingles') || 
+               lowerSubject.includes('english');
+    };
+
+    const esGradoAlto = (grade: string): boolean => {
+        return grade === '5to Grado' || grade === '6to Grado';
+    };
+
     const handleSaveTeacher = async (teacherData: Docente, newAssignments: Assignment[]) => {
         try {
+            // Get current academic year (you might want to get this from context or config)
+            const anoEscolar = '2025-2026'; // TODO: Obtener del contexto/configuración
+
             // Update teacher details in Supabase
             const teacherExists = docentes.some(d => d.id_docente === teacherData.id_docente);
             let savedTeacher: Docente;
@@ -1823,6 +2005,17 @@ const TeachersView: React.FC<{
                 const { id_docente, created_at, updated_at, ...updateData } = teacherData;
                 savedTeacher = await docentesService.update(id_docente, updateData);
                 setDocentes(prev => prev.map(d => d.id_docente === savedTeacher.id_docente ? savedTeacher : d));
+                
+                // Delete old English level assignments if any
+                try {
+                    await supabase
+                        .from('asignacion_docente_nivel_ingles')
+                        .delete()
+                        .eq('id_docente', savedTeacher.id_docente)
+                        .eq('ano_escolar', anoEscolar);
+                } catch (error) {
+                    console.error('Error deleting old English level assignments:', error);
+                }
             } else {
                 // Create new teacher
                 // Omit id_docente, created_at, updated_at - Supabase will generate id_docente automatically
@@ -1849,12 +2042,18 @@ const TeachersView: React.FC<{
                 }
             }
             
+            // Separate English and regular assignments
+            const asignacionesIngles = newAssignments.filter(a => esInglesPrimaria(a.subject));
+            const asignacionesRegulares = newAssignments.filter(a => !esInglesPrimaria(a.subject));
+            
             // Create new classes based on assignments
             if (newAssignments.length > 0) {
                 const createdClasses = [];
                 const errors: string[] = [];
+                const asignacionesNivelCreadas: string[] = [];
                 
-                for (const a of newAssignments) {
+                // Process regular assignments
+                for (const a of asignacionesRegulares) {
                     // Validar que la asignatura y el grado no estén vacíos
                     if (!a.subject || !a.grade) {
                         errors.push(`Asignatura o grado vacío: ${a.subject || 'Sin asignatura'} - ${a.grade || 'Sin grado'}`);
@@ -1879,10 +2078,89 @@ const TeachersView: React.FC<{
                         errors.push(errorMsg);
                     }
                 }
+
+                // Process English assignments
+                for (const a of asignacionesIngles) {
+                    if (!a.subject || !a.grade) {
+                        errors.push(`Asignatura o grado vacío: ${a.subject || 'Sin asignatura'} - ${a.grade || 'Sin grado'}`);
+                        continue;
+                    }
+
+                    try {
+                        if (!esGradoAlto(a.grade)) {
+                            // Para 1er-4to: Crear una sola clase de inglés
+                            const newClass: any = {
+                                nombre_materia: a.subject.trim(),
+                                grado_asignado: a.grade.trim(),
+                                id_docente_asignado: savedTeacher.id_docente,
+                                es_ingles_primaria: true,
+                                es_proyecto: false,
+                                nivel_ingles: null,
+                                skill_rutina: null,
+                                student_ids: alumnos.filter(s => s.salon === a.grade).map(s => s.id_alumno),
+                            };
+                            const created = await clasesService.create(newClass);
+                            createdClasses.push({
+                                ...created,
+                                studentIds: created.student_ids || []
+                            });
+                        } else {
+                            // Para 5to-6to: Crear asignación de docente por nivel
+                            if (a.nivel_ingles) {
+                                try {
+                                    // Verificar si ya existe esta asignación
+                                    const { data: existing } = await supabase
+                                        .from('asignacion_docente_nivel_ingles')
+                                        .select('*')
+                                        .eq('id_docente', savedTeacher.id_docente)
+                                        .eq('nivel_ingles', a.nivel_ingles)
+                                        .eq('ano_escolar', anoEscolar)
+                                        .single();
+
+                                    if (!existing) {
+                                        // Crear entrada en asignacion_docente_nivel_ingles
+                                        const { error: assignError } = await supabase
+                                            .from('asignacion_docente_nivel_ingles')
+                                            .insert({
+                                                id_docente: savedTeacher.id_docente,
+                                                nivel_ingles: a.nivel_ingles,
+                                                ano_escolar: anoEscolar,
+                                                activa: true
+                                            });
+
+                                        if (assignError) {
+                                            throw assignError;
+                                        }
+
+                                        asignacionesNivelCreadas.push(`${a.subject} - ${a.grade} (${a.nivel_ingles})`);
+                                    } else {
+                                        // Actualizar si ya existe
+                                        await supabase
+                                            .from('asignacion_docente_nivel_ingles')
+                                            .update({ activa: true })
+                                            .eq('id', existing.id);
+                                        
+                                        asignacionesNivelCreadas.push(`${a.subject} - ${a.grade} (${a.nivel_ingles})`);
+                                    }
+                                } catch (error: any) {
+                                    const errorMsg = `Error al crear asignación de nivel ${a.nivel_ingles} para ${a.grade}: ${error.message || 'Error desconocido'}`;
+                                    console.error(`Error creating English level assignment:`, error);
+                                    errors.push(errorMsg);
+                                }
+                            } else {
+                                errors.push(`Falta nivel_ingles para ${a.subject} en ${a.grade}`);
+                            }
+                        }
+                    } catch (error: any) {
+                        const errorMsg = `Error al procesar inglés ${a.subject} (${a.grade}): ${error.message || 'Error desconocido'}`;
+                        console.error(`Error processing English assignment:`, error);
+                        errors.push(errorMsg);
+                    }
+                }
                 
                 // Mostrar errores si los hay
                 if (errors.length > 0) {
-                    alert('Algunas clases no se pudieron crear:\n\n' + errors.join('\n'));
+                    alert('Algunas asignaciones no se pudieron crear:\n\n' + errors.join('\n'));
                 }
                 
                 // Recargar todas las clases desde Supabase para asegurar sincronización
@@ -1902,10 +2180,18 @@ const TeachersView: React.FC<{
                 }
                 
                 // Mostrar mensaje de éxito
-                if (createdClasses.length === newAssignments.length) {
-                    alert(`✅ Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente con ${createdClasses.length} asignatura(s).`);
-                } else if (createdClasses.length > 0) {
-                    alert(`⚠️ Docente ${teacherExists ? 'actualizado' : 'creado'} pero solo ${createdClasses.length} de ${newAssignments.length} asignaturas se guardaron correctamente.`);
+                const totalCreado = createdClasses.length + asignacionesNivelCreadas.length;
+                if (totalCreado === newAssignments.length) {
+                    const mensaje = asignacionesNivelCreadas.length > 0
+                        ? `✅ Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente.\n\n` +
+                          `Clases creadas: ${createdClasses.length}\n` +
+                          `Asignaciones de nivel inglés: ${asignacionesNivelCreadas.length}\n\n` +
+                          `${asignacionesNivelCreadas.join('\n')}\n\n` +
+                          `Nota: Para grados 5to-6to, las clases específicas por skill se crearán al generar los horarios.`
+                        : `✅ Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente con ${createdClasses.length} asignatura(s).`;
+                    alert(mensaje);
+                } else if (totalCreado > 0) {
+                    alert(`⚠️ Docente ${teacherExists ? 'actualizado' : 'creado'} pero solo ${totalCreado} de ${newAssignments.length} asignaciones se guardaron correctamente.`);
                 }
             } else {
                 // Si no hay asignaturas, solo actualizar el estado local
