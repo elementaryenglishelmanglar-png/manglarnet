@@ -2209,22 +2209,34 @@ const TeachersView: React.FC<{
 
                     try {
                         if (!esGradoAlto(a.grade)) {
-                            // Para 1er-4to: Crear una sola clase de inglés
-                            const newClass: any = {
-                                nombre_materia: a.subject.trim(),
-                                grado_asignado: a.grade.trim(),
-                                id_docente_asignado: savedTeacher.id_docente,
-                                es_ingles_primaria: true,
-                                es_proyecto: false,
-                                nivel_ingles: null,
-                                skill_rutina: null,
-                                student_ids: alumnos.filter(s => s.salon === a.grade).map(s => s.id_alumno),
-                            };
-                            const created = await clasesService.create(newClass);
-                            createdClasses.push({
-                                ...created,
-                                studentIds: created.student_ids || []
-                            });
+                            // Para 1er-4to: Crear clases por skill
+                            // Skills para 1er-4to: Phonics, Reading, Writing, Listening, Speaking, Project, Use of English
+                            const skillsPrimaria = ['Phonics', 'Reading', 'Writing', 'Listening', 'Speaking', 'Project', 'Use of English'];
+                            const alumnosGrado = alumnos.filter(s => s.salon === a.grade);
+                            
+                            for (const skill of skillsPrimaria) {
+                                try {
+                                    const claseSkill: any = {
+                                        nombre_materia: `Inglés - ${skill}`,
+                                        grado_asignado: a.grade.trim(),
+                                        id_docente_asignado: savedTeacher.id_docente,
+                                        es_ingles_primaria: true,
+                                        es_proyecto: skill === 'Project',
+                                        nivel_ingles: null, // 1er-4to no tienen niveles
+                                        skill_rutina: skill,
+                                        student_ids: alumnosGrado.map(al => al.id_alumno),
+                                    };
+                                    const createdSkill = await clasesService.create(claseSkill);
+                                    createdClasses.push({
+                                        ...createdSkill,
+                                        studentIds: createdSkill.student_ids || []
+                                    });
+                                } catch (error: any) {
+                                    const errorMsg = `Error creating class for ${skill} - ${a.grade}: ${error.message || JSON.stringify(error)}`;
+                                    console.error(errorMsg, error);
+                                    errors.push(errorMsg);
+                                }
+                            }
                         } else {
                             // Para 5to-6to: Crear asignación de docente por nivel Y las clases por skill
                             if (a.nivel_ingles) {
@@ -2260,70 +2272,56 @@ const TeachersView: React.FC<{
                                             .eq('id', existing.id);
                                     }
 
-                                    // Crear clases por skill para cada grado (5to y 6to)
-                                    const skills = ['Reading', 'Writing', 'Speaking', 'Listening', 'Use of English', 'Phonics'];
-                                    const grados = ['5to Grado', '6to Grado'];
+                                    // Crear clases por skill para niveles (5to y 6to)
+                                    // Skills para niveles (5to-6to): Speaking, Listening, Writing, Creative Writing, Use of English, Reading
+                                    // IMPORTANTE: Crear solo 6 clases (una por skill), no duplicar por grado
+                                    // Cada clase se mostrará en el horario de ambos grados (5to y 6to) según el filtro
+                                    const skillsNivel = ['Speaking', 'Listening', 'Writing', 'Creative Writing', 'Use of English', 'Reading'];
                                     
-                                    for (const grado of grados) {
-                                        // Obtener alumnos de este grado con este nivel
-                                        const alumnosNivel = alumnos.filter(
-                                            alumno => alumno.salon === grado && alumno.nivel_ingles === a.nivel_ingles
-                                        );
+                                    // Obtener alumnos de ambos grados con este nivel
+                                    const alumnos5toNivel = alumnos.filter(
+                                        alumno => alumno.salon === '5to Grado' && alumno.nivel_ingles === a.nivel_ingles
+                                    );
+                                    const alumnos6toNivel = alumnos.filter(
+                                        alumno => alumno.salon === '6to Grado' && alumno.nivel_ingles === a.nivel_ingles
+                                    );
+                                    const todosAlumnosNivel = [...alumnos5toNivel, ...alumnos6toNivel];
 
-                                        // Crear clase para cada skill
-                                        for (const skill of skills) {
-                                            try {
-                                                const claseSkill: any = {
-                                                    nombre_materia: `Inglés - ${skill}`,
-                                                    grado_asignado: grado,
-                                                    id_docente_asignado: savedTeacher.id_docente,
-                                                    es_ingles_primaria: true,
-                                                    es_proyecto: false,
-                                                    nivel_ingles: a.nivel_ingles,
-                                                    skill_rutina: skill,
-                                                    student_ids: alumnosNivel.map(al => al.id_alumno),
-                                                };
-                                                const createdSkill = await clasesService.create(claseSkill);
-                                                createdClasses.push({
-                                                    ...createdSkill,
-                                                    studentIds: createdSkill.student_ids || []
-                                                });
-                                            } catch (error: any) {
-                                                console.error(`Error creating class for ${skill} - ${grado} - ${a.nivel_ingles}:`, error);
-                                                // No agregar a errors para no bloquear el proceso
-                                            }
-                                        }
-
-                                        // Crear clase de Project (solo una vez por nivel, no por grado)
-                                        // Project agrupa a todos los estudiantes de 5to y 6to del mismo nivel
-                                        if (grado === '5to Grado') {
-                                            // Solo crear Project una vez (para 5to, pero incluye ambos grados)
-                                            const alumnos5to = alumnos.filter(
-                                                alumno => alumno.salon === '5to Grado' && alumno.nivel_ingles === a.nivel_ingles
-                                            );
-                                            const alumnos6to = alumnos.filter(
-                                                alumno => alumno.salon === '6to Grado' && alumno.nivel_ingles === a.nivel_ingles
-                                            );
-                                            const todosAlumnosProyecto = [...alumnos5to, ...alumnos6to];
-
-                                            try {
-                                                const claseProject: any = {
-                                                    nombre_materia: 'Inglés - Project',
-                                                    grado_asignado: '5to Grado', // Usar 5to como grado principal, pero incluye ambos
-                                                    id_docente_asignado: savedTeacher.id_docente,
-                                                    es_ingles_primaria: true,
-                                                    es_proyecto: true,
-                                                    nivel_ingles: null, // Project no tiene nivel específico
-                                                    skill_rutina: 'Project',
-                                                    student_ids: todosAlumnosProyecto.map(al => al.id_alumno),
-                                                };
-                                                const createdProject = await clasesService.create(claseProject);
-                                                createdClasses.push({
-                                                    ...createdProject,
-                                                    studentIds: createdProject.student_ids || []
-                                                });
-                                            } catch (error: any) {
-                                                console.error(`Error creating Project class for ${a.nivel_ingles}:`, error);
+                                    // Crear solo 6 clases (una por skill) que incluyan ambos grados
+                                    for (const skill of skillsNivel) {
+                                        try {
+                                            // Pequeño delay para evitar rate limiting
+                                            await new Promise(resolve => setTimeout(resolve, 100));
+                                            
+                                            // Crear clase con grado_asignado = '5to Grado' (se filtrará también para 6to en la vista)
+                                            // Los estudiantes incluyen ambos grados
+                                            const claseSkill: any = {
+                                                nombre_materia: `Inglés - ${skill}`,
+                                                grado_asignado: '5to Grado', // Usar 5to como grado principal para el filtro
+                                                id_docente_asignado: savedTeacher.id_docente,
+                                                es_ingles_primaria: true,
+                                                es_proyecto: false,
+                                                nivel_ingles: a.nivel_ingles,
+                                                skill_rutina: skill,
+                                                student_ids: todosAlumnosNivel.map(al => al.id_alumno),
+                                            };
+                                            const createdSkill = await clasesService.create(claseSkill);
+                                            createdClasses.push({
+                                                ...createdSkill,
+                                                studentIds: createdSkill.student_ids || []
+                                            });
+                                        } catch (error: any) {
+                                            const errorMsg = `Error creating class for ${skill} - ${a.nivel_ingles}: ${error.message || JSON.stringify(error)}`;
+                                            console.error(errorMsg, error);
+                                            errors.push(errorMsg);
+                                            
+                                            // Si es un error 401, verificar sesión
+                                            if (error.status === 401 || error.message?.includes('JWT')) {
+                                                const { data: { session } } = await supabase.auth.getSession();
+                                                if (!session) {
+                                                    errors.push('La sesión expiró. Por favor, recarga la página e inicia sesión nuevamente.');
+                                                    break; // Salir del loop para evitar más errores
+                                                }
                                             }
                                         }
                                     }
@@ -2370,8 +2368,8 @@ const TeachersView: React.FC<{
                 // Para niveles de inglés, contamos las clases creadas (no las asignaciones)
                 const totalCreado = createdClasses.length;
                 const totalEsperado = asignacionesRegulares.length + 
-                    (asignacionesIngles.filter(a => !esGradoAlto(a.grade)).length) + // 1er-4to: 1 clase por asignación
-                    (asignacionesIngles.filter(a => esGradoAlto(a.grade) && a.nivel_ingles).length * 13); // 5to-6to: 13 clases por nivel (6 skills × 2 grados + 1 Project)
+                    (asignacionesIngles.filter(a => !esGradoAlto(a.grade)).length * 7) + // 1er-4to: 7 skills por grado
+                    (asignacionesIngles.filter(a => esGradoAlto(a.grade) && a.nivel_ingles).length * 6); // 5to-6to: 6 skills (una por skill, no duplicadas por grado)
                 
                 if (totalCreado >= totalEsperado * 0.9) { // Permitir 10% de error
                     const mensaje = asignacionesNivelCreadas.length > 0
@@ -3102,7 +3100,27 @@ const ScheduleView: React.FC<{
     
     const unassignedClasses = useMemo(() => {
         const assignedClassIds = new Set(weeklySchedule.filter(s => s.id_clase).map(s => s.id_clase));
-        return clases.filter(c => c.grado_asignado === selectedGrade && !assignedClassIds.has(c.id_clase));
+        return clases.filter(c => {
+            // Incluir clases del grado seleccionado normalmente
+            if (c.grado_asignado === selectedGrade && !assignedClassIds.has(c.id_clase)) {
+                return true;
+            }
+            
+            // Para niveles de inglés (5to-6to): incluir clases si:
+            // 1. Es una clase de inglés de primaria con nivel
+            // 2. El grado seleccionado es 5to o 6to
+            // 3. La clase tiene grado_asignado = '5to Grado' (clases de nivel se crean así)
+            // 4. La clase no está ya asignada
+            if (c.es_ingles_primaria && 
+                c.nivel_ingles && 
+                (selectedGrade === '5to Grado' || selectedGrade === '6to Grado') &&
+                c.grado_asignado === '5to Grado' &&
+                !assignedClassIds.has(c.id_clase)) {
+                return true;
+            }
+            
+            return false;
+        });
     }, [clases, weeklySchedule, selectedGrade]);
     
     const handleOpenEventModal = (dia: number, hora: string, existingEvent: Horario | null = null) => {

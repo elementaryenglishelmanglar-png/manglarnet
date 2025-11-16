@@ -9,7 +9,7 @@
 -- ============================================
 ALTER TABLE clases 
 ADD COLUMN IF NOT EXISTS nivel_ingles TEXT CHECK (nivel_ingles IN ('Basic', 'Lower', 'Upper')),
-ADD COLUMN IF NOT EXISTS skill_rutina TEXT CHECK (skill_rutina IN ('Reading', 'Writing', 'Speaking', 'Listening', 'Use of English', 'Phonics', 'Project')),
+ADD COLUMN IF NOT EXISTS skill_rutina TEXT CHECK (skill_rutina IN ('Reading', 'Writing', 'Speaking', 'Listening', 'Use of English', 'Phonics', 'Project', 'Creative Writing')),
 ADD COLUMN IF NOT EXISTS es_ingles_primaria BOOLEAN DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS es_proyecto BOOLEAN DEFAULT FALSE;
 
