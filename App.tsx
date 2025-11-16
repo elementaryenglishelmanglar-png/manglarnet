@@ -1576,6 +1576,101 @@ const TeacherFormModal: React.FC<{
         if (lowerSubject.includes('upper')) return 'Upper';
         return null;
     };
+    
+    // Obtener asignaturas disponibles según la especialidad
+    const getAvailableSubjects = useMemo(() => {
+        const especialidad = formData.especialidad;
+        
+        // Si es Teacher, solo mostrar inglés
+        if (especialidad === 'Teacher') {
+            return [
+                { value: 'Inglés', label: 'Inglés' },
+                { value: 'Inglés Basic', label: 'Inglés Basic' },
+                { value: 'Inglés Lower', label: 'Inglés Lower' },
+                { value: 'Inglés Upper', label: 'Inglés Upper' }
+            ];
+        }
+        
+        // Si es Docente Guía o Integralidad, mostrar todas las asignaturas de primaria (excepto inglés de niveles)
+        if (especialidad === 'Docente Guía' || especialidad === 'Integralidad') {
+            const primariaSubjects = ASIGNATURAS_POR_NIVEL['Nivel Primaria'] || [];
+            // Filtrar asignaturas de inglés de niveles (Basic, Lower, Upper) pero mantener Inglés general
+            const filtered = primariaSubjects.filter(subj => {
+                const lower = subj.toLowerCase();
+                return !lower.includes('inglés (basic)') && 
+                       !lower.includes('inglés (lower)') && 
+                       !lower.includes('inglés (upper)');
+            });
+            
+            // Agrupar por categorías
+            const grouped: { [key: string]: Array<{value: string, label: string}> } = {
+                'Matemáticas': [],
+                'Lenguaje': [],
+                'Ciencias y Sociales': [],
+                'Inglés': [],
+                'Especialidades': [],
+                'Otros': []
+            };
+            
+            filtered.forEach(subj => {
+                const subjLower = subj.toLowerCase();
+                if (subjLower.includes('matemáticas')) {
+                    grouped['Matemáticas'].push({ value: subj, label: subj });
+                } else if (subjLower.includes('lenguaje') || subjLower.includes('literatura')) {
+                    grouped['Lenguaje'].push({ value: subj, label: subj });
+                } else if (subjLower.includes('ciencias') || subjLower.includes('sociales') || subjLower.includes('proyecto')) {
+                    grouped['Ciencias y Sociales'].push({ value: subj, label: subj });
+                } else if (subjLower.includes('inglés')) {
+                    grouped['Inglés'].push({ value: subj, label: subj });
+                } else if (subjLower.includes('música') || subjLower.includes('arte') || subjLower.includes('tecnología') || 
+                          subjLower.includes('física') || subjLower.includes('deporte') || subjLower.includes('valores') ||
+                          subjLower.includes('francés') || subjLower.includes('ajedrez')) {
+                    grouped['Especialidades'].push({ value: subj, label: subj });
+                } else {
+                    grouped['Otros'].push({ value: subj, label: subj });
+                }
+            });
+            
+            return grouped;
+        }
+        
+        // Si es Especialista, mostrar todas las asignaturas
+        if (especialidad === 'Especialista') {
+            const primariaSubjects = ASIGNATURAS_POR_NIVEL['Nivel Primaria'] || [];
+            const grouped: { [key: string]: Array<{value: string, label: string}> } = {
+                'Matemáticas': [],
+                'Lenguaje': [],
+                'Ciencias y Sociales': [],
+                'Inglés': [],
+                'Especialidades': [],
+                'Otros': []
+            };
+            
+            primariaSubjects.forEach(subj => {
+                const subjLower = subj.toLowerCase();
+                if (subjLower.includes('matemáticas')) {
+                    grouped['Matemáticas'].push({ value: subj, label: subj });
+                } else if (subjLower.includes('lenguaje') || subjLower.includes('literatura')) {
+                    grouped['Lenguaje'].push({ value: subj, label: subj });
+                } else if (subjLower.includes('ciencias') || subjLower.includes('sociales') || subjLower.includes('proyecto')) {
+                    grouped['Ciencias y Sociales'].push({ value: subj, label: subj });
+                } else if (subjLower.includes('inglés')) {
+                    grouped['Inglés'].push({ value: subj, label: subj });
+                } else if (subjLower.includes('música') || subjLower.includes('arte') || subjLower.includes('tecnología') || 
+                          subjLower.includes('física') || subjLower.includes('deporte') || subjLower.includes('valores') ||
+                          subjLower.includes('francés') || subjLower.includes('ajedrez')) {
+                    grouped['Especialidades'].push({ value: subj, label: subj });
+                } else {
+                    grouped['Otros'].push({ value: subj, label: subj });
+                }
+            });
+            
+            return grouped;
+        }
+        
+        // Si no hay especialidad seleccionada, no mostrar nada
+        return null;
+    }, [formData.especialidad]);
 
     const requiereNivelIngles = (subject: string, grade: string): boolean => {
         return esInglesPrimaria(subject) && esGradoAlto(grade);
@@ -1629,9 +1724,17 @@ const TeacherFormModal: React.FC<{
         return { valida: true };
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        
+        // Si cambia la especialidad, limpiar la asignatura seleccionada
+        if (name === 'especialidad') {
+            setCurrentSubject('');
+            setCurrentGrade('');
+            setCurrentNivelIngles('');
+            setCurrentAula('');
+        }
         // Limpiar error del campo cuando el usuario empiece a escribir
         if (errors[name]) {
             setErrors(prev => {
@@ -1905,6 +2008,7 @@ const TeacherFormModal: React.FC<{
                                 >
                                     <option value="">Seleccione una especialidad</option>
                                     <option value="Docente Guía">Docente Guía</option>
+                                    <option value="Integralidad">Integralidad</option>
                                     <option value="Teacher">Teacher</option>
                                     <option value="Especialista">Especialista</option>
                                 </InputField>
@@ -1949,15 +2053,34 @@ const TeacherFormModal: React.FC<{
                                         className={`mt-1 block w-full p-2 border rounded-md ${
                                             errors.assignment ? 'border-red-500' : 'border-gray-300'
                                         } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                                        disabled={isSubmitting}
+                                        disabled={isSubmitting || !formData.especialidad}
                                     >
-                                        <option value="">Seleccione una asignatura</option>
-                                        <optgroup label="Inglés">
-                                            <option value="Inglés">Inglés</option>
-                                            <option value="Inglés Basic">Inglés Basic</option>
-                                            <option value="Inglés Lower">Inglés Lower</option>
-                                            <option value="Inglés Upper">Inglés Upper</option>
-                                        </optgroup>
+                                        <option value="">
+                                            {!formData.especialidad 
+                                                ? 'Seleccione primero una especialidad' 
+                                                : 'Seleccione una asignatura'}
+                                        </option>
+                                        {getAvailableSubjects && (
+                                            Array.isArray(getAvailableSubjects) ? (
+                                                // Para Teacher: lista simple
+                                                <optgroup label="Inglés">
+                                                    {getAvailableSubjects.map(subj => (
+                                                        <option key={subj.value} value={subj.value}>{subj.label}</option>
+                                                    ))}
+                                                </optgroup>
+                                            ) : (
+                                                // Para Docente Guía, Integralidad o Especialista: agrupado por categorías
+                                                Object.entries(getAvailableSubjects).map(([category, subjects]) => 
+                                                    subjects.length > 0 ? (
+                                                        <optgroup key={category} label={category}>
+                                                            {subjects.map(subj => (
+                                                                <option key={subj.value} value={subj.value}>{subj.label}</option>
+                                                            ))}
+                                                        </optgroup>
+                                                    ) : null
+                                                )
+                                            )
+                                        )}
                                     </select>
                                 </div>
                                 {!esNivelIngles(currentSubject) && (
