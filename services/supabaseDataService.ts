@@ -50,6 +50,7 @@ export interface Clase {
   nombre_materia: string;
   grado_asignado: string;
   id_docente_asignado: string;
+  id_aula?: string | null; // UUID - Aula/salón asignado
   student_ids: string[];
   nivel_ingles?: string | null; // 'Basic', 'Lower', 'Upper', null
   skill_rutina?: string | null; // 'Reading', 'Writing', 'Speaking', 'Listening', 'Use of English', 'Phonics', 'Project', null

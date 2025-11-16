@@ -90,6 +90,7 @@ interface Clase {
   nombre_materia: string;
   grado_asignado: string;
   id_docente_asignado: string; // UUID
+  id_aula?: string | null; // UUID - Aula/salón asignado
   // Not in schema, but useful for frontend logic
   studentIds: string[];
   // English-specific fields
@@ -185,6 +186,7 @@ interface Assignment {
     subject: string;
     grade: string;
     nivel_ingles?: string; // Solo para inglés en 5to-6to (Basic, Lower, Upper)
+    id_aula?: string; // Aula/salón asignado para esta clase
 }
 
 interface Notification {
@@ -1468,9 +1470,10 @@ const StudentFormModal: React.FC<{
 const TeacherFormModal: React.FC<{
     teacher: Docente | null;
     clases: Clase[];
+    aulas: Aula[];
     onClose: () => void;
     onSave: (teacher: Docente, assignments: Assignment[]) => void;
-}> = ({ teacher, clases, onClose, onSave }) => {
+}> = ({ teacher, clases, aulas, onClose, onSave }) => {
     const [formData, setFormData] = useState<Omit<Docente, 'id_docente' | 'id_usuario'>>({
         nombres: teacher?.nombres || '',
         apellidos: teacher?.apellidos || '',
@@ -1496,7 +1499,8 @@ const TeacherFormModal: React.FC<{
                 return { 
                     subject: c.nombre_materia, 
                     grade: c.grado_asignado,
-                    nivel_ingles: isEnglishHighGrade ? (c as any).nivel_ingles : undefined
+                    nivel_ingles: isEnglishHighGrade ? (c as any).nivel_ingles : undefined,
+                    id_aula: c.id_aula || undefined // Cargar aula asignada
                 };
             });
     }, [teacher, clases]);
@@ -1505,8 +1509,44 @@ const TeacherFormModal: React.FC<{
     const [currentSubject, setCurrentSubject] = useState('');
     const [currentGrade, setCurrentGrade] = useState('');
     const [currentNivelIngles, setCurrentNivelIngles] = useState('');
+    const [currentAula, setCurrentAula] = useState(''); // Aula para asignaciones regulares
+    const [englishLevelAulas, setEnglishLevelAulas] = useState<{[nivel: string]: string}>({}); // Aulas por nivel para inglés
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // Cargar aulas asignadas para inglés de niveles al editar un docente
+    useEffect(() => {
+        const loadEnglishLevelAulas = async () => {
+            if (!teacher) {
+                setEnglishLevelAulas({});
+                return;
+            }
+            
+            try {
+                const anoEscolar = '2025-2026'; // TODO: Obtener del contexto
+                const { data, error } = await supabase
+                    .from('asignacion_aula_nivel_ingles')
+                    .select('nivel_ingles, id_aula')
+                    .eq('ano_escolar', anoEscolar)
+                    .eq('activa', true);
+                
+                if (error) throw error;
+                
+                // Crear objeto con nivel -> id_aula
+                const aulasMap: {[nivel: string]: string} = {};
+                if (data) {
+                    data.forEach(item => {
+                        aulasMap[item.nivel_ingles] = item.id_aula;
+                    });
+                }
+                setEnglishLevelAulas(aulasMap);
+            } catch (error) {
+                console.error('Error loading English level aulas:', error);
+            }
+        };
+        
+        loadEnglishLevelAulas();
+    }, [teacher]);
 
     // Helper functions for English logic
     const esInglesPrimaria = (subject: string): boolean => {
@@ -1670,16 +1710,19 @@ const TeacherFormModal: React.FC<{
 
             // Agregar ambos grados automáticamente
             // Usar "Inglés" como subject base y el nivel en nivel_ingles
+            // Para inglés de niveles, el aula se asignará usando asignacion_aula_nivel_ingles
             setAssignments(prev => [...prev, 
                 { 
                     subject: 'Inglés', 
                     grade: '5to Grado',
-                    nivel_ingles: nivel
+                    nivel_ingles: nivel,
+                    id_aula: englishLevelAulas[nivel] || undefined // Aula para este nivel
                 },
                 { 
                     subject: 'Inglés', 
                     grade: '6to Grado',
-                    nivel_ingles: nivel
+                    nivel_ingles: nivel,
+                    id_aula: englishLevelAulas[nivel] || undefined // Mismo aula para ambos grados
                 }
             ]);
         } else {
@@ -1745,6 +1788,7 @@ const TeacherFormModal: React.FC<{
         setCurrentSubject('');
         setCurrentGrade('');
         setCurrentNivelIngles('');
+        setCurrentAula(''); // Limpiar aula también
         setErrors(prev => {
             const newErrors = { ...prev };
             delete newErrors.assignment;
@@ -1948,13 +1992,57 @@ const TeacherFormModal: React.FC<{
                                     </div>
                                 )}
                                 {esNivelIngles(currentSubject) && (
+                                    <>
+                                        <div className="flex-grow min-w-[200px]">
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Grados (se asignarán automáticamente) <span className="text-green-600">*</span>
+                                            </label>
+                                            <div className="mt-1 p-2 border border-green-300 rounded-md bg-green-50 text-sm text-green-700 font-medium">
+                                                5to Grado y 6to Grado
+                                            </div>
+                                        </div>
+                                        <div className="flex-grow min-w-[200px]">
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Aula/Salón para {extraerNivelDeMateria(currentSubject) || 'este nivel'}
+                                            </label>
+                                            <select
+                                                value={englishLevelAulas[extraerNivelDeMateria(currentSubject) || ''] || ''}
+                                                onChange={(e) => {
+                                                    const nivel = extraerNivelDeMateria(currentSubject);
+                                                    if (nivel) {
+                                                        setEnglishLevelAulas(prev => ({
+                                                            ...prev,
+                                                            [nivel]: e.target.value
+                                                        }));
+                                                    }
+                                                }}
+                                                className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                disabled={isSubmitting}
+                                            >
+                                                <option value="">Seleccione un aula</option>
+                                                {aulas.filter(a => a.activa).map(aula => (
+                                                    <option key={aula.id_aula} value={aula.id_aula}>{aula.nombre}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </>
+                                )}
+                                {!esNivelIngles(currentSubject) && currentSubject && currentGrade && (
                                     <div className="flex-grow min-w-[200px]">
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Grados (se asignarán automáticamente) <span className="text-green-600">*</span>
+                                            Aula/Salón
                                         </label>
-                                        <div className="mt-1 p-2 border border-green-300 rounded-md bg-green-50 text-sm text-green-700 font-medium">
-                                            5to Grado y 6to Grado
-                                        </div>
+                                        <select
+                                            value={currentAula}
+                                            onChange={(e) => setCurrentAula(e.target.value)}
+                                            className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            disabled={isSubmitting}
+                                        >
+                                            <option value="">Seleccione un aula (opcional)</option>
+                                            {aulas.filter(a => a.activa).map(aula => (
+                                                <option key={aula.id_aula} value={aula.id_aula}>{aula.nombre}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 )}
                                 <button 
@@ -1991,6 +2079,9 @@ const TeacherFormModal: React.FC<{
                                                     <span className="text-purple-600">(5to y 6to Grado</span>
                                                     {a.nivel_ingles && (
                                                         <span className="text-purple-700 font-bold"> - {a.nivel_ingles}</span>
+                                                    )}
+                                                    {a.id_aula && (
+                                                        <span className="text-purple-600"> - {aulas.find(aula => aula.id_aula === a.id_aula)?.nombre || 'Aula'}</span>
                                                     )}
                                                     <span className="text-purple-600">)</span>
                                                     <button 
@@ -2029,6 +2120,9 @@ const TeacherFormModal: React.FC<{
                                                 <span className="text-blue-600">({a.grade}</span>
                                                 {a.nivel_ingles && (
                                                     <span className="text-blue-700 font-bold"> - {a.nivel_ingles}</span>
+                                                )}
+                                                {a.id_aula && (
+                                                    <span className="text-blue-600"> - {aulas.find(aula => aula.id_aula === a.id_aula)?.nombre || 'Aula'}</span>
                                                 )}
                                                 <span className="text-blue-600">)</span>
                                                 <button 
@@ -2085,10 +2179,11 @@ const TeachersView: React.FC<{
     docentes: Docente[];
     clases: Clase[];
     alumnos: Alumno[];
+    aulas: Aula[];
     setDocentes: React.Dispatch<React.SetStateAction<Docente[]>>;
     setClases: React.Dispatch<React.SetStateAction<Clase[]>>;
     currentUser: Usuario;
-}> = ({ docentes, clases, alumnos, setDocentes, setClases, currentUser }) => {
+}> = ({ docentes, clases, alumnos, aulas, setDocentes, setClases, currentUser }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [selectedTeacher, setSelectedTeacher] = useState<Docente | null>(null);
     const [unlinkedUsers, setUnlinkedUsers] = useState<Array<{id: string, email: string, role: string}>>([]);
@@ -2189,6 +2284,7 @@ const TeachersView: React.FC<{
                             nombre_materia: a.subject.trim(),
                             grado_asignado: a.grade.trim(),
                             id_docente_asignado: savedTeacher.id_docente,
+                            id_aula: a.id_aula || null, // Agregar aula si está asignada
                             student_ids: alumnos.filter(s => s.salon === a.grade).map(s => s.id_alumno),
                         };
                         const created = await clasesService.create(newClass);
@@ -2223,6 +2319,7 @@ const TeachersView: React.FC<{
                                         nombre_materia: `Inglés - ${skill}`,
                                         grado_asignado: a.grade.trim(),
                                         id_docente_asignado: savedTeacher.id_docente,
+                                        id_aula: a.id_aula || null, // Agregar aula si está asignada
                                         es_ingles_primaria: true,
                                         es_proyecto: skill === 'Project',
                                         nivel_ingles: null, // 1er-4to no tienen niveles
@@ -2241,7 +2338,8 @@ const TeachersView: React.FC<{
                                 }
                             }
                         } else {
-                            // Para 5to-6to: Crear asignación de docente por nivel Y las clases por skill
+                            // Para 5to-6to: Solo crear asignación de docente por nivel, NO crear clases individuales
+                            // Las clases se crearán una sola vez por skill (consolidadas) cuando se agregue el primer docente
                             if (a.nivel_ingles) {
                                 try {
                                     // Verificar si ya existe esta asignación
@@ -2274,57 +2372,96 @@ const TeachersView: React.FC<{
                                             .update({ activa: true })
                                             .eq('id', existing.id);
                                     }
+                                    
+                                    // Crear o actualizar asignación de aula para este nivel
+                                    if (a.id_aula) {
+                                        try {
+                                            // Verificar si ya existe una asignación de aula para este nivel
+                                            const { data: existingAula } = await supabase
+                                                .from('asignacion_aula_nivel_ingles')
+                                                .select('*')
+                                                .eq('nivel_ingles', a.nivel_ingles)
+                                                .eq('ano_escolar', anoEscolar)
+                                                .eq('activa', true)
+                                                .single();
+                                            
+                                            if (!existingAula) {
+                                                // Crear nueva asignación de aula
+                                                const { error: aulaError } = await supabase
+                                                    .from('asignacion_aula_nivel_ingles')
+                                                    .insert({
+                                                        id_aula: a.id_aula,
+                                                        nivel_ingles: a.nivel_ingles,
+                                                        ano_escolar: anoEscolar,
+                                                        prioridad: 1,
+                                                        activa: true
+                                                    });
+                                                
+                                                if (aulaError) {
+                                                    console.error('Error creating aula assignment:', aulaError);
+                                                    // No lanzar error, solo registrar
+                                                }
+                                            } else {
+                                                // Actualizar aula existente si es diferente
+                                                if (existingAula.id_aula !== a.id_aula) {
+                                                    await supabase
+                                                        .from('asignacion_aula_nivel_ingles')
+                                                        .update({ 
+                                                            id_aula: a.id_aula,
+                                                            activa: true 
+                                                        })
+                                                        .eq('id', existingAula.id);
+                                                }
+                                            }
+                                        } catch (error) {
+                                            // Si no existe la tabla o hay error, solo registrar
+                                            console.error('Error managing aula assignment:', error);
+                                        }
+                                    }
 
-                                    // Crear clases por skill para niveles (5to y 6to)
-                                    // Skills para niveles (5to-6to): Speaking, Listening, Writing, Creative Writing, Use of English, Reading
-                                    // IMPORTANTE: Crear solo 6 clases (una por skill), no duplicar por grado
-                                    // Cada clase se mostrará en el horario de ambos grados (5to y 6to) según el filtro
+                                    // Verificar si ya existen clases consolidadas por skill para 5to-6to
+                                    // Si no existen, crearlas una sola vez (6 clases, una por skill)
                                     const skillsNivel = ['Speaking', 'Listening', 'Writing', 'Creative Writing', 'Use of English', 'Reading'];
                                     
-                                    // Obtener alumnos de ambos grados con este nivel
-                                    const alumnos5toNivel = alumnos.filter(
-                                        alumno => alumno.salon === '5to Grado' && alumno.nivel_ingles === a.nivel_ingles
+                                    // Obtener todas las clases de inglés de 5to-6to existentes
+                                    const existingEnglishClasses = clases.filter(c => 
+                                        c.es_ingles_primaria && 
+                                        c.grado_asignado === '5to Grado' &&
+                                        c.skill_rutina &&
+                                        skillsNivel.includes(c.skill_rutina)
                                     );
-                                    const alumnos6toNivel = alumnos.filter(
-                                        alumno => alumno.salon === '6to Grado' && alumno.nivel_ingles === a.nivel_ingles
-                                    );
-                                    const todosAlumnosNivel = [...alumnos5toNivel, ...alumnos6toNivel];
-
-                                    // Crear solo 6 clases (una por skill) que incluyan ambos grados
+                                    
+                                    // Crear solo las clases que no existen aún (una por skill, sin nivel específico)
                                     for (const skill of skillsNivel) {
-                                        try {
-                                            // Pequeño delay para evitar rate limiting
-                                            await new Promise(resolve => setTimeout(resolve, 100));
-                                            
-                                            // Crear clase con grado_asignado = '5to Grado' (se filtrará también para 6to en la vista)
-                                            // Los estudiantes incluyen ambos grados
-                                            const claseSkill: any = {
-                                                nombre_materia: `Inglés - ${skill}`,
-                                                grado_asignado: '5to Grado', // Usar 5to como grado principal para el filtro
-                                                id_docente_asignado: savedTeacher.id_docente,
-                                                es_ingles_primaria: true,
-                                                es_proyecto: false,
-                                                nivel_ingles: a.nivel_ingles,
-                                                skill_rutina: skill,
-                                                student_ids: todosAlumnosNivel.map(al => al.id_alumno),
-                                            };
-                                            const createdSkill = await clasesService.create(claseSkill);
-                                            createdClasses.push({
-                                                ...createdSkill,
-                                                studentIds: createdSkill.student_ids || []
-                                            });
-                                        } catch (error: any) {
-                                            const errorMsg = `Error creating class for ${skill} - ${a.nivel_ingles}: ${error.message || JSON.stringify(error)}`;
-                                            console.error(errorMsg, error);
-                                            errors.push(errorMsg);
-                                            
-                                            // Si es un error 401, verificar sesión
-                                            if (error.status === 401 || error.message?.includes('JWT')) {
-                                                const { data: { session } } = await supabase.auth.getSession();
-                                                if (!session) {
-                                                    errors.push('La sesión expiró. Por favor, recarga la página e inicia sesión nuevamente.');
-                                                    break; // Salir del loop para evitar más errores
-                                                }
+                                        const classExists = existingEnglishClasses.some(c => c.skill_rutina === skill);
+                                        
+                                        if (!classExists) {
+                                            try {
+                                                // Obtener todos los alumnos de 5to y 6to (sin filtrar por nivel, ya que la clase es consolidada)
+                                                const todosAlumnos5to6to = alumnos.filter(
+                                                    alumno => alumno.salon === '5to Grado' || alumno.salon === '6to Grado'
+                                                );
+                                                
+                                                // Crear clase consolidada (sin nivel específico, nivel_ingles = null)
+                                                const claseSkill: any = {
+                                                    nombre_materia: `Inglés - ${skill}`,
+                                                    grado_asignado: '5to Grado', // Usar 5to como grado principal para el filtro
+                                                    id_docente_asignado: null, // Sin docente específico, se consultará de asignaciones
+                                                    es_ingles_primaria: true,
+                                                    es_proyecto: false,
+                                                    nivel_ingles: null, // null indica que es una clase consolidada
+                                                    skill_rutina: skill,
+                                                    student_ids: todosAlumnos5to6to.map(al => al.id_alumno),
+                                                };
+                                                const createdSkill = await clasesService.create(claseSkill);
+                                                createdClasses.push({
+                                                    ...createdSkill,
+                                                    studentIds: createdSkill.student_ids || []
+                                                });
+                                            } catch (error: any) {
+                                                const errorMsg = `Error creating consolidated class for ${skill}: ${error.message || JSON.stringify(error)}`;
+                                                console.error(errorMsg, error);
+                                                errors.push(errorMsg);
                                             }
                                         }
                                     }
@@ -2370,9 +2507,15 @@ const TeachersView: React.FC<{
                 // Mostrar mensaje de éxito
                 // Para niveles de inglés, contamos las clases creadas (no las asignaciones)
                 const totalCreado = createdClasses.length;
+                // Contar clases consolidadas de inglés de 5to-6to (máximo 6, una por skill)
+                const englishConsolidatedClasses = createdClasses.filter(c => 
+                    c.es_ingles_primaria && 
+                    c.nivel_ingles === null && 
+                    c.grado_asignado === '5to Grado'
+                ).length;
                 const totalEsperado = asignacionesRegulares.length + 
                     (asignacionesIngles.filter(a => !esGradoAlto(a.grade)).length * 7) + // 1er-4to: 7 skills por grado
-                    (asignacionesIngles.filter(a => esGradoAlto(a.grade) && a.nivel_ingles).length * 6); // 5to-6to: 6 skills (una por skill, no duplicadas por grado)
+                    Math.min(englishConsolidatedClasses, 6); // 5to-6to: máximo 6 clases consolidadas (una por skill)
                 
                 if (totalCreado >= totalEsperado * 0.9) { // Permitir 10% de error
                     const mensaje = asignacionesNivelCreadas.length > 0
@@ -2380,7 +2523,7 @@ const TeachersView: React.FC<{
                           `Clases creadas: ${createdClasses.length}\n` +
                           `Asignaciones de nivel inglés: ${asignacionesNivelCreadas.length}\n\n` +
                           `${asignacionesNivelCreadas.join('\n')}\n\n` +
-                          `Se crearon automáticamente las clases por skill (Reading, Writing, Speaking, Listening, Use of English, Phonics) y Project para cada nivel.`
+                          `Se crearon automáticamente las clases consolidadas por skill (Reading, Writing, Speaking, Listening, Use of English, Creative Writing) para 5to y 6to Grado.`
                         : `✅ Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente con ${createdClasses.length} clase(s).`;
                     alert(mensaje);
                 } else if (totalCreado > 0) {
@@ -2451,7 +2594,20 @@ const TeachersView: React.FC<{
                         {docentes.map(docente => {
                             const teacherClasses = clases.filter(c => c.id_docente_asignado === docente.id_docente);
                             const subjects = [...new Set(teacherClasses.map(c => c.nombre_materia))];
-                            const grades = [...new Set(teacherClasses.map(c => c.grado_asignado))];
+                            let grades = [...new Set(teacherClasses.map(c => c.grado_asignado))];
+                            
+                            // Para clases de inglés de niveles (5to-6to), agregar "6to Grado" si hay clases con "5to Grado"
+                            // porque las clases de inglés de niveles están agrupadas para ambos grados
+                            const hasEnglishLevelClasses = teacherClasses.some(c => 
+                                c.es_ingles_primaria && 
+                                c.nivel_ingles && 
+                                c.grado_asignado === '5to Grado'
+                            );
+                            
+                            if (hasEnglishLevelClasses && !grades.includes('6to Grado')) {
+                                grades.push('6to Grado');
+                                grades.sort(); // Ordenar para mantener consistencia
+                            }
 
                             return (
                                 <tr key={docente.id_docente} className="hover:bg-gray-50">
@@ -2541,7 +2697,7 @@ const TeachersView: React.FC<{
                 </div>
             )}
 
-            {isModalOpen && <TeacherFormModal teacher={selectedTeacher} clases={clases} onClose={handleCloseModal} onSave={handleSaveTeacher} />}
+            {isModalOpen && <TeacherFormModal teacher={selectedTeacher} clases={clases} aulas={aulas} onClose={handleCloseModal} onSave={handleSaveTeacher} />}
         </div>
     );
 };
@@ -2991,6 +3147,28 @@ const ScheduleView: React.FC<{
     const [eventData, setEventData] = useState<{dia: number, hora: string, desc: string, id: string | null}>({dia: 0, hora: '', desc: '', id: null});
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+    const [englishLevelAssignments, setEnglishLevelAssignments] = useState<Array<{id_docente: string, nivel_ingles: string}>>([]);
+    
+    // Cargar asignaciones de niveles de inglés
+    useEffect(() => {
+        const loadEnglishAssignments = async () => {
+            try {
+                const anoEscolar = '2025-2026'; // TODO: Obtener del contexto
+                const { data, error } = await supabase
+                    .from('asignacion_docente_nivel_ingles')
+                    .select('id_docente, nivel_ingles')
+                    .eq('ano_escolar', anoEscolar)
+                    .eq('activa', true);
+                
+                if (error) throw error;
+                setEnglishLevelAssignments(data || []);
+            } catch (error) {
+                console.error('Error loading English level assignments:', error);
+            }
+        };
+        
+        loadEnglishAssignments();
+    }, []);
 
     const isPrimaryGrade = useMemo(() => {
         const gradeNum = parseInt(selectedGrade.match(/\d+/)?.[0] || '0');
@@ -3037,35 +3215,62 @@ const ScheduleView: React.FC<{
     }, [weeklySchedule, selectedGrade, currentWeek, schedules, setSchedules]);
 
     // Helper function to group English classes by time and skill
+    // Para clases consolidadas, crea "horarios virtuales" basados en asignaciones de niveles
     const groupEnglishClassesByTimeAndSkill = useMemo(() => {
         const grouped: Map<string, Horario[]> = new Map();
         
         weeklySchedule.forEach(item => {
             if (item.id_clase) {
                 const clase = clases.find(c => c.id_clase === item.id_clase);
-                const isEnglish = clase?.es_ingles_primaria && 
-                                  clase?.nivel_ingles && 
-                                  (selectedGrade === '5to Grado' || selectedGrade === '6to Grado');
+                const isEnglishConsolidated = clase?.es_ingles_primaria && 
+                                             clase?.nivel_ingles === null && // Clase consolidada
+                                             clase?.skill_rutina &&
+                                             (selectedGrade === '5to Grado' || selectedGrade === '6to Grado');
                 
-                if (isEnglish) {
-                    // Create key: dia-hora-skill
+                if (isEnglishConsolidated) {
+                    // Para clases consolidadas, crear horarios virtuales para cada nivel/docente
                     const skill = clase.skill_rutina || 'Inglés';
-                    // Normalize hora_inicio to match slot format (HH:MM)
                     const horaInicio = item.hora_inicio.length >= 5 
                         ? item.hora_inicio.substring(0, 5) 
                         : item.hora_inicio;
                     const key = `${item.dia_semana}-${horaInicio}-${skill}`;
                     
-                    if (!grouped.has(key)) {
-                        grouped.set(key, []);
+                    // Obtener todas las asignaciones de niveles activas para este skill
+                    // Crear un horario virtual para cada nivel/docente
+                    const virtualHorarios: Horario[] = englishLevelAssignments.map(assignment => ({
+                        ...item,
+                        id_horario: `${item.id_horario}-${assignment.nivel_ingles}-${assignment.id_docente}`, // ID único virtual
+                        id_docente: assignment.id_docente,
+                        // Mantener id_clase para referencia a la clase consolidada
+                    }));
+                    
+                    if (virtualHorarios.length > 0) {
+                        grouped.set(key, virtualHorarios);
                     }
-                    grouped.get(key)!.push(item);
+                } else {
+                    // Para clases de inglés con nivel específico (1er-4to o clases antiguas)
+                    const isEnglish = clase?.es_ingles_primaria && 
+                                      clase?.nivel_ingles && 
+                                      (selectedGrade === '5to Grado' || selectedGrade === '6to Grado');
+                    
+                    if (isEnglish) {
+                        const skill = clase.skill_rutina || 'Inglés';
+                        const horaInicio = item.hora_inicio.length >= 5 
+                            ? item.hora_inicio.substring(0, 5) 
+                            : item.hora_inicio;
+                        const key = `${item.dia_semana}-${horaInicio}-${skill}`;
+                        
+                        if (!grouped.has(key)) {
+                            grouped.set(key, []);
+                        }
+                        grouped.get(key)!.push(item);
+                    }
                 }
             }
         });
         
         return grouped;
-    }, [weeklySchedule, clases, selectedGrade]);
+    }, [weeklySchedule, clases, selectedGrade, englishLevelAssignments]);
 
     const handleDrop = (day: number, slot: string) => {
         if (currentUser.role === 'docente') return; // Docentes no pueden editar
@@ -3080,10 +3285,16 @@ const ScheduleView: React.FC<{
         );
 
         // Create new item with updated position
+        // Para clases consolidadas de inglés, id_docente será null (se consultará de asignaciones)
+        const clase = clases.find(c => c.id_clase === draggedItem.id);
+        const isConsolidatedEnglish = clase?.es_ingles_primaria && 
+                                      clase?.nivel_ingles === null && 
+                                      clase?.skill_rutina;
+        
         const newItem: Horario = draggedItem.type === 'class'
             ? {
                 id_horario: `h-${selectedGrade.replace(/\s+/g, '-')}-${currentWeek}-${day}-${hora_inicio.replace(':', '')}-${draggedItem.id}`,
-                id_docente: draggedItem.docenteId,
+                id_docente: isConsolidatedEnglish ? null : draggedItem.docenteId, // null para clases consolidadas
                 id_clase: draggedItem.id,
                 dia_semana: day,
                 hora_inicio: hora_inicio,
@@ -3145,16 +3356,24 @@ const ScheduleView: React.FC<{
         return clases.filter(c => {
             // Incluir clases del grado seleccionado normalmente
             if (c.grado_asignado === selectedGrade && !assignedClassIds.has(c.id_clase)) {
-                return true;
+                // Para clases de inglés consolidadas (5to-6to), solo mostrar si no están asignadas
+                if (c.es_ingles_primaria && c.nivel_ingles === null && c.skill_rutina) {
+                    return true; // Clase consolidada de inglés
+                }
+                // Para otras clases normales
+                if (!c.es_ingles_primaria || c.nivel_ingles !== null) {
+                    return true;
+                }
             }
             
-            // Para niveles de inglés (5to-6to): incluir clases si:
-            // 1. Es una clase de inglés de primaria con nivel
+            // Para niveles de inglés consolidados (5to-6to): incluir clases consolidadas si:
+            // 1. Es una clase de inglés de primaria sin nivel específico (consolidada)
             // 2. El grado seleccionado es 5to o 6to
-            // 3. La clase tiene grado_asignado = '5to Grado' (clases de nivel se crean así)
+            // 3. La clase tiene grado_asignado = '5to Grado'
             // 4. La clase no está ya asignada
             if (c.es_ingles_primaria && 
-                c.nivel_ingles && 
+                c.nivel_ingles === null && // Clase consolidada
+                c.skill_rutina && // Tiene skill definido
                 (selectedGrade === '5to Grado' || selectedGrade === '6to Grado') &&
                 c.grado_asignado === '5to Grado' &&
                 !assignedClassIds.has(c.id_clase)) {
@@ -3404,18 +3623,26 @@ const ScheduleView: React.FC<{
                                         
                                         if (firstItem?.id_clase) {
                                             const clase = clases.find(c => c.id_clase === firstItem.id_clase);
-                                            const isEnglish = clase?.es_ingles_primaria && 
-                                                              clase?.nivel_ingles && 
-                                                              (selectedGrade === '5to Grado' || selectedGrade === '6to Grado');
+                                            // Detectar clases consolidadas (nivel_ingles === null) o clases con nivel específico
+                                            const isEnglishConsolidated = clase?.es_ingles_primaria && 
+                                                                          clase?.nivel_ingles === null && 
+                                                                          clase?.skill_rutina &&
+                                                                          (selectedGrade === '5to Grado' || selectedGrade === '6to Grado');
+                                            const isEnglishWithLevel = clase?.es_ingles_primaria && 
+                                                                       clase?.nivel_ingles && 
+                                                                       (selectedGrade === '5to Grado' || selectedGrade === '6to Grado');
                                             
-                                            if (isEnglish) {
+                                            if (isEnglishConsolidated || isEnglishWithLevel) {
                                                 const skill = clase.skill_rutina || 'Inglés';
                                                 const key = `${day}-${horaInicioFormatted}-${skill}`;
                                                 englishGroup = groupEnglishClassesByTimeAndSkill.get(key) || null;
                                                 
                                                 // Only show consolidated block if there are multiple levels or if it's the first item in the group
                                                 if (englishGroup && englishGroup.length > 0) {
-                                                    const isFirstInGroup = englishGroup[0].id_clase === firstItem.id_clase;
+                                                    // Para clases consolidadas, siempre mostrar el bloque
+                                                    // Para clases con nivel, verificar si es la primera del grupo
+                                                    const isFirstInGroup = isEnglishConsolidated || 
+                                                                          englishGroup[0].id_clase === firstItem.id_clase;
                                                     if (!isFirstInGroup) {
                                                         // Skip rendering for subsequent items in the group
                                                         return <td key={`${day}-${slot}`} className="border p-1 align-top text-xs relative h-24"></td>;
@@ -3475,11 +3702,14 @@ const ScheduleView: React.FC<{
                                                                         <div className="font-bold text-xs mb-1">{skill}</div>
                                                                         <div className="text-[10px] space-y-0.5">
                                                                             {englishGroup.map((h) => {
-                                                                                const c = clases.find(cl => cl.id_clase === h.id_clase);
+                                                                                // Para horarios virtuales, obtener nivel_ingles de la asignación
+                                                                                const assignment = englishLevelAssignments.find(a => a.id_docente === h.id_docente);
+                                                                                const nivel = assignment?.nivel_ingles || 
+                                                                                             clases.find(cl => cl.id_clase === h.id_clase)?.nivel_ingles;
                                                                                 const aula = aulas.find(a => a.id_aula === h.id_aula);
                                                                                 return (
-                                                                                    <div key={h.id_clase} className="text-gray-700 border-b border-gray-300 pb-0.5 last:border-0">
-                                                                                        <span className="font-semibold">{c?.nivel_ingles}</span>
+                                                                                    <div key={h.id_horario} className="text-gray-700 border-b border-gray-300 pb-0.5 last:border-0">
+                                                                                        <span className="font-semibold">{nivel}</span>
                                                                                         {aula && <span className="text-gray-500"> - {aula.nombre}</span>}
                                                                                     </div>
                                                                                 );
@@ -3539,17 +3769,67 @@ const ScheduleView: React.FC<{
                                 e.currentTarget.classList.add('border-gray-300');
                             }}
                         >
-                            {unassignedClasses.map(clase => (
-                                 <div key={clase.id_clase}
-                                    draggable
-                                    onDragStart={(e) => handleDragStart(e, clase, 'class')}
-                                    className="p-2 rounded-md cursor-grab hover:shadow-md transition-shadow"
-                                    style={{backgroundColor: subjectColors[clase.nombre_materia] || getSubjectColor(clase.nombre_materia)}}
-                                 >
-                                    <div className="font-bold">{clase.nombre_materia}</div>
-                                    <div className="text-sm text-gray-600">{docentes.find(d => d.id_docente === clase.id_docente_asignado)?.nombres}</div>
-                                </div>
-                            ))}
+                            {(() => {
+                                // Agrupar clases de inglés consolidadas por skill para mostrar un solo bloque
+                                const englishConsolidated = unassignedClasses.filter(c => 
+                                    c.es_ingles_primaria && 
+                                    c.nivel_ingles === null && 
+                                    c.skill_rutina &&
+                                    (selectedGrade === '5to Grado' || selectedGrade === '6to Grado')
+                                );
+                                const otherClasses = unassignedClasses.filter(c => 
+                                    !(c.es_ingles_primaria && c.nivel_ingles === null && c.skill_rutina)
+                                );
+                                
+                                // Obtener skills únicos de clases consolidadas
+                                const uniqueSkills = [...new Set(englishConsolidated.map(c => c.skill_rutina).filter(Boolean))];
+                                
+                                return (
+                                    <>
+                                        {/* Mostrar un bloque por skill consolidado */}
+                                        {uniqueSkills.map(skill => {
+                                            const claseConsolidada = englishConsolidated.find(c => c.skill_rutina === skill);
+                                            if (!claseConsolidada) return null;
+                                            
+                                            // Obtener todas las asignaciones de niveles activas (aplican a todos los skills)
+                                            const assignmentsForSkill = englishLevelAssignments;
+                                            
+                                            return (
+                                                <div 
+                                                    key={`consolidated-${skill}`}
+                                                    draggable
+                                                    onDragStart={(e) => handleDragStart(e, claseConsolidada, 'class')}
+                                                    className="p-2 rounded-md cursor-grab hover:shadow-md transition-shadow"
+                                                    style={{backgroundColor: subjectColors['Inglés'] || getSubjectColor('Inglés')}}
+                                                >
+                                                    <div className="font-bold">{claseConsolidada.nombre_materia}</div>
+                                                    {assignmentsForSkill.length > 0 && (
+                                                        <div className="text-xs text-gray-600 mt-1">
+                                                            {assignmentsForSkill.map(a => {
+                                                                const docente = docentes.find(d => d.id_docente === a.id_docente);
+                                                                return `${a.nivel_ingles}: ${docente?.nombres || 'N/A'}`;
+                                                            }).join(' | ')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                        
+                                        {/* Mostrar otras clases normalmente */}
+                                        {otherClasses.map(clase => (
+                                            <div key={clase.id_clase}
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, clase, 'class')}
+                                                className="p-2 rounded-md cursor-grab hover:shadow-md transition-shadow"
+                                                style={{backgroundColor: subjectColors[clase.nombre_materia] || getSubjectColor(clase.nombre_materia)}}
+                                            >
+                                                <div className="font-bold">{clase.nombre_materia}</div>
+                                                <div className="text-sm text-gray-600">{docentes.find(d => d.id_docente === clase.id_docente_asignado)?.nombres}</div>
+                                            </div>
+                                        ))}
+                                    </>
+                                );
+                            })()}
                             {unassignedClasses.length === 0 && (
                                 <div className="text-sm text-gray-500 p-4 border-2 border-dashed border-gray-300 rounded-md text-center">
                                     <p className="mb-2">Todas las asignaturas están en el horario</p>
@@ -6315,7 +6595,7 @@ const App: React.FC = () => {
                     onDeleteStudent={handleDeleteStudent}
                 />;
       case 'teachers':
-        return <TeachersView docentes={docentes} clases={clases} alumnos={alumnos} setDocentes={setDocentes} setClases={setClases} currentUser={currentUser!} />;
+        return <TeachersView docentes={docentes} clases={clases} alumnos={alumnos} aulas={aulas} setDocentes={setDocentes} setClases={setClases} currentUser={currentUser!} />;
       case 'planning':
         return <PlanningView planificaciones={planificaciones} setPlanificaciones={setPlanificaciones} clases={clases} docentes={docentes} currentUser={currentUser!} navParams={navParams}/>;
       case 'calendar':
