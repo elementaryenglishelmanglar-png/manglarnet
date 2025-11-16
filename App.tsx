@@ -29,7 +29,8 @@ import {
   type Notification as NotificationDB,
   type EventoCalendario as EventoCalendarioDB,
   type ConfiguracionHorario,
-  type GeneracionHorario
+  type GeneracionHorario,
+  type Aula
 } from './services/supabaseDataService';
 
 
@@ -100,7 +101,7 @@ interface Clase {
 
 interface Planificacion {
   id_planificacion: string; // UUID
-  id_docente: string; // UUID
+  id_docente: string | null; // UUID - Can be null if docente is deleted
   id_clase: string; // UUID
   semana: number;
   lapso: 'I Lapso' | 'II Lapso' | 'III Lapso';
@@ -113,6 +114,8 @@ interface Planificacion {
   recursos_links?: string;
   status: 'Borrador' | 'Enviado' | 'Revisado' | 'Aprobado';
   observaciones?: string;
+  nombres_docente?: string; // Preserved docente name
+  apellidos_docente?: string; // Preserved docente last name
 }
 
 interface Horario {
@@ -2599,6 +2602,8 @@ const PlanningFormModal: React.FC<{
         recursos_links: plan?.recursos_links || '',
         status: plan?.status || 'Borrador',
         observaciones: plan?.observaciones || '',
+        nombres_docente: plan?.nombres_docente,
+        apellidos_docente: plan?.apellidos_docente,
     });
 
     const isReviewMode = userRole !== 'docente' && plan !== null;
@@ -2862,7 +2867,13 @@ const PlanningView: React.FC<{
                         .sort((a,b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime())
                         .map(plan => {
                         const clase = clases.find(c => c.id_clase === plan.id_clase);
-                        const docente = docentes.find(d => d.id_docente === plan.id_docente);
+                        const docente = plan.id_docente ? docentes.find(d => d.id_docente === plan.id_docente) : null;
+                        // Use preserved names if docente is deleted, otherwise use current docente info
+                        const docenteNombre = docente 
+                            ? `${docente.nombres} ${docente.apellidos}`
+                            : (plan.nombres_docente && plan.apellidos_docente 
+                                ? `${plan.nombres_docente} ${plan.apellidos_docente}` 
+                                : 'Docente no disponible');
                         const isHighlighted = navParams?.planId === plan.id_planificacion;
                         return (
                             <div key={plan.id_planificacion} ref={isHighlighted ? highlightRef : null} className={`border rounded-lg p-4 flex flex-col justify-between ${isHighlighted ? 'ring-2 ring-brand-primary shadow-lg' : 'shadow-sm'}`}>
@@ -2873,7 +2884,7 @@ const PlanningView: React.FC<{
                                             {plan.status}
                                         </span>
                                     </div>
-                                    <p className="text-sm text-gray-500">Docente: {docente?.nombres} {docente?.apellidos}</p>
+                                    <p className="text-sm text-gray-500">Docente: {docenteNombre}</p>
                                     <p className="text-sm text-gray-500">Semana {plan.semana} | {plan.lapso} | {plan.ano_escolar}</p>
                                     <p className="text-xs text-gray-400 mt-1">Creado: {new Date(plan.fecha_creacion).toLocaleDateString()}</p>
                                     {plan.competencia_indicadores && (
@@ -2970,7 +2981,8 @@ const ScheduleView: React.FC<{
     docentes: Docente[];
     currentUser: Usuario;
     alumnos: Alumno[];
-}> = ({ schedules, setSchedules, clases, docentes, currentUser, alumnos }) => {
+    aulas: Aula[];
+}> = ({ schedules, setSchedules, clases, docentes, currentUser, alumnos, aulas }) => {
     const allGrades = useMemo(() => Array.from(new Set(alumnos.map(a => a.salon))).sort(), [alumnos]);
     const [selectedGrade, setSelectedGrade] = useState(allGrades[0] || '');
     const [currentWeek, setCurrentWeek] = useState<number | null>(null);
@@ -3024,6 +3036,36 @@ const ScheduleView: React.FC<{
         }
     }, [weeklySchedule, selectedGrade, currentWeek, schedules, setSchedules]);
 
+    // Helper function to group English classes by time and skill
+    const groupEnglishClassesByTimeAndSkill = useMemo(() => {
+        const grouped: Map<string, Horario[]> = new Map();
+        
+        weeklySchedule.forEach(item => {
+            if (item.id_clase) {
+                const clase = clases.find(c => c.id_clase === item.id_clase);
+                const isEnglish = clase?.es_ingles_primaria && 
+                                  clase?.nivel_ingles && 
+                                  (selectedGrade === '5to Grado' || selectedGrade === '6to Grado');
+                
+                if (isEnglish) {
+                    // Create key: dia-hora-skill
+                    const skill = clase.skill_rutina || 'Inglés';
+                    // Normalize hora_inicio to match slot format (HH:MM)
+                    const horaInicio = item.hora_inicio.length >= 5 
+                        ? item.hora_inicio.substring(0, 5) 
+                        : item.hora_inicio;
+                    const key = `${item.dia_semana}-${horaInicio}-${skill}`;
+                    
+                    if (!grouped.has(key)) {
+                        grouped.set(key, []);
+                    }
+                    grouped.get(key)!.push(item);
+                }
+            }
+        });
+        
+        return grouped;
+    }, [weeklySchedule, clases, selectedGrade]);
 
     const handleDrop = (day: number, slot: string) => {
         if (currentUser.role === 'docente') return; // Docentes no pueden editar
@@ -3344,7 +3386,47 @@ const ScheduleView: React.FC<{
                                     <td className="px-2 py-2 whitespace-nowrap text-sm font-medium text-gray-900 border-r">{slot.replace('-', ' - ')}</td>
                                     {WEEK_DAYS.map((_, dayIndex) => {
                                         const day = dayIndex + 1;
-                                        const item = weeklySchedule.find(s => s.dia_semana === day && s.hora_inicio.startsWith(slot.split(' - ')[0]));
+                                        const [horaInicio] = slot.split(' - ');
+                                        const horaInicioFormatted = horaInicio.trim();
+                                        
+                                        // Find all items at this time slot (could be multiple for English classes)
+                                        // Normalize hora_inicio for comparison (HH:MM format)
+                                        const itemsAtSlot = weeklySchedule.filter(s => {
+                                            const sHora = s.hora_inicio.length >= 5 
+                                                ? s.hora_inicio.substring(0, 5) 
+                                                : s.hora_inicio;
+                                            return s.dia_semana === day && sHora === horaInicioFormatted;
+                                        });
+                                        
+                                        // Check if this is an English class group
+                                        const firstItem = itemsAtSlot[0];
+                                        let englishGroup: Horario[] | null = null;
+                                        
+                                        if (firstItem?.id_clase) {
+                                            const clase = clases.find(c => c.id_clase === firstItem.id_clase);
+                                            const isEnglish = clase?.es_ingles_primaria && 
+                                                              clase?.nivel_ingles && 
+                                                              (selectedGrade === '5to Grado' || selectedGrade === '6to Grado');
+                                            
+                                            if (isEnglish) {
+                                                const skill = clase.skill_rutina || 'Inglés';
+                                                const key = `${day}-${horaInicioFormatted}-${skill}`;
+                                                englishGroup = groupEnglishClassesByTimeAndSkill.get(key) || null;
+                                                
+                                                // Only show consolidated block if there are multiple levels or if it's the first item in the group
+                                                if (englishGroup && englishGroup.length > 0) {
+                                                    const isFirstInGroup = englishGroup[0].id_clase === firstItem.id_clase;
+                                                    if (!isFirstInGroup) {
+                                                        // Skip rendering for subsequent items in the group
+                                                        return <td key={`${day}-${slot}`} className="border p-1 align-top text-xs relative h-24"></td>;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Use first item for non-English or single-item slots
+                                        const item = firstItem;
+                                        
                                         return (
                                             <td key={`${day}-${slot}`}
                                                 className="border p-1 align-top text-xs relative h-24"
@@ -3375,7 +3457,42 @@ const ScheduleView: React.FC<{
                                                                 {item.evento_descripcion}
                                                             </div>
                                                         </div>
+                                                    ) : item.id_clase && englishGroup && englishGroup.length > 0 ? (
+                                                        // Render consolidated English block
+                                                        <div 
+                                                            draggable={currentUser.role !== 'docente'} 
+                                                            onDragStart={(e) => handleDragStart(e, item, 'event')} 
+                                                            className={`h-full ${currentUser.role !== 'docente' ? 'cursor-grab' : 'cursor-default'}`}
+                                                        >
+                                                            {(() => {
+                                                                const firstClase = clases.find(c => c.id_clase === englishGroup![0].id_clase);
+                                                                const skill = firstClase?.skill_rutina || 'Inglés';
+                                                                
+                                                                return (
+                                                                    <div className="p-1.5 rounded-md h-full overflow-y-auto" style={{
+                                                                        backgroundColor: subjectColors['Inglés'] || getSubjectColor('Inglés')
+                                                                    }}>
+                                                                        <div className="font-bold text-xs mb-1">{skill}</div>
+                                                                        <div className="text-[10px] space-y-0.5">
+                                                                            {englishGroup.map((h) => {
+                                                                                const c = clases.find(cl => cl.id_clase === h.id_clase);
+                                                                                const d = docentes.find(doc => doc.id_docente === h.id_docente);
+                                                                                const aula = aulas.find(a => a.id_aula === h.id_aula);
+                                                                                return (
+                                                                                    <div key={h.id_clase} className="text-gray-700 border-b border-gray-300 pb-0.5 last:border-0">
+                                                                                        <span className="font-semibold">{c?.nivel_ingles}:</span>{' '}
+                                                                                        {d ? `${d.nombres} ${d.apellidos}` : 'N/A'}
+                                                                                        {aula && <span className="text-gray-500"> - {aula.nombre}</span>}
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
                                                     ) : item.id_clase && (
+                                                        // Render normal class (non-English or single English class)
                                                         <div 
                                                             draggable={currentUser.role !== 'docente'} 
                                                             onDragStart={(e) => handleDragStart(e, item, 'event')} 
@@ -5745,6 +5862,7 @@ const App: React.FC = () => {
   const [schedules, setSchedules] = useState<WeeklySchedules>({});
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [minutas, setMinutas] = useState<MinutaEvaluacion[]>([]);
+  const [aulas, setAulas] = useState<Aula[]>([]);
 
   // Loading states
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -5800,7 +5918,7 @@ const App: React.FC = () => {
     
     try {
       // Load all data in parallel
-      const [alumnosData, docentesData, clasesData, planificacionesData, horariosData, minutasData, notificationsData] = await Promise.all([
+      const [alumnosData, docentesData, clasesData, planificacionesData, horariosData, minutasData, notificationsData, aulasData] = await Promise.all([
         alumnosService.getAll().catch((err) => { console.error('Error loading alumnos:', err); return []; }),
         docentesService.getAll().catch((err) => { console.error('Error loading docentes:', err); return []; }),
         clasesService.getAll().catch((err) => { console.error('Error loading clases:', err); return []; }),
@@ -5811,7 +5929,8 @@ const App: React.FC = () => {
           console.error('Minutas error details:', JSON.stringify(err, null, 2));
           return []; 
         }),
-        notificacionesService.getAll().catch((err) => { console.error('Error loading notifications:', err); return []; })
+        notificacionesService.getAll().catch((err) => { console.error('Error loading notifications:', err); return []; }),
+        aulasService.getAll().catch((err) => { console.error('Error loading aulas:', err); return []; })
       ]);
 
       setAlumnos(alumnosData.map(convertAlumno));
@@ -5819,6 +5938,7 @@ const App: React.FC = () => {
       setClases(clasesData.map(convertClase));
       setPlanificaciones(planificacionesData);
       setMinutas(minutasData);
+      setAulas(aulasData);
       setNotifications(notificationsData.map(n => {
         const linkTo = typeof n.link_to === 'string' ? JSON.parse(n.link_to) : n.link_to;
         return {
@@ -6203,7 +6323,7 @@ const App: React.FC = () => {
       case 'calendar':
         return <CalendarView currentUser={currentUser!} />;
       case 'schedules':
-        return <ScheduleView schedules={schedules} setSchedules={setSchedules} clases={clases} docentes={docentes} currentUser={currentUser!} alumnos={alumnos} />;
+        return <ScheduleView schedules={schedules} setSchedules={setSchedules} clases={clases} docentes={docentes} currentUser={currentUser!} alumnos={alumnos} aulas={aulas} />;
       case 'team-schedules':
         return <TeamScheduleView docentes={docentes} schedules={schedules} setSchedules={setSchedules} clases={clases} alumnos={alumnos}/>;
       case 'schedule-generator':

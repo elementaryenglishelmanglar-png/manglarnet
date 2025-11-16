@@ -61,7 +61,7 @@ export interface Clase {
 
 export interface Planificacion {
   id_planificacion: string;
-  id_docente: string;
+  id_docente: string | null; // Can be null if docente is deleted
   id_clase: string;
   semana: number;
   lapso: 'I Lapso' | 'II Lapso' | 'III Lapso';
@@ -75,6 +75,8 @@ export interface Planificacion {
   status: 'Borrador' | 'Enviado' | 'Revisado' | 'Aprobado';
   observaciones?: string;
   updated_at?: string;
+  nombres_docente?: string; // Preserved docente name
+  apellidos_docente?: string; // Preserved docente last name
 }
 
 export interface Horario {
