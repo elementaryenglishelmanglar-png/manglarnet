@@ -3541,7 +3541,8 @@ const ScheduleView: React.FC<{
         const newItem: Horario = draggedItem.type === 'class'
             ? {
                 id_horario: `h-${selectedGrade.replace(/\s+/g, '-')}-${currentWeek}-${day}-${hora_inicio.replace(':', '')}-${draggedItem.id}`,
-                id_docente: isConsolidatedEnglish ? null : draggedItem.docenteId, // null para clases consolidadas
+                // CORRECCIÓN: Para clases consolidadas de inglés, usar null, pero para otras clases usar el docente de la clase si no está en draggedItem
+                id_docente: isConsolidatedEnglish ? null : (draggedItem.docenteId || clase?.id_docente_asignado || null),
                 id_clase: draggedItem.id,
                 id_aula: clase?.id_aula || null, // Incluir aula de la clase
                 dia_semana: day,
@@ -3721,10 +3722,14 @@ const ScheduleView: React.FC<{
                     ? `${horario.dia_semana}-${horario.hora_inicio}-event-${horario.evento_descripcion}`
                     : `${horario.dia_semana}-${horario.hora_inicio}-class-${horario.id_clase || 'null'}`;
                 
+                // CORRECCIÓN: Si id_docente es null pero la clase tiene docente, usar el de la clase
+                const clase = horario.id_clase ? clases.find(c => c.id_clase === horario.id_clase) : null;
+                const correctedIdDocente = horario.id_docente || clase?.id_docente_asignado || null;
+                
                 const newHorario = {
                     grado: selectedGrade,
                     semana: currentWeek,
-                    id_docente: horario.id_docente,
+                    id_docente: correctedIdDocente, // Usar el docente corregido
                     id_clase: horario.id_clase,
                     id_aula: horario.id_aula || null, // Incluir aula al guardar
                     dia_semana: horario.dia_semana,
@@ -3739,14 +3744,14 @@ const ScheduleView: React.FC<{
                     // New horario to create
                     horariosToCreate.push(newHorario);
                 } else {
-                    // Check if it needs updating
+                    // Check if it needs updating (incluyendo corrección de id_docente)
                     if (existing.id_docente !== newHorario.id_docente || 
                         existing.id_clase !== newHorario.id_clase ||
                         existing.id_aula !== newHorario.id_aula ||
                         existing.hora_fin !== newHorario.hora_fin ||
                         existing.evento_descripcion !== newHorario.evento_descripcion) {
                         await horariosService.update(existing.id_horario, {
-                            id_docente: newHorario.id_docente,
+                            id_docente: newHorario.id_docente, // Ya incluye la corrección
                             id_clase: newHorario.id_clase,
                             id_aula: newHorario.id_aula,
                             hora_fin: newHorario.hora_fin,
@@ -4264,7 +4269,7 @@ const TeamScheduleView: React.FC<{
                     // Verificar si el docente está asignado directamente al horario
                     const isDirectlyAssigned = item.id_docente === selectedTeacherId;
                     
-                    // Verificar si el docente está asignado a la clase
+                    // Verificar si el docente está asignado a la clase (MEJORADO: también si id_docente es null)
                     const isClassTeacher = clase?.id_docente_asignado === selectedTeacherId;
                     
                     // Verificar si es una clase consolidada de inglés (5to-6to) y el docente está asignado a algún nivel
@@ -4276,8 +4281,11 @@ const TeamScheduleView: React.FC<{
                         );
                     }
                     
+                    // MEJORADO: También verificar si el horario tiene id_docente null pero debería tenerlo
+                    const shouldHaveDocente = !item.id_docente && clase?.id_docente_asignado === selectedTeacherId;
+                    
                     // Incluir si el docente está asignado de alguna manera
-                    if (isDirectlyAssigned || isClassTeacher || isEnglishLevelTeacher) {
+                    if (isDirectlyAssigned || isClassTeacher || isEnglishLevelTeacher || shouldHaveDocente) {
                         // For classes, use the class's grade. For events (guardias), use the grade of the schedule it's in.
                         scheduleWithGrade.push({ ...item, grade: clase?.grado_asignado || grade });
                     }
@@ -6640,8 +6648,19 @@ const App: React.FC = () => {
       }));
 
       // Build schedules from horarios
+      // CORRECCIÓN: Corregir horarios que tienen id_docente null pero deberían tenerlo
+      const correctedHorarios = horariosData.map(h => {
+        if (!h.id_docente && h.id_clase) {
+          const clase = clasesData.find(c => c.id_clase === h.id_clase);
+          if (clase?.id_docente_asignado) {
+            return { ...h, id_docente: clase.id_docente_asignado };
+          }
+        }
+        return h;
+      });
+      
       const schedulesMap: WeeklySchedules = {};
-      horariosData.forEach(h => {
+      correctedHorarios.forEach(h => {
         if (!schedulesMap[h.grado]) {
           schedulesMap[h.grado] = {};
         }
