@@ -4205,14 +4205,45 @@ const TeamScheduleView: React.FC<{
     setSchedules: React.Dispatch<React.SetStateAction<WeeklySchedules>>;
     clases: Clase[];
     alumnos: Alumno[];
-}> = ({ docentes, schedules, setSchedules, clases, alumnos }) => {
+    aulas: Aula[];
+}> = ({ docentes, schedules, setSchedules, clases, alumnos, aulas }) => {
     const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
     const [isGuardiaModalOpen, setGuardiaModalOpen] = useState(false);
+    const [englishLevelAssignments, setEnglishLevelAssignments] = useState<Array<{
+        id_docente: string, 
+        nivel_ingles: string
+    }>>([]);
     
     type GuardiaData = { dia: number, hora: string, desc: string, grade: string, id: string | null };
     const [guardiaData, setGuardiaData] = useState<GuardiaData | null>(null);
 
     const allGrades = useMemo(() => Array.from(new Set(alumnos.map(a => a.salon))).sort(), [alumnos]);
+    
+    // Cargar asignaciones de niveles de inglés
+    useEffect(() => {
+        const loadEnglishAssignments = async () => {
+            try {
+                const anoEscolar = '2025-2026'; // TODO: Obtener del contexto
+                
+                const { data: docenteAssignments, error: docenteError } = await supabase
+                    .from('asignacion_docente_nivel_ingles')
+                    .select('id_docente, nivel_ingles')
+                    .eq('ano_escolar', anoEscolar)
+                    .eq('activa', true);
+                
+                if (docenteError) {
+                    console.error('Error loading English assignments:', docenteError);
+                    return;
+                }
+                
+                setEnglishLevelAssignments(docenteAssignments || []);
+            } catch (error) {
+                console.error('Error loading English level assignments:', error);
+            }
+        };
+        
+        loadEnglishAssignments();
+    }, []);
 
     const teacherPrimaryGrade = useMemo(() => {
         if (!selectedTeacherId) return allGrades[0] || '';
@@ -4228,9 +4259,25 @@ const TeamScheduleView: React.FC<{
             for (const week in schedules[grade]) {
                 const weekSchedule = schedules[grade][parseInt(week)] || [];
                 for (const item of weekSchedule) {
-                    // A single check for any item (class or event) assigned to the selected teacher
-                    if (item.id_docente === selectedTeacherId) {
-                        const clase = clases.find(c => c.id_clase === item.id_clase);
+                    const clase = item.id_clase ? clases.find(c => c.id_clase === item.id_clase) : null;
+                    
+                    // Verificar si el docente está asignado directamente al horario
+                    const isDirectlyAssigned = item.id_docente === selectedTeacherId;
+                    
+                    // Verificar si el docente está asignado a la clase
+                    const isClassTeacher = clase?.id_docente_asignado === selectedTeacherId;
+                    
+                    // Verificar si es una clase consolidada de inglés (5to-6to) y el docente está asignado a algún nivel
+                    let isEnglishLevelTeacher = false;
+                    if (clase?.es_ingles_primaria && clase?.nivel_ingles === null && clase?.skill_rutina) {
+                        // Es una clase consolidada de inglés, verificar asignaciones de nivel de inglés
+                        isEnglishLevelTeacher = englishLevelAssignments.some(
+                            assignment => assignment.id_docente === selectedTeacherId
+                        );
+                    }
+                    
+                    // Incluir si el docente está asignado de alguna manera
+                    if (isDirectlyAssigned || isClassTeacher || isEnglishLevelTeacher) {
                         // For classes, use the class's grade. For events (guardias), use the grade of the schedule it's in.
                         scheduleWithGrade.push({ ...item, grade: clase?.grado_asignado || grade });
                     }
@@ -4247,7 +4294,7 @@ const TeamScheduleView: React.FC<{
             )
         );
         return uniqueSchedule;
-    }, [selectedTeacherId, schedules, clases]);
+    }, [selectedTeacherId, schedules, clases, englishLevelAssignments]);
 
     // Usar siempre los mismos time slots que ScheduleView (primaria: 07:30 - 15:30 con bloques de 45 minutos)
     const timeSlots = TIME_SLOTS_PRIMARIA;
