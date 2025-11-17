@@ -1,6 +1,13 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { DashboardIcon, StudentsIcon, TeachersIcon, ClassesIcon, PlusIcon, CloseIcon, EditIcon, DeleteIcon, ChevronDownIcon, LogoutIcon, PlanningIcon, GradesIcon, FilterIcon, CalendarIcon, SearchIcon, SpecialSubjectIcon, SparklesIcon, ArrowLeftIcon, UserCircleIcon, AcademicCapIcon, UsersIcon, IdentificationIcon, CakeIcon, LocationMarkerIcon, MailIcon, PhoneIcon, ClipboardCheckIcon, SendIcon, BellIcon, TagIcon, DownloadIcon, EvaluationIcon, SaveIcon, MenuIcon, MagicWandIcon } from './components/Icons';
+
+// Icono de check para tareas completadas
+const CheckIcon = () => (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+    </svg>
+);
 import { getAIPlanSuggestions, getAIEvaluationAnalysis } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
 import { LoginScreen } from './components/LoginScreen';
@@ -1110,34 +1117,50 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
 
     if (isLoading) {
         return (
-            <div className="bg-white p-6 rounded-lg shadow-md">
-                <h3 className="text-lg font-bold text-text-main mb-4">Mi Agenda del Día</h3>
-                <p className="text-gray-500">Cargando...</p>
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl shadow-lg border border-blue-100">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-blue-500 rounded-lg">
+                        <CalendarIcon className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800">Mi Agenda del Día</h3>
+                </div>
+                <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-bold text-text-main mb-4">Mi Agenda del Día</h3>
+        <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow duration-300">
+            {/* Header con icono y título */}
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md">
+                    <CalendarIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-gray-800">Mi Agenda del Día</h3>
+                    <p className="text-xs text-gray-500">Gestiona tus tareas diarias</p>
+                </div>
+            </div>
             
             {/* Formulario para agregar nueva tarea */}
-            <div className="mb-4 flex gap-2">
+            <div className="mb-6 flex gap-2">
                 <input
                     type="text"
                     value={nuevaTarea}
                     onChange={(e) => setNuevaTarea(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleAddTarea()}
                     placeholder="Agregar nueva tarea..."
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    className="flex-1 px-4 py-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm"
                     disabled={isAdding}
                 />
                 <button
                     onClick={handleAddTarea}
                     disabled={isAdding || !nuevaTarea.trim()}
-                    className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-semibold shadow-md hover:shadow-lg transition-all transform hover:scale-105"
                 >
-                    <PlusIcon className="h-4 w-4" />
+                    <PlusIcon className="h-5 w-5" />
                     Agregar
                 </button>
             </div>
@@ -1145,20 +1168,23 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
             {/* Lista de tareas pendientes */}
             {tareasPendientes.length > 0 && (
                 <div className="mb-4">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Pendientes ({tareasPendientes.length})</h4>
+                    <div className="flex items-center gap-2 mb-3">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Pendientes ({tareasPendientes.length})</h4>
+                    </div>
                     <div className="space-y-2">
                         {tareasPendientes.map((tarea) => (
-                            <div key={tarea.id_tarea} className="flex items-start gap-3 p-2 rounded-md hover:bg-gray-50">
+                            <div key={tarea.id_tarea} className="flex items-center gap-3 p-3 rounded-lg bg-white border-l-4 border-blue-500 hover:bg-blue-50 hover:shadow-md transition-all group">
                                 <input
                                     type="checkbox"
                                     checked={tarea.completada}
                                     onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
-                                    className="mt-1 h-4 w-4 text-brand-primary focus:ring-brand-primary border-gray-300 rounded"
+                                    className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
                                 />
-                                <span className="flex-1 text-sm text-gray-700">{tarea.descripcion}</span>
+                                <span className="flex-1 text-sm font-medium text-gray-800">{tarea.descripcion}</span>
                                 <button
                                     onClick={() => handleDeleteTarea(tarea.id_tarea)}
-                                    className="text-red-500 hover:text-red-700 p-1"
+                                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded transition-all"
                                     title="Eliminar tarea"
                                 >
                                     <DeleteIcon className="h-4 w-4" />
@@ -1173,25 +1199,26 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
             {tareasCompletadas.length > 0 && (
                 <div>
                     <details className="group">
-                        <summary className="text-sm font-semibold text-gray-500 cursor-pointer list-none">
+                        <summary className="text-sm font-semibold text-gray-500 cursor-pointer list-none hover:text-gray-700 transition-colors">
                             <span className="flex items-center gap-2">
+                                <CheckIcon className="h-4 w-4 text-green-500" />
                                 <span>Completadas ({tareasCompletadas.length})</span>
                                 <ChevronDownIcon className="h-4 w-4 transform group-open:rotate-180 transition-transform" />
                             </span>
                         </summary>
                         <div className="mt-2 space-y-2">
                             {tareasCompletadas.map((tarea) => (
-                                <div key={tarea.id_tarea} className="flex items-start gap-3 p-2 rounded-md opacity-60">
+                                <div key={tarea.id_tarea} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 opacity-75 border-l-4 border-green-400">
                                     <input
                                         type="checkbox"
                                         checked={tarea.completada}
                                         onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
-                                        className="mt-1 h-4 w-4 text-brand-primary focus:ring-brand-primary border-gray-300 rounded"
+                                        className="h-5 w-5 text-green-600 focus:ring-green-500 border-gray-300 rounded cursor-pointer"
                                     />
                                     <span className="flex-1 text-sm text-gray-500 line-through">{tarea.descripcion}</span>
                                     <button
                                         onClick={() => handleDeleteTarea(tarea.id_tarea)}
-                                        className="text-red-500 hover:text-red-700 p-1"
+                                        className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded transition-all"
                                         title="Eliminar tarea"
                                     >
                                         <DeleteIcon className="h-4 w-4" />
@@ -1204,7 +1231,13 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
             )}
 
             {tareas.length === 0 && (
-                <p className="text-gray-500 text-sm text-center py-4">No hay tareas. Agrega una nueva tarea arriba.</p>
+                <div className="text-center py-8">
+                    <div className="inline-block p-4 bg-blue-100 rounded-full mb-3">
+                        <CalendarIcon className="h-8 w-8 text-blue-500" />
+                    </div>
+                    <p className="text-gray-500 text-sm font-medium">No hay tareas pendientes</p>
+                    <p className="text-gray-400 text-xs mt-1">Agrega una nueva tarea para comenzar</p>
+                </div>
             )}
         </div>
     );
@@ -1262,32 +1295,62 @@ const EventosSemanaWidget: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="bg-white p-6 rounded-lg shadow-md">
-                <h3 className="text-lg font-bold text-text-main mb-4">Eventos de la Semana</h3>
-                <p className="text-gray-500">Cargando...</p>
+            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-xl shadow-lg border border-yellow-100">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-yellow-500 rounded-lg">
+                        <CalendarIcon className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800">Eventos de la Semana</h3>
+                </div>
+                <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500"></div>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-bold text-text-main mb-4">Eventos de la Semana</h3>
+        <div className="bg-gradient-to-br from-yellow-50 via-white to-orange-50 p-6 rounded-xl shadow-lg border border-yellow-100 hover:shadow-xl transition-shadow duration-300">
+            {/* Header con icono y título */}
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl shadow-md">
+                    <CalendarIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-gray-800">Eventos de la Semana</h3>
+                    <p className="text-xs text-gray-500">Próximos 7 días</p>
+                </div>
+            </div>
+            
             {eventos.length === 0 ? (
-                <p className="text-gray-500 text-sm">No hay eventos programados para esta semana</p>
+                <div className="text-center py-8">
+                    <div className="inline-block p-4 bg-yellow-100 rounded-full mb-3">
+                        <CalendarIcon className="h-8 w-8 text-yellow-600" />
+                    </div>
+                    <p className="text-gray-500 text-sm font-medium">No hay eventos programados</p>
+                    <p className="text-gray-400 text-xs mt-1">Esta semana está libre de eventos</p>
+                </div>
             ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                     {eventos.map((evento) => {
                         const color = evento.color || getEventColor(evento.tipo_evento);
                         return (
-                            <div key={evento.id_evento} className="flex items-center gap-2 text-sm">
-                                <span className="font-semibold text-gray-700 min-w-[100px]">
-                                    {formatDate(evento.fecha_inicio)}:
-                                </span>
-                                <span 
-                                    className="inline-block w-3 h-3 rounded-full mr-1"
+                            <div key={evento.id_evento} className="flex items-center gap-3 p-3 rounded-lg bg-white hover:shadow-md transition-all border-l-4" style={{ borderLeftColor: color }}>
+                                <div 
+                                    className="w-4 h-4 rounded-full shadow-sm flex-shrink-0"
                                     style={{ backgroundColor: color }}
-                                ></span>
-                                <span className="text-gray-700">{evento.titulo}</span>
+                                ></div>
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-sm text-gray-800 min-w-[90px]">
+                                            {formatDate(evento.fecha_inicio)}
+                                        </span>
+                                        <span className="text-sm font-semibold text-gray-700">{evento.titulo}</span>
+                                    </div>
+                                    {evento.descripcion && (
+                                        <p className="text-xs text-gray-500 mt-1 ml-[98px]">{evento.descripcion}</p>
+                                    )}
+                                </div>
                             </div>
                         );
                     })}
@@ -1324,47 +1387,64 @@ const EstadoMiEquipoWidget: React.FC<{ docentes: Docente[]; planificaciones: Pla
     const strokeDasharray = circumference;
     const strokeDashoffset = circumference - (stats.porcentaje / 100) * circumference;
 
+    const progressColor = stats.porcentaje >= 80 ? '#10b981' : stats.porcentaje >= 50 ? '#f59e0b' : '#ef4444';
+
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-bold text-text-main mb-4">Estado de Mi Equipo</h3>
+        <div className="bg-gradient-to-br from-green-50 via-white to-emerald-50 p-6 rounded-xl shadow-lg border border-green-100 hover:shadow-xl transition-shadow duration-300">
+            {/* Header con icono y título */}
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-md">
+                    <UsersIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-gray-800">Estado de Mi Equipo</h3>
+                    <p className="text-xs text-gray-500">Planificaciones del lapso</p>
+                </div>
+            </div>
+            
             <div className="flex items-center gap-6">
-                <div className="relative">
-                    <svg width="100" height="100" className="transform -rotate-90">
+                <div className="relative flex-shrink-0">
+                    <svg width="120" height="120" className="transform -rotate-90">
                         <circle
-                            cx="50"
-                            cy="50"
+                            cx="60"
+                            cy="60"
                             r={radius}
                             stroke="#e5e7eb"
-                            strokeWidth="8"
+                            strokeWidth="10"
                             fill="none"
                         />
                         <circle
-                            cx="50"
-                            cy="50"
+                            cx="60"
+                            cy="60"
                             r={radius}
-                            stroke="#78AC40"
-                            strokeWidth="8"
+                            stroke={progressColor}
+                            strokeWidth="10"
                             fill="none"
                             strokeDasharray={strokeDasharray}
                             strokeDashoffset={strokeDashoffset}
                             strokeLinecap="round"
-                            className="transition-all duration-500"
+                            className="transition-all duration-700 ease-out"
                         />
                     </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-bold text-gray-800">{stats.porcentaje}%</span>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-3xl font-bold" style={{ color: progressColor }}>{stats.porcentaje}%</span>
+                        <span className="text-xs text-gray-500 font-medium">Completado</span>
                     </div>
                 </div>
-                <div className="flex-1">
-                    <div className="space-y-2">
-                        <div>
-                            <span className="text-sm font-semibold text-gray-700">Planificaciones Entregadas: </span>
-                            <span className="text-sm text-gray-600">{stats.entregadas} de {stats.total}</span>
+                <div className="flex-1 space-y-3">
+                    <div className="p-3 rounded-lg bg-white shadow-sm border-l-4 border-green-500">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-gray-700">Entregadas</span>
+                            <span className="text-lg font-bold text-green-600">{stats.entregadas}</span>
                         </div>
-                        <div>
-                            <span className="text-sm font-semibold text-gray-700">Pendientes: </span>
-                            <span className="text-sm text-red-600">{stats.pendientes}</span>
+                        <div className="text-xs text-gray-500 mt-1">de {stats.total} docentes</div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-white shadow-sm border-l-4 border-red-400">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-gray-700">Pendientes</span>
+                            <span className="text-lg font-bold text-red-600">{stats.pendientes}</span>
                         </div>
+                        <div className="text-xs text-gray-500 mt-1">requieren atención</div>
                     </div>
                 </div>
             </div>
@@ -1405,45 +1485,74 @@ const AlertasCocoWidget: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="bg-white p-6 rounded-lg shadow-md">
-                <h3 className="text-lg font-bold text-text-main mb-4">Alertas de Coco</h3>
-                <p className="text-gray-500">Cargando...</p>
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-lg border border-purple-100">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-purple-500 rounded-lg">
+                        <SparklesIcon className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800">Alertas de Coco</h3>
+                </div>
+                <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="flex items-center gap-2 mb-4">
-                <SparklesIcon className="h-5 w-5 text-brand-primary" />
-                <h3 className="text-lg font-bold text-text-main">Alertas de Coco</h3>
+        <div className="bg-gradient-to-br from-purple-50 via-white to-pink-50 p-6 rounded-xl shadow-lg border border-purple-100 hover:shadow-xl transition-shadow duration-300">
+            {/* Header con icono y título */}
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-md animate-pulse">
+                    <SparklesIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-gray-800">Alertas de Coco</h3>
+                    <p className="text-xs text-gray-500">IA Proactiva</p>
+                </div>
             </div>
+            
             {alertas.length === 0 ? (
-                <p className="text-gray-500 text-sm">No hay alertas pendientes</p>
+                <div className="text-center py-8">
+                    <div className="inline-block p-4 bg-purple-100 rounded-full mb-3">
+                        <SparklesIcon className="h-8 w-8 text-purple-500" />
+                    </div>
+                    <p className="text-gray-500 text-sm font-medium">No hay alertas pendientes</p>
+                    <p className="text-gray-400 text-xs mt-1">Coco está monitoreando activamente</p>
+                </div>
             ) : (
                 <div className="space-y-3">
                     {alertas.map((alerta) => {
                         const color = getAlertaColor(alerta.tipo_alerta);
                         return (
-                            <div key={alerta.id_log} className="border-l-4 pl-3" style={{ borderLeftColor: color }}>
+                            <div 
+                                key={alerta.id_log} 
+                                className="p-4 rounded-lg bg-white border-l-4 shadow-sm hover:shadow-md transition-all"
+                                style={{ borderLeftColor: color }}
+                            >
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
+                                        <div className="flex items-center gap-2 mb-2">
                                             <span 
-                                                className="text-xs font-semibold px-2 py-1 rounded text-white"
+                                                className="text-xs font-bold px-3 py-1.5 rounded-full text-white shadow-sm"
                                                 style={{ backgroundColor: color }}
                                             >
                                                 {alerta.tipo_alerta || 'Otro'}
                                             </span>
-                                            <span className="text-xs text-gray-500">{alerta.grado}</span>
+                                            <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                                                {alerta.grado}
+                                            </span>
                                         </div>
-                                        <p className="text-sm font-semibold text-gray-800">{alerta.categoria}</p>
+                                        <p className="text-sm font-bold text-gray-800 mb-1">{alerta.categoria}</p>
                                         {alerta.descripcion && (
-                                            <p className="text-xs text-gray-600 mt-1">{alerta.descripcion}</p>
+                                            <p className="text-xs text-gray-600 mb-2 leading-relaxed">{alerta.descripcion}</p>
                                         )}
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            Aparece en {alerta.frecuencia} reunión{alerta.frecuencia > 1 ? 'es' : ''}
-                                        </p>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <BellIcon className="h-3 w-3 text-gray-400" />
+                                            <p className="text-xs text-gray-500 font-medium">
+                                                Aparece en <span className="font-bold">{alerta.frecuencia}</span> reunión{alerta.frecuencia > 1 ? 'es' : ''}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -8534,3 +8643,4 @@ const App: React.FC = () => {
 
 
 export default App;
+
