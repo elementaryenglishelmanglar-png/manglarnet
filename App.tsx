@@ -1691,13 +1691,14 @@ const ResumenAlumnosDocenteWidget: React.FC<{
         return GRADOS.filter(g => gradeSet.has(g));
     }, [studentsByGrade]);
 
-    if (sortedGrades.length === 0) {
-        return null;
-    }
-
     return (
         <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
             <h2 className="text-2xl font-bold text-text-main mb-6">Mis Alumnos por Grado</h2>
+            {sortedGrades.length === 0 ? (
+                <div className="text-center py-8">
+                    <p className="text-gray-500 text-sm">No tienes alumnos asignados aún</p>
+                </div>
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                 {sortedGrades.map((grade) => {
                     const gradeColor = getGradeColor(grade);
@@ -1718,6 +1719,7 @@ const ResumenAlumnosDocenteWidget: React.FC<{
                     );
                 })}
             </div>
+            )}
         </div>
     );
 };
@@ -1950,10 +1952,6 @@ const MisAsignaturasWidget: React.FC<{
         return Array.from(asignaturasMap.values());
     }, [clases, alumnos, currentUser.docenteId]);
 
-    if (misAsignaturas.length === 0) {
-        return null;
-    }
-
     return (
         <div className="bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-6 rounded-xl shadow-lg border border-indigo-100 hover:shadow-xl transition-shadow duration-300">
             <div className="flex items-center gap-3 mb-6">
@@ -1966,23 +1964,33 @@ const MisAsignaturasWidget: React.FC<{
                 </div>
             </div>
             
-            <div className="space-y-3">
-                {misAsignaturas.map((asignatura, index) => (
-                    <div key={index} className="p-4 rounded-lg bg-white hover:shadow-md transition-all border-l-4 border-indigo-500">
-                        <p className="font-semibold text-gray-800 mb-2">{asignatura.materia}</p>
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <span className="flex items-center gap-1">
-                                <UsersIcon className="h-4 w-4" />
-                                {Array.from(asignatura.grados).join(', ')}
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <UserCircleIcon className="h-4 w-4" />
-                                {asignatura.totalAlumnos} alumno{asignatura.totalAlumnos !== 1 ? 's' : ''}
-                            </span>
-                        </div>
+            {misAsignaturas.length === 0 ? (
+                <div className="text-center py-8">
+                    <div className="inline-block p-4 bg-indigo-100 rounded-full mb-3">
+                        <AcademicCapIcon className="h-8 w-8 text-indigo-600" />
                     </div>
-                ))}
-            </div>
+                    <p className="text-gray-500 text-sm font-medium">No tienes asignaturas asignadas</p>
+                    <p className="text-gray-400 text-xs mt-1">Contacta a un coordinador para asignarte clases</p>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {misAsignaturas.map((asignatura, index) => (
+                        <div key={index} className="p-4 rounded-lg bg-white hover:shadow-md transition-all border-l-4 border-indigo-500">
+                            <p className="font-semibold text-gray-800 mb-2">{asignatura.materia}</p>
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                                <span className="flex items-center gap-1">
+                                    <UsersIcon className="h-4 w-4" />
+                                    {Array.from(asignatura.grados).join(', ')}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <UserCircleIcon className="h-4 w-4" />
+                                    {asignatura.totalAlumnos} alumno{asignatura.totalAlumnos !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
@@ -2571,9 +2579,10 @@ const TeacherScheduleDashboard: React.FC<{
                 </table>
             </div>
             )}
+            </div>
         </div>
     );
-}
+};
 
 const StudentListView: React.FC<{
     students: Alumno[];
