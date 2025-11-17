@@ -245,12 +245,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           }
           return;
         }
-        
-        // Usar la sesión obtenida
-        const session = finalSession;
 
-        console.log('Calling checkAuthorization for:', session.user.email);
-        const role = await checkAuthorization(session.user.email);
+        console.log('Calling checkAuthorization for:', finalSession.user.email);
+        const role = await checkAuthorization(finalSession.user.email);
         console.log('checkAuthorization returned:', role);
         
         if (role && isMounted) {
@@ -259,12 +256,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           const { data: userData } = await supabase.auth.getUser();
           const fullName = userData.user?.user_metadata?.full_name || 
                           userData.user?.user_metadata?.name ||
-                          session.user.email.split('@')[0];
+                          finalSession.user.email.split('@')[0];
 
           console.log('Calling onLoginSuccess with role:', role, 'fullName:', fullName);
           onLoginSuccess({
-            id: session.user.id,
-            email: session.user.email,
+            id: finalSession.user.id,
+            email: finalSession.user.email,
             role: role,
             fullName: fullName,
           });
