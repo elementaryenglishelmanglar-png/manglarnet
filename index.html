@@ -11,22 +11,34 @@
     <title>ManglarNet - Conexión Pedagógica</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
+              sans: ['Poppins', 'sans-serif'],
             },
             colors: {
+              // Colores funcionales (mantener para grados y asignaturas)
               'brand-primary': '#78AC40',
               'brand-secondary': '#FADB16',
-              'background-dark': '#111827',
-              'background-light': '#f9fafb',
-              'text-main': '#1f2937',
-              'text-secondary': '#6b7280',
+              
+              // Paleta monocromática Apple
+              'apple-white': '#FFFFFF',
+              'apple-gray-light': '#F5F5F7',
+              'apple-gray': '#86868B',
+              'apple-gray-dark': '#1D1D1F',
+              'apple-blue': '#007AFF',
+              'apple-red': '#FF3B30',
+              'apple-green': '#34C759',
+              
+              // Compatibilidad con código existente
+              'background-dark': '#1D1D1F',
+              'background-light': '#F5F5F7',
+              'text-main': '#1D1D1F',
+              'text-secondary': '#86868B',
               'brand-gray': '#B0B4B7',
             },
             borderRadius: {

@@ -1,5 +1,5 @@
 /* ============================================
-   MANGULARNET - SISTEMA DE DISEÑO
+   MANGULARNET - FILOSOFÍA DE DISEÑO APPLE
    ============================================ */
 
 * {
@@ -9,10 +9,13 @@
 }
 
 body {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Poppins', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  background-color: #FFFFFF;
+  color: #1D1D1F;
+  letter-spacing: -0.01em;
 }
 
 #root {
@@ -21,53 +24,105 @@ body {
 }
 
 /* ============================================
-   SCROLLBAR PERSONALIZADO
+   JERARQUÍA TIPOGRÁFICA APPLE
+   ============================================ */
+h1 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 2.5rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: #1D1D1F;
+}
+
+h2 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #1D1D1F;
+}
+
+h3 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 1.25rem;
+  line-height: 1.3;
+  color: #1D1D1F;
+}
+
+p, body {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 400;
+  color: #1D1D1F;
+  line-height: 1.6;
+}
+
+.text-secondary {
+  font-weight: 300;
+  color: #86868B;
+}
+
+/* ============================================
+   SCROLLBAR MINIMALISTA APPLE
    ============================================ */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 10px;
+  background: #F5F5F7;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #78AC40 0%, #5a8a30 100%);
-  border-radius: 10px;
-  border: 2px solid #f1f5f9;
+  background: #86868B;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #5a8a30 0%, #78AC40 100%);
+  background: #1D1D1F;
 }
 
 /* ============================================
-   UTILIDADES DE TRANSICIÓN
+   TRANSICIONES SUTILES APPLE
    ============================================ */
-.transition-smooth {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.transition-smooth-slow {
+.transition-apple {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.transition-smooth-slow {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 /* ============================================
-   EFECTOS HOVER MEJORADOS
+   ESPACIO EN BLANCO GENEROSO
+   ============================================ */
+.container-apple {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ============================================
+   EFECTOS HOVER SUTILES
    ============================================ */
 .hover-lift {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
 }
 
 .hover-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.1);
+  opacity: 0.9;
 }
 
 .hover-scale {
-  transition: transform 0.2s ease;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .hover-scale:hover {
@@ -79,14 +134,14 @@ body {
    ============================================ */
 .glass {
   background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .glass-dark {
-  background: rgba(17, 24, 39, 0.95);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(29, 29, 31, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 /* ============================================
@@ -113,7 +168,7 @@ body {
 
   /* Improve touch targets */
   a, button, input, select, textarea {
-    -webkit-tap-highlight-color: rgba(120, 172, 64, 0.2);
+    -webkit-tap-highlight-color: rgba(0, 122, 255, 0.2);
   }
 }
 
@@ -124,23 +179,24 @@ input, select, textarea {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
+  font-family: 'Poppins', sans-serif;
 }
 
 /* ============================================
-   ESTADOS DE FOCUS MEJORADOS
+   ESTADOS DE FOCUS APPLE
    ============================================ */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid #78AC40;
+  outline: 2px solid #007AFF;
   outline-offset: 2px;
   outline-style: solid;
 }
 
 /* ============================================
-   ANIMACIONES SUAVES
+   ANIMACIONES SUAVES APPLE
    ============================================ */
 @keyframes fadeIn {
   from {
@@ -154,7 +210,7 @@ textarea:focus-visible {
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
+  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes slideIn {
@@ -169,28 +225,5 @@ textarea:focus-visible {
 }
 
 .animate-slide-in {
-  animation: slideIn 0.2s ease-out;
+  animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-/* ============================================
-   GRADIENTES DE MARCA
-   ============================================ */
-.gradient-brand {
-  background: linear-gradient(135deg, #78AC40 0%, #5a8a30 100%);
-}
-
-.gradient-brand-secondary {
-  background: linear-gradient(135deg, #FADB16 0%, #e6c514 100%);
-}
-
-/* ============================================
-   SOMBRAS CONSISTENTES
-   ============================================ */
-.shadow-brand {
-  box-shadow: 0 4px 6px -1px rgba(120, 172, 64, 0.1), 0 2px 4px -1px rgba(120, 172, 64, 0.06);
-}
-
-.shadow-brand-lg {
-  box-shadow: 0 10px 15px -3px rgba(120, 172, 64, 0.1), 0 4px 6px -2px rgba(120, 172, 64, 0.05);
-}
-

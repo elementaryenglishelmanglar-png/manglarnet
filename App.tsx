@@ -867,32 +867,32 @@ const Header: React.FC<{
     }
 
     return (
-        <header className="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-30 border-b border-gray-100">
+        <header className="bg-white p-4 flex justify-between items-center sticky top-0 z-30 border-b border-apple-gray-light">
             <div className="flex items-center gap-3">
                 {onMenuToggle && (
                     <button
                         onClick={onMenuToggle}
-                        className="lg:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-smooth"
+                        className="lg:hidden p-2 text-apple-gray hover:text-apple-gray-dark hover:bg-apple-gray-light rounded-lg transition-apple"
                         aria-label="Toggle menu"
                     >
                         <MenuIcon className="h-6 w-6" />
                     </button>
                 )}
-                <h1 className="text-xl sm:text-2xl font-bold text-text-main truncate">{title}</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold text-apple-gray-dark truncate tracking-tight">{title}</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
                  {currentUser.role === 'docente' && (
                     <div className="relative">
-                        <button onClick={() => setNotificationsOpen(!isNotificationsOpen)} className="relative text-gray-500 hover:text-gray-700">
+                        <button onClick={() => setNotificationsOpen(!isNotificationsOpen)} className="relative text-apple-gray hover:text-apple-gray-dark transition-apple">
                             <BellIcon className="h-6 w-6" />
                             {unreadCount > 0 && (
                                 <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
                             )}
                         </button>
                         {isNotificationsOpen && (
-                            <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-xl shadow-xl glass z-20 border border-gray-100 animate-fade-in">
+                            <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-xl shadow-lg z-20 border border-apple-gray-light bg-white animate-fade-in">
                                 <div className="p-2 border-b">
-                                    <h3 className="font-semibold text-gray-800">Notificaciones</h3>
+                                    <h3 className="font-semibold text-apple-gray-dark">Notificaciones</h3>
                                 </div>
                                 <div className="py-1 max-h-96 overflow-y-auto">
                                     {notifications.filter(n => n.recipientId === currentUser.docenteId).length > 0 ? (
@@ -903,15 +903,15 @@ const Header: React.FC<{
                                                     key={n.id}
                                                     href="#"
                                                     onClick={(e) => { e.preventDefault(); onNotificationClick(n); setNotificationsOpen(false); }}
-                                                    className={`block px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 ${!n.isRead ? 'bg-blue-50' : ''}`}
+                                                    className={`block px-4 py-3 text-sm text-apple-gray-dark hover:bg-apple-gray-light transition-apple ${!n.isRead ? 'bg-blue-50' : ''}`}
                                                 >
                                                     <p className="font-bold">{n.title}</p>
-                                                    <p className="text-gray-600 text-xs">{n.message}</p>
-                                                    <p className="text-right text-xs text-gray-400 mt-1">{timeSince(n.timestamp)} ago</p>
+                                                    <p className="text-apple-gray text-xs font-light">{n.message}</p>
+                                                    <p className="text-right text-xs text-apple-gray font-light mt-1">{timeSince(n.timestamp)} ago</p>
                                                 </a>
                                             ))
                                     ) : (
-                                        <p className="text-center text-gray-500 py-4">No hay notificaciones.</p>
+                                        <p className="text-center text-apple-gray py-4 font-light">No hay notificaciones.</p>
                                     )}
                                 </div>
                             </div>
@@ -921,18 +921,18 @@ const Header: React.FC<{
                 <div className="relative">
                     <button onClick={() => setMenuOpen(!isMenuOpen)} className="flex items-center gap-2 text-left">
                         <div className="hidden sm:block">
-                            <p className="font-semibold text-text-main text-sm sm:text-base">{currentUser.fullName}</p>
-                            <p className="text-xs sm:text-sm text-text-secondary capitalize">{currentUser.role}</p>
+                            <p className="font-semibold text-apple-gray-dark text-sm sm:text-base">{currentUser.fullName}</p>
+                            <p className="text-xs sm:text-sm text-apple-gray font-light capitalize">{currentUser.role}</p>
                         </div>
                         <div className="sm:hidden">
-                            <UserCircleIcon className="h-8 w-8 text-gray-600" />
+                            <UserCircleIcon className="h-8 w-8 text-apple-gray" />
                         </div>
                         <ChevronDownIcon className="hidden sm:block" />
                     </button>
                     {isMenuOpen && (
-                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-xl shadow-xl glass z-10 border border-gray-100 animate-fade-in">
+                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-xl shadow-lg z-10 border border-apple-gray-light bg-white animate-fade-in">
                             <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                                <a href="#" onClick={onLogout} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                                <a href="#" onClick={onLogout} className="flex items-center gap-2 px-4 py-2 text-sm text-apple-gray-dark hover:bg-apple-gray-light transition-apple" role="menuitem">
                                     <LogoutIcon />
                                     Cerrar Sesión
                                 </a>
@@ -987,18 +987,18 @@ const Sidebar: React.FC<{
             )}
             <aside className={`
                 fixed lg:static inset-y-0 left-0 z-50
-                w-64 bg-background-dark text-white flex flex-col
+                w-64 bg-apple-gray-dark text-white flex flex-col
                 transform transition-transform duration-300 ease-in-out
                 ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
             `}>
                 <div className="p-4 lg:p-6 flex justify-between items-center lg:block">
                     <div className="text-center flex-1 lg:block">
                         <h2 className="text-xl lg:text-2xl font-bold text-brand-secondary">ManglarNet</h2>
-                        <p className="text-xs lg:text-sm text-gray-400">Conexión Pedagógica</p>
+                        <p className="text-xs lg:text-sm text-apple-gray font-light">Conexión Pedagógica</p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="lg:hidden p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md"
+                        className="lg:hidden p-2 text-apple-gray hover:text-white hover:bg-apple-gray-dark rounded-lg transition-apple"
                         aria-label="Close menu"
                     >
                         <CloseIcon />
@@ -1010,10 +1010,10 @@ const Sidebar: React.FC<{
                             key={id}
                             href="#"
                             onClick={(e) => { e.preventDefault(); handleNavigate(id); }}
-                            className={`flex items-center gap-3 px-4 lg:px-5 py-3.5 my-1 rounded-xl text-sm font-medium transition-smooth ${
+                            className={`flex items-center gap-3 px-4 lg:px-5 py-3.5 my-1 rounded-lg text-sm font-medium transition-apple ${
                                 activeView === id
-                                    ? 'bg-brand-primary text-white shadow-brand'
-                                    : 'text-gray-300 hover:bg-gray-700/80 hover:text-white'
+                                    ? 'bg-apple-blue text-white'
+                                    : 'text-apple-gray hover:bg-white/10 hover:text-white'
                             }`}
                         >
                             <Icon className="h-5 w-5 flex-shrink-0" />
@@ -1118,74 +1118,59 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
 
     if (isLoading) {
         return (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl shadow-lg border border-blue-100">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-blue-500 rounded-lg">
-                        <CalendarIcon className="h-6 w-6 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-800">Mi Agenda del Día</h3>
-                </div>
-                <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <div className="mb-12">
+                <h3 className="text-xl font-semibold mb-2 tracking-tight">Mi Agenda del Día</h3>
+                <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-apple-blue"></div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow duration-300">
-            {/* Header con icono y título */}
-            <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md">
-                    <CalendarIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                    <h3 className="text-xl font-bold text-gray-800">Mi Agenda del Día</h3>
-                    <p className="text-xs text-gray-500">Gestiona tus tareas diarias</p>
-                </div>
-            </div>
+        <div className="mb-12">
+            <h3 className="text-xl font-semibold mb-2 tracking-tight">Mi Agenda del Día</h3>
+            <p className="text-apple-gray text-sm font-light mb-8">Gestiona tus tareas diarias</p>
             
-            {/* Formulario para agregar nueva tarea */}
-            <div className="mb-6 flex gap-2">
+            <div className="mb-8 flex gap-3">
                 <input
                     type="text"
                     value={nuevaTarea}
                     onChange={(e) => setNuevaTarea(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleAddTarea()}
                     placeholder="Agregar nueva tarea..."
-                    className="flex-1 px-4 py-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm"
+                    className="flex-1 px-4 py-3 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple"
                     disabled={isAdding}
                 />
                 <button
                     onClick={handleAddTarea}
                     disabled={isAdding || !nuevaTarea.trim()}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-semibold shadow-md hover:shadow-lg transition-all transform hover:scale-105"
+                    className="px-6 py-3 bg-apple-blue text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium transition-apple hover:opacity-90"
                 >
                     <PlusIcon className="h-5 w-5" />
                     Agregar
                 </button>
             </div>
 
-            {/* Lista de tareas pendientes */}
             {tareasPendientes.length > 0 && (
-                <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-3">
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                        <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Pendientes ({tareasPendientes.length})</h4>
+                <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="w-2 h-2 bg-apple-red rounded-full"></div>
+                        <h4 className="text-sm font-medium text-apple-gray-dark">Pendientes ({tareasPendientes.length})</h4>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                         {tareasPendientes.map((tarea) => (
-                            <div key={tarea.id_tarea} className="flex items-center gap-3 p-3 rounded-lg bg-white border-l-4 border-blue-500 hover:bg-blue-50 hover:shadow-md transition-all group">
+                            <div key={tarea.id_tarea} className="flex items-center gap-4 py-3 border-b border-apple-gray-light transition-apple hover:opacity-70 group">
                                 <input
                                     type="checkbox"
                                     checked={tarea.completada}
                                     onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
-                                    className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                                    className="h-5 w-5 text-apple-blue focus:ring-apple-blue border-apple-gray rounded cursor-pointer transition-apple"
                                 />
-                                <span className="flex-1 text-sm font-medium text-gray-800">{tarea.descripcion}</span>
+                                <span className="flex-1 text-sm font-light text-apple-gray-dark">{tarea.descripcion}</span>
                                 <button
                                     onClick={() => handleDeleteTarea(tarea.id_tarea)}
-                                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded transition-all"
+                                    className="opacity-0 group-hover:opacity-100 text-apple-red hover:text-apple-red p-1.5 rounded transition-apple"
                                     title="Eliminar tarea"
                                 >
                                     <DeleteIcon className="h-4 w-4" />
@@ -1196,30 +1181,29 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
                 </div>
             )}
 
-            {/* Lista de tareas completadas (colapsable) */}
             {tareasCompletadas.length > 0 && (
                 <div>
                     <details className="group">
-                        <summary className="text-sm font-semibold text-gray-500 cursor-pointer list-none hover:text-gray-700 transition-colors">
+                        <summary className="text-sm font-light text-apple-gray cursor-pointer list-none hover:text-apple-gray-dark transition-apple mb-3">
                             <span className="flex items-center gap-2">
-                                <CheckIcon className="h-4 w-4 text-green-500" />
+                                <CheckIcon className="h-4 w-4 text-apple-green" />
                                 <span>Completadas ({tareasCompletadas.length})</span>
-                                <ChevronDownIcon className="h-4 w-4 transform group-open:rotate-180 transition-transform" />
+                                <ChevronDownIcon className="h-4 w-4 transform group-open:rotate-180 transition-apple" />
                             </span>
                         </summary>
-                        <div className="mt-2 space-y-2">
+                        <div className="mt-2 space-y-3">
                             {tareasCompletadas.map((tarea) => (
-                                <div key={tarea.id_tarea} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 opacity-75 border-l-4 border-green-400">
+                                <div key={tarea.id_tarea} className="flex items-center gap-4 py-3 border-b border-apple-gray-light opacity-60">
                                     <input
                                         type="checkbox"
                                         checked={tarea.completada}
                                         onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
-                                        className="h-5 w-5 text-green-600 focus:ring-green-500 border-gray-300 rounded cursor-pointer"
+                                        className="h-5 w-5 text-apple-green focus:ring-apple-green border-apple-gray rounded cursor-pointer transition-apple"
                                     />
-                                    <span className="flex-1 text-sm text-gray-500 line-through">{tarea.descripcion}</span>
+                                    <span className="flex-1 text-sm text-apple-gray line-through font-light">{tarea.descripcion}</span>
                                     <button
                                         onClick={() => handleDeleteTarea(tarea.id_tarea)}
-                                        className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded transition-all"
+                                        className="text-apple-red hover:text-apple-red p-1.5 rounded transition-apple"
                                         title="Eliminar tarea"
                                     >
                                         <DeleteIcon className="h-4 w-4" />
@@ -1232,12 +1216,9 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
             )}
 
             {tareas.length === 0 && (
-                <div className="text-center py-8">
-                    <div className="inline-block p-4 bg-blue-100 rounded-full mb-3">
-                        <CalendarIcon className="h-8 w-8 text-blue-500" />
-                    </div>
-                    <p className="text-gray-500 text-sm font-medium">No hay tareas pendientes</p>
-                    <p className="text-gray-400 text-xs mt-1">Agrega una nueva tarea para comenzar</p>
+                <div className="text-center py-12">
+                    <p className="text-apple-gray text-sm font-light">No hay tareas pendientes</p>
+                    <p className="text-apple-gray text-xs font-light mt-2">Agrega una nueva tarea para comenzar</p>
                 </div>
             )}
         </div>
@@ -1296,60 +1277,44 @@ const EventosSemanaWidget: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-xl shadow-lg border border-yellow-100">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-yellow-500 rounded-lg">
-                        <CalendarIcon className="h-6 w-6 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-800">Eventos de la Semana</h3>
-                </div>
-                <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500"></div>
+            <div className="mb-12">
+                <h3 className="text-xl font-semibold mb-2 tracking-tight">Eventos de la Semana</h3>
+                <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-apple-blue"></div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-gradient-to-br from-yellow-50 via-white to-orange-50 p-6 rounded-xl shadow-lg border border-yellow-100 hover:shadow-xl transition-shadow duration-300">
-            {/* Header con icono y título */}
-            <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl shadow-md">
-                    <CalendarIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                    <h3 className="text-xl font-bold text-gray-800">Eventos de la Semana</h3>
-                    <p className="text-xs text-gray-500">Próximos 7 días</p>
-                </div>
-            </div>
+        <div className="mb-12">
+            <h3 className="text-xl font-semibold mb-2 tracking-tight">Eventos de la Semana</h3>
+            <p className="text-apple-gray text-sm font-light mb-8">Próximos 7 días</p>
             
             {eventos.length === 0 ? (
-                <div className="text-center py-8">
-                    <div className="inline-block p-4 bg-yellow-100 rounded-full mb-3">
-                        <CalendarIcon className="h-8 w-8 text-yellow-600" />
-                    </div>
-                    <p className="text-gray-500 text-sm font-medium">No hay eventos programados</p>
-                    <p className="text-gray-400 text-xs mt-1">Esta semana está libre de eventos</p>
+                <div className="text-center py-12">
+                    <p className="text-apple-gray text-sm font-light">No hay eventos programados</p>
+                    <p className="text-apple-gray text-xs font-light mt-2">Esta semana está libre de eventos</p>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {eventos.map((evento) => {
                         const color = evento.color || getEventColor(evento.tipo_evento);
                         return (
-                            <div key={evento.id_evento} className="flex items-center gap-3 p-3 rounded-lg bg-white hover:shadow-md transition-all border-l-4" style={{ borderLeftColor: color }}>
+                            <div key={evento.id_evento} className="flex items-center gap-4 py-4 border-b border-apple-gray-light transition-apple hover:opacity-70">
                                 <div 
-                                    className="w-4 h-4 rounded-full shadow-sm flex-shrink-0"
+                                    className="w-3 h-3 rounded-full flex-shrink-0"
                                     style={{ backgroundColor: color }}
                                 ></div>
                                 <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-bold text-sm text-gray-800 min-w-[90px]">
+                                    <div className="flex items-center gap-3">
+                                        <span className="font-medium text-sm text-apple-gray-dark min-w-[100px]">
                                             {formatDate(evento.fecha_inicio)}
                                         </span>
-                                        <span className="text-sm font-semibold text-gray-700">{evento.titulo}</span>
+                                        <span className="text-sm text-apple-gray-dark font-light">{evento.titulo}</span>
                                     </div>
                                     {evento.descripcion && (
-                                        <p className="text-xs text-gray-500 mt-1 ml-[98px]">{evento.descripcion}</p>
+                                        <p className="text-xs text-apple-gray font-light mt-1 ml-[108px]">{evento.descripcion}</p>
                                     )}
                                 </div>
                             </div>
@@ -1391,17 +1356,9 @@ const EstadoMiEquipoWidget: React.FC<{ docentes: Docente[]; planificaciones: Pla
     const progressColor = stats.porcentaje >= 80 ? '#10b981' : stats.porcentaje >= 50 ? '#f59e0b' : '#ef4444';
 
     return (
-        <div className="bg-gradient-to-br from-green-50 via-white to-emerald-50 p-6 rounded-xl shadow-lg border border-green-100 hover:shadow-xl transition-shadow duration-300">
-            {/* Header con icono y título */}
-            <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-md">
-                    <UsersIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                    <h3 className="text-xl font-bold text-gray-800">Estado de Mi Equipo</h3>
-                    <p className="text-xs text-gray-500">Planificaciones del lapso</p>
-                </div>
-            </div>
+        <div className="mb-12">
+            <h3 className="text-xl font-semibold mb-2 tracking-tight">Estado de Mi Equipo</h3>
+            <p className="text-apple-gray text-sm font-light mb-8">Planificaciones del lapso</p>
             
             <div className="flex items-center gap-6">
                 <div className="relative flex-shrink-0">
@@ -1429,23 +1386,23 @@ const EstadoMiEquipoWidget: React.FC<{ docentes: Docente[]; planificaciones: Pla
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                         <span className="text-3xl font-bold" style={{ color: progressColor }}>{stats.porcentaje}%</span>
-                        <span className="text-xs text-gray-500 font-medium">Completado</span>
+                        <span className="text-xs text-apple-gray font-medium">Completado</span>
                     </div>
                 </div>
                 <div className="flex-1 space-y-3">
-                    <div className="p-3 rounded-lg bg-white shadow-sm border-l-4 border-green-500">
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-gray-700">Entregadas</span>
-                            <span className="text-lg font-bold text-green-600">{stats.entregadas}</span>
+                    <div className="py-4 border-b border-apple-gray-light">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-apple-gray-dark">Entregadas</span>
+                            <span className="text-lg font-semibold text-apple-green">{stats.entregadas}</span>
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">de {stats.total} docentes</div>
+                        <div className="text-xs text-apple-gray font-light">de {stats.total} docentes</div>
                     </div>
-                    <div className="p-3 rounded-lg bg-white shadow-sm border-l-4 border-red-400">
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-gray-700">Pendientes</span>
-                            <span className="text-lg font-bold text-red-600">{stats.pendientes}</span>
+                    <div className="py-4 border-b border-apple-gray-light">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-apple-gray-dark">Pendientes</span>
+                            <span className="text-lg font-semibold text-apple-red">{stats.pendientes}</span>
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">requieren atención</div>
+                        <div className="text-xs text-apple-gray font-light">requieren atención</div>
                     </div>
                 </div>
             </div>
@@ -1486,72 +1443,55 @@ const AlertasCocoWidget: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-lg border border-purple-100">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-purple-500 rounded-lg">
-                        <SparklesIcon className="h-6 w-6 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-800">Alertas de Coco</h3>
-                </div>
-                <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+            <div className="mb-12">
+                <h3 className="text-xl font-semibold mb-2 tracking-tight">Alertas de Coco</h3>
+                <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-apple-blue"></div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-gradient-to-br from-purple-50 via-white to-pink-50 p-6 rounded-xl shadow-lg border border-purple-100 hover:shadow-xl transition-shadow duration-300">
-            {/* Header con icono y título */}
-            <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-md animate-pulse">
-                    <SparklesIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                    <h3 className="text-xl font-bold text-gray-800">Alertas de Coco</h3>
-                    <p className="text-xs text-gray-500">IA Proactiva</p>
-                </div>
-            </div>
+        <div className="mb-12">
+            <h3 className="text-xl font-semibold mb-2 tracking-tight">Alertas de Coco</h3>
+            <p className="text-apple-gray text-sm font-light mb-8">IA Proactiva</p>
             
             {alertas.length === 0 ? (
-                <div className="text-center py-8">
-                    <div className="inline-block p-4 bg-purple-100 rounded-full mb-3">
-                        <SparklesIcon className="h-8 w-8 text-purple-500" />
-                    </div>
-                    <p className="text-gray-500 text-sm font-medium">No hay alertas pendientes</p>
-                    <p className="text-gray-400 text-xs mt-1">Coco está monitoreando activamente</p>
+                <div className="text-center py-12">
+                    <p className="text-apple-gray text-sm font-light">No hay alertas pendientes</p>
+                    <p className="text-apple-gray text-xs font-light mt-2">Coco está monitoreando activamente</p>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {alertas.map((alerta) => {
                         const color = getAlertaColor(alerta.tipo_alerta);
                         return (
                             <div 
                                 key={alerta.id_log} 
-                                className="p-4 rounded-lg bg-white border-l-4 shadow-sm hover:shadow-md transition-all"
-                                style={{ borderLeftColor: color }}
+                                className="py-4 border-b border-apple-gray-light transition-apple hover:opacity-70"
                             >
-                                <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-2">
+                                        <div className="flex items-center gap-3 mb-3">
                                             <span 
-                                                className="text-xs font-bold px-3 py-1.5 rounded-full text-white shadow-sm"
+                                                className="text-xs font-medium px-3 py-1.5 rounded-full text-white"
                                                 style={{ backgroundColor: color }}
                                             >
                                                 {alerta.tipo_alerta || 'Otro'}
                                             </span>
-                                            <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                                            <span className="text-xs font-light text-apple-gray bg-apple-gray-light px-3 py-1 rounded">
                                                 {alerta.grado}
                                             </span>
                                         </div>
-                                        <p className="text-sm font-bold text-gray-800 mb-1">{alerta.categoria}</p>
+                                        <p className="text-sm font-semibold text-apple-gray-dark mb-2">{alerta.categoria}</p>
                                         {alerta.descripcion && (
-                                            <p className="text-xs text-gray-600 mb-2 leading-relaxed">{alerta.descripcion}</p>
+                                            <p className="text-xs text-apple-gray font-light mb-3 leading-relaxed">{alerta.descripcion}</p>
                                         )}
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <BellIcon className="h-3 w-3 text-gray-400" />
-                                            <p className="text-xs text-gray-500 font-medium">
-                                                Aparece en <span className="font-bold">{alerta.frecuencia}</span> reunión{alerta.frecuencia > 1 ? 'es' : ''}
+                                        <div className="flex items-center gap-2">
+                                            <BellIcon className="h-3 w-3 text-apple-gray" />
+                                            <p className="text-xs text-apple-gray font-light">
+                                                Aparece en <span className="font-medium">{alerta.frecuencia}</span> reunión{alerta.frecuencia > 1 ? 'es' : ''}
                                             </p>
                                         </div>
                                     </div>
@@ -1604,51 +1544,51 @@ const DashboardView: React.FC<{
     const isCoordinator = currentUser.role === 'coordinador' || currentUser.role === 'directivo';
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-16 py-8">
             {/* Widgets existentes para todos los roles */}
-            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-                <h2 className="text-2xl font-bold text-text-main mb-6">Resumen de Alumnos por Grado</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            <div className="mb-16">
+                <h2 className="text-2xl font-bold mb-8 tracking-tight">Resumen de Alumnos por Grado</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
                     {sortedGrades.map((grade) => {
                         const gradeColor = getGradeColor(grade);
                         return (
                             <div 
                                 key={grade} 
-                                className="p-6 rounded-xl shadow-lg text-white hover:shadow-xl transition-smooth hover-lift"
+                                className="p-8 rounded-2xl text-white transition-apple hover:scale-[1.02]"
                                 style={{ backgroundColor: gradeColor }}
                             >
                                 <div className="flex justify-between items-start">
                                     <div>
-                                        <p className="text-4xl font-bold">{studentsByGrade[grade]}</p>
+                                        <p className="text-5xl font-bold mb-2">{studentsByGrade[grade]}</p>
                                         <p className="text-lg font-semibold">{grade}</p>
                                     </div>
-                                    <UsersIcon className="h-10 w-10 opacity-75" />
+                                    <UsersIcon className="h-10 w-10 opacity-80" />
                                 </div>
                             </div>
                         );
                     })}
                 </div>
-                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-gray-50 p-6 rounded-lg shadow-md flex justify-between items-center">
+                <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="py-6 border-b border-apple-gray-light flex justify-between items-center">
                         <div>
-                            <p className="text-4xl font-bold text-gray-800">{stats.totalTeachers}</p>
-                            <p className="text-lg text-gray-600">Docentes Activos</p>
+                            <p className="text-4xl font-bold text-apple-gray-dark mb-2">{stats.totalTeachers}</p>
+                            <p className="text-lg text-apple-gray font-light">Docentes Activos</p>
                         </div>
-                        <AcademicCapIcon className="h-12 w-12 text-brand-primary" />
+                        <AcademicCapIcon className="h-12 w-12 text-apple-blue opacity-60" />
                     </div>
-                    <div className="bg-gray-50 p-6 rounded-lg shadow-md flex justify-between items-center">
+                    <div className="py-6 border-b border-apple-gray-light flex justify-between items-center">
                         <div>
-                            <p className="text-4xl font-bold text-gray-800">{stats.classesToday}</p>
-                            <p className="text-lg text-gray-600">Clases Hoy</p>
+                            <p className="text-4xl font-bold text-apple-gray-dark mb-2">{stats.classesToday}</p>
+                            <p className="text-lg text-apple-gray font-light">Clases Hoy</p>
                         </div>
-                        <CalendarIcon className="h-12 w-12 text-brand-primary" />
+                        <CalendarIcon className="h-12 w-12 text-apple-blue opacity-60" />
                     </div>
                 </div>
             </div>
 
             {/* Widgets adicionales solo para coordinadores */}
             {isCoordinator && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                     <MiAgendaDelDiaWidget currentUser={currentUser} />
                     <EventosSemanaWidget />
                     <EstadoMiEquipoWidget docentes={docentes} planificaciones={planificaciones} />
@@ -1693,28 +1633,28 @@ const ResumenAlumnosDocenteWidget: React.FC<{
     }, [studentsByGrade]);
 
     return (
-        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-            <h2 className="text-2xl font-bold text-text-main mb-6">Mis Alumnos por Grado</h2>
+        <div className="mb-16">
+            <h2 className="text-2xl font-bold mb-8 tracking-tight">Mis Alumnos por Grado</h2>
             {sortedGrades.length === 0 ? (
-                <div className="text-center py-8">
-                    <p className="text-gray-500 text-sm">No tienes alumnos asignados aún</p>
+                <div className="text-center py-12">
+                    <p className="text-apple-gray text-sm font-light">No tienes alumnos asignados aún</p>
                 </div>
             ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
                 {sortedGrades.map((grade) => {
                     const gradeColor = getGradeColor(grade);
                     return (
                         <div 
                             key={grade} 
-                            className="p-6 rounded-xl shadow-lg text-white hover:shadow-xl transition-smooth hover-lift"
+                            className="p-8 rounded-2xl text-white transition-apple hover:scale-[1.02]"
                             style={{ backgroundColor: gradeColor }}
                         >
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <p className="text-4xl font-bold">{studentsByGrade[grade]}</p>
+                                    <p className="text-5xl font-bold mb-2">{studentsByGrade[grade]}</p>
                                     <p className="text-lg font-semibold">{grade}</p>
                                 </div>
-                                <UsersIcon className="h-10 w-10 opacity-75" />
+                                <UsersIcon className="h-10 w-10 opacity-80" />
                             </div>
                         </div>
                     );
@@ -1817,34 +1757,24 @@ const MisClasesHoyWidget: React.FC<{
     }, [schedules, clases, currentUser.docenteId, aulas]);
 
     return (
-        <div className="bg-gradient-to-br from-green-50 via-white to-emerald-50 p-6 rounded-xl shadow-lg border border-green-100 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-md">
-                    <CalendarIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                    <h3 className="text-xl font-bold text-gray-800">Mis Clases de Hoy</h3>
-                    <p className="text-xs text-gray-500">{new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-                </div>
-            </div>
+        <div className="mb-12">
+            <h3 className="text-xl font-semibold mb-2 tracking-tight">Mis Clases de Hoy</h3>
+            <p className="text-apple-gray text-sm font-light mb-8">{new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
             
             {classesToday.length === 0 ? (
-                <div className="text-center py-8">
-                    <div className="inline-block p-4 bg-green-100 rounded-full mb-3">
-                        <CalendarIcon className="h-8 w-8 text-green-600" />
-                    </div>
-                    <p className="text-gray-500 text-sm font-medium">No hay clases programadas para hoy</p>
+                <div className="text-center py-12">
+                    <p className="text-apple-gray text-sm font-light">No hay clases programadas para hoy</p>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {classesToday.map((clase, index) => (
-                        <div key={`${clase.id_clase}-${index}`} className="flex items-center gap-3 p-3 rounded-lg bg-white hover:shadow-md transition-all border-l-4 border-green-500">
-                            <div className="flex-shrink-0 w-16 text-center">
-                                <p className="text-sm font-bold text-green-600">{clase.hora}</p>
+                        <div key={`${clase.id_clase}-${index}`} className="flex items-center gap-6 py-4 border-b border-apple-gray-light transition-apple hover:opacity-70">
+                            <div className="flex-shrink-0 w-20 text-left">
+                                <p className="text-base font-semibold text-apple-gray-dark">{clase.hora}</p>
                             </div>
                             <div className="flex-1">
-                                <p className="font-semibold text-gray-800">{clase.materia}</p>
-                                <p className="text-sm text-gray-600">{clase.grado} {clase.aula && `• ${clase.aula}`}</p>
+                                <p className="font-medium text-apple-gray-dark mb-1">{clase.materia}</p>
+                                <p className="text-sm text-apple-gray font-light">{clase.grado} {clase.aula && `• ${clase.aula}`}</p>
                             </div>
                         </div>
                     ))}
@@ -1871,42 +1801,32 @@ const PlanificacionesPendientesWidget: React.FC<{
     }, [planificaciones, currentUser.docenteId, clases]);
 
     const getStatusColor = (status: string): string => {
-        if (status === 'Borrador') return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-        if (status === 'Revisado') return 'bg-blue-100 text-blue-800 border-blue-300';
-        return 'bg-gray-100 text-gray-800 border-gray-300';
+        if (status === 'Borrador') return 'bg-yellow-100 text-yellow-800';
+        if (status === 'Revisado') return 'bg-apple-blue text-white';
+        return 'bg-apple-gray-light text-apple-gray-dark';
     };
 
     return (
-        <div className="bg-gradient-to-br from-purple-50 via-white to-pink-50 p-6 rounded-xl shadow-lg border border-purple-100 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-md">
-                    <PlanningIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                    <h3 className="text-xl font-bold text-gray-800">Planificaciones Pendientes</h3>
-                    <p className="text-xs text-gray-500">{pendientes.length} pendiente{pendientes.length !== 1 ? 's' : ''}</p>
-                </div>
-            </div>
+        <div className="mb-12">
+            <h3 className="text-xl font-semibold mb-2 tracking-tight">Planificaciones Pendientes</h3>
+            <p className="text-apple-gray text-sm font-light mb-8">{pendientes.length} pendiente{pendientes.length !== 1 ? 's' : ''}</p>
             
             {pendientes.length === 0 ? (
-                <div className="text-center py-8">
-                    <div className="inline-block p-4 bg-purple-100 rounded-full mb-3">
-                        <CheckIcon className="h-8 w-8 text-purple-600" />
-                    </div>
-                    <p className="text-gray-500 text-sm font-medium">¡Todo al día!</p>
-                    <p className="text-gray-400 text-xs mt-1">No tienes planificaciones pendientes</p>
+                <div className="text-center py-12">
+                    <p className="text-apple-gray text-sm font-light">¡Todo al día!</p>
+                    <p className="text-apple-gray text-xs font-light mt-2">No tienes planificaciones pendientes</p>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {pendientes.map((plan) => {
                         const clase = clases.find(c => c.id_clase === plan.id_clase);
                         return (
-                            <div key={plan.id_planificacion} className="flex items-center gap-3 p-3 rounded-lg bg-white hover:shadow-md transition-all border-l-4 border-purple-500">
+                            <div key={plan.id_planificacion} className="flex items-center justify-between py-4 border-b border-apple-gray-light transition-apple hover:opacity-70">
                                 <div className="flex-1">
-                                    <p className="font-semibold text-gray-800">{clase?.nombre_materia || 'Sin asignatura'}</p>
-                                    <p className="text-sm text-gray-600">Semana {plan.semana} • {plan.lapso} • {clase?.grado_asignado}</p>
+                                    <p className="font-medium text-apple-gray-dark mb-1">{clase?.nombre_materia || 'Sin asignatura'}</p>
+                                    <p className="text-sm text-apple-gray font-light">Semana {plan.semana} • {plan.lapso} • {clase?.grado_asignado}</p>
                                 </div>
-                                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(plan.status)}`}>
+                                <span className={`px-4 py-1.5 rounded-full text-xs font-medium ${getStatusColor(plan.status)}`}>
                                     {plan.status}
                                 </span>
                             </div>
@@ -1954,36 +1874,26 @@ const MisAsignaturasWidget: React.FC<{
     }, [clases, alumnos, currentUser.docenteId]);
 
     return (
-        <div className="bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-6 rounded-xl shadow-lg border border-indigo-100 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl shadow-md">
-                    <AcademicCapIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                    <h3 className="text-xl font-bold text-gray-800">Mis Asignaturas</h3>
-                    <p className="text-xs text-gray-500">{misAsignaturas.length} asignatura{misAsignaturas.length !== 1 ? 's' : ''}</p>
-                </div>
-            </div>
+        <div className="mb-12">
+            <h3 className="text-xl font-semibold mb-2 tracking-tight">Mis Asignaturas</h3>
+            <p className="text-apple-gray text-sm font-light mb-8">{misAsignaturas.length} asignatura{misAsignaturas.length !== 1 ? 's' : ''}</p>
             
             {misAsignaturas.length === 0 ? (
-                <div className="text-center py-8">
-                    <div className="inline-block p-4 bg-indigo-100 rounded-full mb-3">
-                        <AcademicCapIcon className="h-8 w-8 text-indigo-600" />
-                    </div>
-                    <p className="text-gray-500 text-sm font-medium">No tienes asignaturas asignadas</p>
-                    <p className="text-gray-400 text-xs mt-1">Contacta a un coordinador para asignarte clases</p>
+                <div className="text-center py-12">
+                    <p className="text-apple-gray text-sm font-light">No tienes asignaturas asignadas</p>
+                    <p className="text-apple-gray text-xs font-light mt-2">Contacta a un coordinador para asignarte clases</p>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {misAsignaturas.map((asignatura, index) => (
-                        <div key={index} className="p-4 rounded-lg bg-white hover:shadow-md transition-all border-l-4 border-indigo-500">
-                            <p className="font-semibold text-gray-800 mb-2">{asignatura.materia}</p>
-                            <div className="flex items-center gap-4 text-sm text-gray-600">
-                                <span className="flex items-center gap-1">
+                        <div key={index} className="py-4 border-b border-apple-gray-light transition-apple hover:opacity-70">
+                            <p className="font-medium text-apple-gray-dark mb-3">{asignatura.materia}</p>
+                            <div className="flex items-center gap-6 text-sm text-apple-gray font-light">
+                                <span className="flex items-center gap-2">
                                     <UsersIcon className="h-4 w-4" />
                                     {Array.from(asignatura.grados).join(', ')}
                                 </span>
-                                <span className="flex items-center gap-1">
+                                <span className="flex items-center gap-2">
                                     <UserCircleIcon className="h-4 w-4" />
                                     {asignatura.totalAlumnos} alumno{asignatura.totalAlumnos !== 1 ? 's' : ''}
                                 </span>
@@ -2052,7 +1962,7 @@ const EventosDocenteWidget: React.FC = () => {
                     <div className="p-2 bg-yellow-500 rounded-lg">
                         <CalendarIcon className="h-6 w-6 text-white" />
                     </div>
-                    <h3 className="text-xl font-bold text-gray-800">Próximos Eventos</h3>
+                    <h3 className="text-xl font-semibold text-apple-gray-dark tracking-tight">Próximos Eventos</h3>
                 </div>
                 <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500"></div>
@@ -2062,43 +1972,33 @@ const EventosDocenteWidget: React.FC = () => {
     }
 
     return (
-        <div className="bg-gradient-to-br from-yellow-50 via-white to-orange-50 p-6 rounded-xl shadow-lg border border-yellow-100 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl shadow-md">
-                    <CalendarIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                    <h3 className="text-xl font-bold text-gray-800">Próximos Eventos</h3>
-                    <p className="text-xs text-gray-500">Próximos 7 días</p>
-                </div>
-            </div>
+        <div className="mb-12">
+            <h3 className="text-xl font-semibold mb-2 tracking-tight">Próximos Eventos</h3>
+            <p className="text-apple-gray text-sm font-light mb-8">Próximos 7 días</p>
             
             {eventos.length === 0 ? (
-                <div className="text-center py-8">
-                    <div className="inline-block p-4 bg-yellow-100 rounded-full mb-3">
-                        <CalendarIcon className="h-8 w-8 text-yellow-600" />
-                    </div>
-                    <p className="text-gray-500 text-sm font-medium">No hay eventos programados</p>
+                <div className="text-center py-12">
+                    <p className="text-apple-gray text-sm font-light">No hay eventos programados</p>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {eventos.map((evento) => {
                         const color = evento.color || getEventColor(evento.tipo_evento);
                         return (
-                            <div key={evento.id_evento} className="flex items-center gap-3 p-3 rounded-lg bg-white hover:shadow-md transition-all border-l-4" style={{ borderLeftColor: color }}>
+                            <div key={evento.id_evento} className="flex items-center gap-4 py-4 border-b border-apple-gray-light transition-apple hover:opacity-70">
                                 <div 
-                                    className="w-4 h-4 rounded-full shadow-sm flex-shrink-0"
+                                    className="w-3 h-3 rounded-full flex-shrink-0"
                                     style={{ backgroundColor: color }}
                                 ></div>
                                 <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-bold text-sm text-gray-800 min-w-[90px]">
+                                    <div className="flex items-center gap-3">
+                                        <span className="font-medium text-sm text-apple-gray-dark min-w-[100px]">
                                             {formatDate(evento.fecha_inicio)}:
                                         </span>
-                                        <span className="text-sm text-gray-700">{evento.nombre_evento}</span>
+                                        <span className="text-sm text-apple-gray-dark font-light">{evento.nombre_evento}</span>
                                     </div>
                                     {evento.responsable && (
-                                        <p className="text-xs text-gray-500 mt-1">Resp: {evento.responsable}</p>
+                                        <p className="text-xs text-apple-gray font-light mt-1 ml-[108px]">Resp: {evento.responsable}</p>
                                     )}
                                 </div>
                             </div>
@@ -2196,46 +2096,34 @@ const MiAgendaDocenteWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser
 
     if (isLoading) {
         return (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl shadow-lg border border-blue-100">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-blue-500 rounded-lg">
-                        <CalendarIcon className="h-6 w-6 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-800">Mi Agenda del Día</h3>
-                </div>
-                <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <div className="mb-12">
+                <h3 className="text-xl font-semibold mb-2 tracking-tight">Mi Agenda del Día</h3>
+                <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-apple-blue"></div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md">
-                    <CalendarIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                    <h3 className="text-xl font-bold text-gray-800">Mi Agenda del Día</h3>
-                    <p className="text-xs text-gray-500">Gestiona tus tareas diarias</p>
-                </div>
-            </div>
+        <div className="mb-12">
+            <h3 className="text-xl font-semibold mb-2 tracking-tight">Mi Agenda del Día</h3>
+            <p className="text-apple-gray text-sm font-light mb-8">Gestiona tus tareas diarias</p>
             
-            <div className="mb-6 flex gap-2">
+            <div className="mb-8 flex gap-3">
                 <input
                     type="text"
                     value={nuevaTarea}
                     onChange={(e) => setNuevaTarea(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleAddTarea()}
                     placeholder="Agregar nueva tarea..."
-                    className="flex-1 px-4 py-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm"
+                    className="flex-1 px-4 py-3 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple"
                     disabled={isAdding}
                 />
                 <button
                     onClick={handleAddTarea}
                     disabled={isAdding || !nuevaTarea.trim()}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-semibold shadow-md hover:shadow-lg transition-all transform hover:scale-105"
+                    className="px-6 py-3 bg-apple-blue text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium transition-apple hover:opacity-90"
                 >
                     <PlusIcon className="h-5 w-5" />
                     Agregar
@@ -2243,24 +2131,24 @@ const MiAgendaDocenteWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser
             </div>
 
             {tareasPendientes.length > 0 && (
-                <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-3">
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                        <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Pendientes ({tareasPendientes.length})</h4>
+                <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="w-2 h-2 bg-apple-red rounded-full"></div>
+                        <h4 className="text-sm font-medium text-apple-gray-dark">Pendientes ({tareasPendientes.length})</h4>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                         {tareasPendientes.map((tarea) => (
-                            <div key={tarea.id_tarea} className="flex items-center gap-3 p-3 rounded-lg bg-white border-l-4 border-blue-500 hover:bg-blue-50 hover:shadow-md transition-all group">
+                            <div key={tarea.id_tarea} className="flex items-center gap-4 py-3 border-b border-apple-gray-light transition-apple hover:opacity-70 group">
                                 <input
                                     type="checkbox"
                                     checked={tarea.completada}
                                     onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
-                                    className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                                    className="h-5 w-5 text-apple-blue focus:ring-apple-blue border-apple-gray rounded cursor-pointer transition-apple"
                                 />
-                                <span className="flex-1 text-sm font-medium text-gray-800">{tarea.descripcion}</span>
+                                <span className="flex-1 text-sm font-light text-apple-gray-dark">{tarea.descripcion}</span>
                                 <button
                                     onClick={() => handleDeleteTarea(tarea.id_tarea)}
-                                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded transition-all"
+                                    className="opacity-0 group-hover:opacity-100 text-apple-red hover:text-apple-red p-1.5 rounded transition-apple"
                                     title="Eliminar tarea"
                                 >
                                     <DeleteIcon className="h-4 w-4" />
@@ -2274,26 +2162,26 @@ const MiAgendaDocenteWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser
             {tareasCompletadas.length > 0 && (
                 <div>
                     <details className="group">
-                        <summary className="text-sm font-semibold text-gray-500 cursor-pointer list-none hover:text-gray-700 transition-colors">
+                        <summary className="text-sm font-light text-apple-gray cursor-pointer list-none hover:text-apple-gray-dark transition-apple mb-3">
                             <span className="flex items-center gap-2">
-                                <CheckIcon className="h-4 w-4 text-green-500" />
+                                <CheckIcon className="h-4 w-4 text-apple-green" />
                                 <span>Completadas ({tareasCompletadas.length})</span>
-                                <ChevronDownIcon className="h-4 w-4 transform group-open:rotate-180 transition-transform" />
+                                <ChevronDownIcon className="h-4 w-4 transform group-open:rotate-180 transition-apple" />
                             </span>
                         </summary>
-                        <div className="mt-2 space-y-2">
+                        <div className="mt-2 space-y-3">
                             {tareasCompletadas.map((tarea) => (
-                                <div key={tarea.id_tarea} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 opacity-75 border-l-4 border-green-400">
+                                <div key={tarea.id_tarea} className="flex items-center gap-4 py-3 border-b border-apple-gray-light opacity-60">
                                     <input
                                         type="checkbox"
                                         checked={tarea.completada}
                                         onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
-                                        className="h-5 w-5 text-green-600 focus:ring-green-500 border-gray-300 rounded cursor-pointer"
+                                        className="h-5 w-5 text-apple-green focus:ring-apple-green border-apple-gray rounded cursor-pointer transition-apple"
                                     />
-                                    <span className="flex-1 text-sm text-gray-500 line-through">{tarea.descripcion}</span>
+                                    <span className="flex-1 text-sm text-apple-gray line-through font-light">{tarea.descripcion}</span>
                                     <button
                                         onClick={() => handleDeleteTarea(tarea.id_tarea)}
-                                        className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded transition-all"
+                                        className="text-apple-red hover:text-apple-red p-1.5 rounded transition-apple"
                                         title="Eliminar tarea"
                                     >
                                         <DeleteIcon className="h-4 w-4" />
@@ -2306,12 +2194,9 @@ const MiAgendaDocenteWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser
             )}
 
             {tareas.length === 0 && (
-                <div className="text-center py-8">
-                    <div className="inline-block p-4 bg-blue-100 rounded-full mb-3">
-                        <CalendarIcon className="h-8 w-8 text-blue-500" />
-                    </div>
-                    <p className="text-gray-500 text-sm font-medium">No hay tareas pendientes</p>
-                    <p className="text-gray-400 text-xs mt-1">Agrega una nueva tarea para comenzar</p>
+                <div className="text-center py-12">
+                    <p className="text-apple-gray text-sm font-light">No hay tareas pendientes</p>
+                    <p className="text-apple-gray text-xs font-light mt-2">Agrega una nueva tarea para comenzar</p>
                 </div>
             )}
         </div>
@@ -2425,11 +2310,11 @@ const TeacherScheduleDashboard: React.FC<{
             {/* Widget 6: Próximos Eventos */}
             <EventosDocenteWidget />
 
-            {/* Horario de Clases (mantener el existente) */}
-            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-            <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
-                <div className="flex items-center gap-3">
-                    <h3 className="text-xl font-bold text-text-main">Mi Horario de Clases</h3>
+            {/* Horario de Clases (estilo Apple - sin caja) */}
+            <div className="mb-16">
+            <h2 className="text-2xl font-bold mb-4 tracking-tight">Mi Horario de Clases</h2>
+            <div className="flex flex-wrap justify-between items-center mb-8 gap-6">
+                <div className="flex items-center gap-4">
                     {selectedGrade && (
                         <div className="flex items-center gap-2">
                             <div 
@@ -2437,53 +2322,47 @@ const TeacherScheduleDashboard: React.FC<{
                                 style={{ backgroundColor: selectedGradeColor }}
                                 title={`Color del ${selectedGrade}`}
                             ></div>
-                            <span className="text-sm font-medium text-gray-600">{selectedGrade}</span>
+                            <span className="text-sm font-medium text-apple-gray-dark">{selectedGrade}</span>
                         </div>
                     )}
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="relative">
+                    <div className="flex items-center gap-4">
                         <select
                             value={selectedGrade}
                             onChange={(e) => setSelectedGrade(e.target.value)}
-                            className="p-2 border-2 rounded-md shadow-sm pr-10 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                            className="px-4 py-2 border border-apple-gray rounded-lg transition-apple focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue"
                             style={{ 
-                                borderColor: selectedGradeColor,
-                                paddingRight: '2.5rem'
+                                borderColor: selectedGradeColor
                             }}
                         >
                             {allGrades.map(grade => <option key={grade} value={grade}>{grade}</option>)}
                         </select>
-                        <div 
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 rounded-full border border-gray-300"
-                            style={{ backgroundColor: selectedGradeColor }}
-                        ></div>
-                    </div>
-                    <select
-                        value={currentWeek || ''}
-                        onChange={(e) => setCurrentWeek(e.target.value ? parseInt(e.target.value) : null)}
-                        className="p-2 border border-gray-300 rounded-md shadow-sm min-w-[150px]"
-                    >
-                        <option value="">Elegir Semana</option>
-                        {Array.from({ length: 18 }, (_, i) => i + 1).map(week => (
-                            <option key={week} value={week}>Semana {week}</option>
-                        ))}
-                    </select>
-                     <div className="relative">
-                        <button
-                            onClick={() => setDownloadMenuOpen(!isDownloadMenuOpen)}
-                            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary"
+                        <select
+                            value={currentWeek || ''}
+                            onChange={(e) => setCurrentWeek(e.target.value ? parseInt(e.target.value) : null)}
+                            className="px-4 py-2 border border-apple-gray rounded-lg transition-apple focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue min-w-[150px]"
                         >
-                            <DownloadIcon />
-                            Descargar Horario
-                        </button>
+                            <option value="">Elegir Semana</option>
+                            {Array.from({ length: 18 }, (_, i) => i + 1).map(week => (
+                                <option key={week} value={week}>Semana {week}</option>
+                            ))}
+                        </select>
+                        <div className="relative">
+                            <button
+                                onClick={() => setDownloadMenuOpen(!isDownloadMenuOpen)}
+                                className="flex items-center gap-2 px-4 py-2 border border-apple-gray rounded-lg text-sm font-medium text-apple-gray-dark transition-apple hover:bg-apple-gray-light focus:outline-none focus:ring-2 focus:ring-apple-blue"
+                            >
+                                <DownloadIcon />
+                                Descargar
+                            </button>
                         {isDownloadMenuOpen && (
                             <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
                                 <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                                    <a href="#" onClick={(e) => { e.preventDefault(); handleDownload('jpeg'); }} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                                    <a href="#" onClick={(e) => { e.preventDefault(); handleDownload('jpeg'); }} className="block px-4 py-2 text-sm text-apple-gray-dark hover:bg-apple-gray-light transition-apple" role="menuitem">
                                         Exportar a JPEG
                                     </a>
-                                    <a href="#" onClick={(e) => { e.preventDefault(); handleDownload('pdf'); }} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                                    <a href="#" onClick={(e) => { e.preventDefault(); handleDownload('pdf'); }} className="block px-4 py-2 text-sm text-apple-gray-dark hover:bg-apple-gray-light transition-apple" role="menuitem">
                                         Exportar a PDF
                                     </a>
                                 </div>
@@ -2493,7 +2372,7 @@ const TeacherScheduleDashboard: React.FC<{
                 </div>
             </div>
             {!currentWeek ? (
-                <div className="text-center py-12 text-gray-500 mt-4">
+                <div className="text-center py-12 text-apple-gray font-light mt-4">
                     <p className="text-lg font-medium">Seleccione una semana para ver el horario</p>
                     <p className="text-sm mt-2">Use el menú desplegable arriba para elegir una semana (1-18)</p>
                 </div>
@@ -2510,12 +2389,12 @@ const TeacherScheduleDashboard: React.FC<{
                         className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: selectedGradeColor }}
                     ></div>
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-sm font-medium text-apple-gray-dark">
                         Horario de <strong>{selectedGrade}</strong>
                     </span>
                 </div>
                 <table ref={scheduleTableRef} className="min-w-full divide-y divide-gray-200 border bg-white">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-apple-gray-light">
                         <tr>
                             <th 
                                 className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider w-32"
@@ -2537,16 +2416,16 @@ const TeacherScheduleDashboard: React.FC<{
                     <tbody className="bg-white divide-y divide-gray-200">
                         {timeSlots.map(slot => (
                             <tr key={slot}>
-                                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 border-r">{slot}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-apple-gray-dark border-r border-apple-gray-light">{slot}</td>
                                 {WEEK_DAYS.map((_, dayIndex) => {
                                     const day = dayIndex + 1;
                                     const item = weeklySchedule.find(s => s.dia_semana === day && s.hora_inicio.startsWith(slot.split(' - ')[0]));
                                     if (item) {
                                         if (item.evento_descripcion) {
                                             return (
-                                                <td key={`${day}-${slot}`} className="border p-2 align-top text-xs relative h-24 bg-gray-200">
-                                                    <div className="font-semibold text-gray-700 flex items-center gap-1">
-                                                        <TagIcon className="h-4 w-4 text-gray-500" />
+                                                <td key={`${day}-${slot}`} className="border p-2 align-top text-xs relative h-24 bg-apple-gray-light">
+                                                    <div className="font-semibold text-apple-gray-dark flex items-center gap-1">
+                                                        <TagIcon className="h-4 w-4 text-apple-gray" />
                                                         {item.evento_descripcion}
                                                     </div>
                                                 </td>
@@ -2560,13 +2439,13 @@ const TeacherScheduleDashboard: React.FC<{
                                                 ? (subjectColors[clase?.nombre_materia || 'default'] || getSubjectColor(clase?.nombre_materia || ''))
                                                 : '#F3F4F6'; 
                                             
-                                            const textColor = isCurrentUserClass ? 'text-black' : 'text-gray-600';
+                                            const textColor = isCurrentUserClass ? 'text-apple-gray-dark' : 'text-apple-gray';
                                     
                                             return (
                                                 <td key={`${day}-${slot}`} className={`border p-2 align-top text-xs relative h-24 ${textColor}`} style={{ backgroundColor: bgColor }}>
                                                     <div className="font-bold">{clase?.nombre_materia}</div>
                                                     {!isCurrentUserClass && docente && (
-                                                        <div className="text-gray-500 text-[10px]">{`${docente.nombres} ${docente.apellidos}`}</div>
+                                                        <div className="text-apple-gray text-[10px] font-light">{`${docente.nombres} ${docente.apellidos}`}</div>
                                                     )}
                                                 </td>
                                             );
@@ -2606,32 +2485,32 @@ const StudentListView: React.FC<{
     }, [students, searchTerm, filterGrade]);
 
     return (
-        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-text-main">Lista de Alumnos</h2>
-                <button onClick={onAddStudent} className="flex items-center gap-2 bg-brand-primary text-white px-6 py-3 rounded-xl hover:bg-opacity-90 text-sm sm:text-base font-semibold min-h-[44px] shadow-md hover:shadow-lg transition-smooth hover-scale">
+        <div className="mb-8">
+            <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl font-bold text-apple-gray-dark tracking-tight">Lista de Alumnos</h2>
+                <button onClick={onAddStudent} className="flex items-center gap-2 bg-apple-blue text-white px-6 py-3 rounded-lg hover:opacity-90 text-sm sm:text-base font-medium min-h-[44px] transition-apple">
                     <PlusIcon />
                     <span className="hidden sm:inline">Añadir Alumno</span>
                     <span className="sm:hidden">Añadir</span>
                 </button>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row gap-4 mb-8">
                 <div className="relative flex-grow">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                        <SearchIcon />
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-4">
+                        <SearchIcon className="text-apple-gray" />
                     </span>
                     <input
                         type="text"
                         placeholder="Buscar por nombre..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base placeholder:text-gray-400"
+                        className="pl-12 pr-4 py-3 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple text-base placeholder:text-apple-gray"
                     />
                 </div>
                 <select
                     value={filterGrade}
                     onChange={e => setFilterGrade(e.target.value)}
-                    className="p-2.5 border border-gray-300 rounded-md text-base w-full sm:w-auto"
+                    className="px-4 py-3 border border-apple-gray rounded-lg text-base w-full sm:w-auto transition-apple focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue"
                 >
                     {grades.map(grade => <option key={grade} value={grade}>{grade === 'all' ? 'Todos los Salones' : grade}</option>)}
                 </select>
@@ -2639,42 +2518,42 @@ const StudentListView: React.FC<{
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
                 {filteredStudents.map(student => (
-                    <div key={student.id_alumno} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-smooth hover-lift">
+                    <div key={student.id_alumno} className="py-4 border-b border-apple-gray-light transition-apple hover:opacity-70">
                         <div className="flex justify-between items-start mb-3">
                             <div className="flex-1">
-                                <h3 className="font-semibold text-gray-900 text-lg">{student.nombres} {student.apellidos}</h3>
-                                <p className="text-sm text-gray-500 mt-1">{student.email_alumno}</p>
+                                <h3 className="font-semibold text-apple-gray-dark text-lg mb-1">{student.nombres} {student.apellidos}</h3>
+                                <p className="text-sm text-apple-gray font-light">{student.email_alumno}</p>
                             </div>
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${student.condicion === 'Regular' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                            <span className={`px-3 py-1 text-xs font-medium rounded-full ${student.condicion === 'Regular' ? 'bg-apple-green text-white' : 'bg-yellow-100 text-yellow-800'}`}>
                                 {student.condicion}
                             </span>
                         </div>
                         <div className="space-y-2 mb-4">
                             <div className="flex items-center text-sm">
-                                <span className="text-gray-600 font-medium w-24">Salón:</span>
-                                <span className="text-gray-900">{student.salon}</span>
+                                <span className="text-apple-gray font-light w-24">Salón:</span>
+                                <span className="text-apple-gray-dark font-medium">{student.salon}</span>
                             </div>
                             <div className="flex items-center text-sm">
-                                <span className="text-gray-600 font-medium w-24">Cédula:</span>
-                                <span className="text-gray-900">{student.cedula_escolar}</span>
+                                <span className="text-apple-gray font-light w-24">Cédula:</span>
+                                <span className="text-apple-gray-dark font-medium">{student.cedula_escolar}</span>
                             </div>
                         </div>
-                        <div className="flex gap-2 pt-3 border-t border-gray-200">
+                        <div className="flex gap-3 pt-3 border-t border-apple-gray-light">
                             <button 
                                 onClick={() => onSelectStudent(student)} 
-                                className="flex-1 px-3 py-2 bg-brand-primary text-white rounded-md hover:bg-opacity-90 text-sm font-medium transition-colors"
+                                className="flex-1 px-4 py-2 bg-apple-blue text-white rounded-lg hover:opacity-90 text-sm font-medium transition-apple"
                             >
                                 Ver
                             </button>
                             <button 
                                 onClick={() => onEditStudent(student)} 
-                                className="px-3 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 text-sm font-medium transition-colors"
+                                className="px-4 py-2 border border-apple-gray text-apple-gray-dark rounded-lg hover:bg-apple-gray-light text-sm font-medium transition-apple"
                             >
                                 <EditIcon />
                             </button>
                             <button 
                                 onClick={() => onDeleteStudent(student.id_alumno)} 
-                                className="px-3 py-2 bg-red-50 text-red-700 rounded-md hover:bg-red-100 text-sm font-medium transition-colors"
+                                className="px-4 py-2 border border-apple-red text-apple-red rounded-lg hover:bg-apple-red hover:text-white text-sm font-medium transition-apple"
                             >
                                 <DeleteIcon />
                             </button>
@@ -2682,42 +2561,42 @@ const StudentListView: React.FC<{
                     </div>
                 ))}
                 {filteredStudents.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                        No se encontraron alumnos
+                    <div className="text-center py-12">
+                        <p className="text-apple-gray text-sm font-light">No se encontraron alumnos</p>
                     </div>
                 )}
             </div>
 
             {/* Desktop Table View */}
             <div className="hidden md:block overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-apple-gray-light">
+                    <thead>
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre Completo</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salón</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cédula Escolar</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Condición</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Nombre Completo</th>
+                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Salón</th>
+                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Cédula Escolar</th>
+                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Condición</th>
+                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white divide-y divide-apple-gray-light">
                         {filteredStudents.map(student => (
-                            <tr key={student.id_alumno} className="hover:bg-gray-50">
+                            <tr key={student.id_alumno} className="transition-apple hover:opacity-70">
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="font-medium text-gray-900">{student.nombres} {student.apellidos}</div>
-                                    <div className="text-sm text-gray-500">{student.email_alumno}</div>
+                                    <div className="font-medium text-apple-gray-dark">{student.nombres} {student.apellidos}</div>
+                                    <div className="text-sm text-apple-gray font-light">{student.email_alumno}</div>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.salon}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.cedula_escolar}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-apple-gray font-light">{student.salon}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-apple-gray font-light">{student.cedula_escolar}</td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${student.condicion === 'Regular' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                    <span className={`px-3 py-1 inline-flex text-xs font-medium rounded-full ${student.condicion === 'Regular' ? 'bg-apple-green text-white' : 'bg-yellow-100 text-yellow-800'}`}>
                                         {student.condicion}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex items-center gap-4">
-                                    <button onClick={() => onSelectStudent(student)} className="text-brand-primary hover:underline">Ver Detalles</button>
-                                    <button onClick={() => onEditStudent(student)} className="text-blue-600 hover:text-blue-800"><EditIcon /></button>
-                                    <button onClick={() => onDeleteStudent(student.id_alumno)} className="text-red-600 hover:text-red-800"><DeleteIcon /></button>
+                                    <button onClick={() => onSelectStudent(student)} className="text-apple-blue hover:underline transition-apple">Ver Detalles</button>
+                                    <button onClick={() => onEditStudent(student)} className="text-apple-blue hover:text-apple-blue transition-apple"><EditIcon /></button>
+                                    <button onClick={() => onDeleteStudent(student.id_alumno)} className="text-apple-red hover:text-apple-red transition-apple"><DeleteIcon /></button>
                                 </td>
                             </tr>
                         ))}
@@ -2733,29 +2612,29 @@ const StudentDetailView: React.FC<{
     onBack: () => void;
 }> = ({ student, onBack }) => {
     const InfoItem: React.FC<{icon: React.ElementType, label: string, value?: string | string[]}> = ({ icon: Icon, label, value }) => (
-        <div className="flex items-start gap-3">
-            <Icon className="h-5 w-5 text-gray-400 mt-1" />
+        <div className="flex items-start gap-4">
+            <Icon className="h-5 w-5 text-apple-gray mt-1" />
             <div>
-                <p className="text-sm text-gray-500">{label}</p>
-                <p className="font-medium text-gray-800">{Array.isArray(value) ? value.join(', ') : (value || 'N/A')}</p>
+                <p className="text-sm text-apple-gray font-light mb-1">{label}</p>
+                <p className="font-medium text-apple-gray-dark">{Array.isArray(value) ? value.join(', ') : (value || 'N/A')}</p>
             </div>
         </div>
     );
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-            <button onClick={onBack} className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4">
+        <div className="mb-8">
+            <button onClick={onBack} className="flex items-center gap-2 text-sm text-apple-gray hover:text-apple-gray-dark mb-8 transition-apple">
                 <ArrowLeftIcon />
                 Volver a la Lista
             </button>
-            <div className="flex flex-col md:flex-row gap-8">
+            <div className="flex flex-col md:flex-row gap-12">
                 <div className="flex-shrink-0 text-center">
-                     <UserCircleIcon className="h-32 w-32 text-gray-300 mx-auto" />
-                     <h2 className="text-2xl font-bold mt-4">{student.nombres} {student.apellidos}</h2>
-                     <p className="text-gray-500">{student.salon}</p>
+                     <UserCircleIcon className="h-32 w-32 text-apple-gray mx-auto opacity-40" />
+                     <h2 className="text-3xl font-bold mt-6 text-apple-gray-dark tracking-tight">{student.nombres} {student.apellidos}</h2>
+                     <p className="text-apple-gray font-light mt-2">{student.salon}</p>
                 </div>
                 <div className="flex-grow">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         <InfoItem icon={IdentificationIcon} label="Cédula Escolar" value={student.cedula_escolar} />
                         <InfoItem icon={CakeIcon} label="Fecha de Nacimiento" value={new Date(student.fecha_nacimiento).toLocaleDateString()} />
                         <InfoItem icon={LocationMarkerIcon} label="Lugar de Nacimiento" value={`${student.lugar_nacimiento}, ${student.estado}`} />
@@ -2763,19 +2642,19 @@ const StudentDetailView: React.FC<{
                         <InfoItem icon={UsersIcon} label="Hermanos en el Colegio" value={student.hermanos.length > 0 ? student.hermanos : 'No tiene'} />
                         <InfoItem icon={SparklesIcon} label="Nivel de Inglés" value={student.nivel_ingles} />
                     </div>
-                     <hr className="my-6" />
-                     <h3 className="text-lg font-semibold mb-4 text-text-main">Información de Contacto de Representantes</h3>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                         <div className="bg-gray-50 p-4 rounded-lg">
-                             <h4 className="font-bold text-gray-800 mb-2">Madre: {student.info_madre.nombre}</h4>
-                             <div className="space-y-3">
+                     <hr className="my-8 border-apple-gray-light" />
+                     <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight">Información de Contacto de Representantes</h3>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                         <div className="py-6 border-b border-apple-gray-light">
+                             <h4 className="font-semibold text-apple-gray-dark mb-4">Madre: {student.info_madre.nombre}</h4>
+                             <div className="space-y-4">
                                 <InfoItem icon={MailIcon} label="Email" value={student.info_madre.email} />
                                 <InfoItem icon={PhoneIcon} label="Teléfono" value={student.info_madre.telefono} />
                              </div>
                          </div>
-                         <div className="bg-gray-50 p-4 rounded-lg">
-                             <h4 className="font-bold text-gray-800 mb-2">Padre: {student.info_padre.nombre}</h4>
-                             <div className="space-y-3">
+                         <div className="py-6 border-b border-apple-gray-light">
+                             <h4 className="font-semibold text-apple-gray-dark mb-4">Padre: {student.info_padre.nombre}</h4>
+                             <div className="space-y-4">
                                 <InfoItem icon={MailIcon} label="Email" value={student.info_padre.email} />
                                 <InfoItem icon={PhoneIcon} label="Teléfono" value={student.info_padre.telefono} />
                              </div>
@@ -2847,16 +2726,16 @@ const StudentFormModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-0 sm:p-4">
-            <div className="bg-white rounded-none sm:rounded-lg shadow-xl p-4 sm:p-6 lg:p-8 w-full h-full sm:h-auto sm:max-w-4xl sm:max-h-[90vh] overflow-y-auto flex flex-col">
-                <div className="flex justify-between items-center mb-4 sm:mb-6 flex-shrink-0">
-                    <h2 className="text-xl sm:text-2xl font-bold">{student ? 'Editar Alumno' : 'Añadir Alumno'}</h2>
-                    <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600"><CloseIcon /></button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-0 sm:p-4">
+            <div className="bg-white rounded-2xl p-6 sm:p-8 lg:p-10 w-full h-full sm:h-auto sm:max-w-4xl sm:max-h-[90vh] overflow-y-auto flex flex-col">
+                <div className="flex justify-between items-center mb-8 flex-shrink-0">
+                    <h2 className="text-2xl sm:text-3xl font-bold text-apple-gray-dark tracking-tight">{student ? 'Editar Alumno' : 'Añadir Alumno'}</h2>
+                    <button onClick={onClose} className="p-2 text-apple-gray hover:text-apple-gray-dark transition-apple rounded-lg hover:bg-apple-gray-light"><CloseIcon /></button>
                 </div>
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-8">
                     {/* Personal Info */}
-                    <div className="border-b pb-6">
-                        <h3 className="text-lg font-semibold mb-4 text-text-main">Datos Personales</h3>
+                    <div className="border-b border-apple-gray-light pb-8">
+                        <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight">Datos Personales</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <InputField label="Nombres" name="nombres" value={formData.nombres} onChange={handleChange} required />
                             <InputField label="Apellidos" name="apellidos" value={formData.apellidos} onChange={handleChange} required />
@@ -2871,8 +2750,8 @@ const StudentFormModal: React.FC<{
                         </div>
                     </div>
                     {/* Academic Info */}
-                    <div className="border-b pb-6">
-                        <h3 className="text-lg font-semibold mb-4 text-text-main">Datos Académicos</h3>
+                    <div className="border-b border-apple-gray-light pb-8">
+                        <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight">Datos Académicos</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                              <InputField label="Cédula Escolar" name="cedula_escolar" value={formData.cedula_escolar} onChange={handleChange} />
                             <InputField as="select" label="Salón/Grado" name="salon" value={formData.salon} onChange={handleChange}>
@@ -2898,16 +2777,16 @@ const StudentFormModal: React.FC<{
                     </div>
                     {/* Parent Info */}
                     <div>
-                        <h3 className="text-lg font-semibold mb-4 text-text-main">Datos de Representantes</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-gray-50 p-4 rounded-lg space-y-4">
-                                <h4 className="font-bold">Madre</h4>
+                        <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight">Datos de Representantes</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="py-6 border-b border-apple-gray-light space-y-4">
+                                <h4 className="font-semibold text-apple-gray-dark">Madre</h4>
                                 <InputField label="Nombre Completo" name="info_madre.nombre" value={formData.info_madre.nombre} onChange={handleChange} required />
                                 <InputField label="Email" name="info_madre.email" type="email" value={formData.info_madre.email} onChange={handleChange} required />
                                 <InputField label="Teléfono" name="info_madre.telefono" value={formData.info_madre.telefono} onChange={handleChange} required />
                             </div>
-                            <div className="bg-gray-50 p-4 rounded-lg space-y-4">
-                                <h4 className="font-bold">Padre</h4>
+                            <div className="py-6 border-b border-apple-gray-light space-y-4">
+                                <h4 className="font-semibold text-apple-gray-dark">Padre</h4>
                                 <InputField label="Nombre Completo" name="info_padre.nombre" value={formData.info_padre.nombre} onChange={handleChange} />
                                 <InputField label="Email" name="info_padre.email" type="email" value={formData.info_padre.email} onChange={handleChange} />
                                 <InputField label="Teléfono" name="info_padre.telefono" value={formData.info_padre.telefono} onChange={handleChange} />
@@ -2915,9 +2794,9 @@ const StudentFormModal: React.FC<{
                         </div>
                     </div>
                     {/* Actions */}
-                    <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 sm:mt-8 pt-4 sm:pt-6 border-t flex-shrink-0">
-                        <button type="button" onClick={onClose} className="w-full sm:w-auto px-4 py-2.5 bg-gray-200 rounded-md text-base font-medium">Cancelar</button>
-                        <button type="submit" className="w-full sm:w-auto px-4 py-2.5 bg-brand-primary text-white rounded-md text-base font-medium">Guardar Alumno</button>
+                    <div className="flex flex-col sm:flex-row justify-end gap-4 mt-8 pt-6 border-t border-apple-gray-light flex-shrink-0">
+                        <button type="button" onClick={onClose} className="w-full sm:w-auto px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg text-base font-medium transition-apple hover:bg-apple-gray-light">Cancelar</button>
+                        <button type="submit" className="w-full sm:w-auto px-6 py-3 bg-apple-blue text-white rounded-lg text-base font-medium transition-apple hover:opacity-90">Guardar Alumno</button>
                     </div>
                 </form>
             </div>
@@ -3457,12 +3336,12 @@ const TeacherFormModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-0 sm:p-4" onClick={onClose}>
-            <div className="bg-white rounded-none sm:rounded-lg shadow-xl p-4 sm:p-6 lg:p-8 w-full h-full sm:h-auto sm:max-w-3xl sm:max-h-[90vh] overflow-y-auto flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl p-6 sm:p-8 lg:p-10 w-full h-full sm:h-auto sm:max-w-3xl sm:max-h-[90vh] overflow-y-auto flex flex-col" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4 sm:mb-6 flex-shrink-0">
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-800">{teacher ? 'Editar Docente' : 'Añadir Docente'}</h2>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-apple-gray-dark tracking-tight">{teacher ? 'Editar Docente' : 'Añadir Docente'}</h2>
                     <button 
                         onClick={onClose} 
-                        className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                        className="text-apple-gray hover:text-apple-gray-dark transition-apple p-2 rounded-lg hover:bg-apple-gray-light"
                         disabled={isSubmitting}
                     >
                         <CloseIcon />
@@ -3471,7 +3350,7 @@ const TeacherFormModal: React.FC<{
                 <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 flex-1 overflow-y-auto">
                     {/* Información Personal */}
                     <div>
-                        <h3 className="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Información Personal</h3>
+                        <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight border-b border-apple-gray-light pb-4">Información Personal</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <InputField 
@@ -3538,16 +3417,16 @@ const TeacherFormModal: React.FC<{
                     
                     {/* Asignaturas y Grados */}
                     <div className="border-t pt-6">
-                        <h3 className="text-lg font-semibold mb-4 text-gray-700">Asignaturas y Grados</h3>
+                        <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight">Asignaturas y Grados</h3>
                         {isLoadingAssignments && teacher && (
                             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                                 <p className="text-sm text-blue-800">Cargando asignaciones existentes...</p>
                             </div>
                         )}
-                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div className="bg-apple-gray-light p-4 rounded-lg border border-apple-gray-light">
                             <div className="flex flex-wrap items-end gap-4 mb-4">
                                 <div className="flex-grow min-w-[200px]">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-apple-gray-dark mb-2">
                                         Asignatura <span className="text-red-500">*</span>
                                     </label>
                                     <select 
@@ -3576,7 +3455,7 @@ const TeacherFormModal: React.FC<{
                                             }
                                         }}
                                         className={`mt-1 block w-full p-2 border rounded-md ${
-                                            errors.assignment ? 'border-red-500' : 'border-gray-300'
+                                            errors.assignment ? 'border-apple-red' : 'border-apple-gray'
                                         } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                                         disabled={isSubmitting || !formData.especialidad}
                                     >
@@ -3610,7 +3489,7 @@ const TeacherFormModal: React.FC<{
                                 </div>
                                 {!esNivelIngles(currentSubject) && (
                                     <div className="flex-grow min-w-[150px]">
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        <label className="block text-sm font-medium text-apple-gray-dark mb-2">
                                             Grado <span className="text-red-500">*</span>
                                         </label>
                                         <select 
@@ -3630,7 +3509,7 @@ const TeacherFormModal: React.FC<{
                                                 }
                                             }}
                                             className={`mt-1 block w-full p-2 border rounded-md ${
-                                                errors.assignment ? 'border-red-500' : 'border-gray-300'
+                                                errors.assignment ? 'border-apple-red' : 'border-apple-gray'
                                             } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                                             disabled={isSubmitting}
                                         >
@@ -3642,7 +3521,7 @@ const TeacherFormModal: React.FC<{
                                 {esNivelIngles(currentSubject) && (
                                     <>
                                         <div className="flex-grow min-w-[200px]">
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            <label className="block text-sm font-medium text-apple-gray-dark mb-2">
                                                 Grados (se asignarán automáticamente) <span className="text-green-600">*</span>
                                             </label>
                                             <div className="mt-1 p-2 border border-green-300 rounded-md bg-green-50 text-sm text-green-700 font-medium">
@@ -3650,7 +3529,7 @@ const TeacherFormModal: React.FC<{
                                             </div>
                                         </div>
                                         <div className="flex-grow min-w-[200px]">
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            <label className="block text-sm font-medium text-apple-gray-dark mb-2">
                                                 Aula/Salón para {extraerNivelDeMateria(currentSubject) || 'este nivel'}
                                             </label>
                                             <select
@@ -3664,7 +3543,7 @@ const TeacherFormModal: React.FC<{
                                                         }));
                                                     }
                                                 }}
-                                                className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="mt-1 block w-full px-4 py-3 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple text-base"
                                                 disabled={isSubmitting}
                                             >
                                                 <option value="">Seleccione un aula</option>
@@ -3677,7 +3556,7 @@ const TeacherFormModal: React.FC<{
                                 )}
                                 {!esNivelIngles(currentSubject) && currentSubject && currentGrade && (
                                     <div className="flex-grow min-w-[200px]">
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        <label className="block text-sm font-medium text-apple-gray-dark mb-2">
                                             Aula/Salón
                                         </label>
                                         <select
@@ -3696,7 +3575,7 @@ const TeacherFormModal: React.FC<{
                                 <button 
                                     type="button" 
                                     onClick={handleAddAssignment} 
-                                    className="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                    className="bg-apple-blue text-white px-6 py-3 rounded-lg hover:opacity-90 transition-apple disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                                     disabled={isSubmitting}
                                 >
                                     Añadir
@@ -3787,24 +3666,24 @@ const TeacherFormModal: React.FC<{
                                     })}
                                 </div>
                             ) : (
-                                <p className="text-sm text-gray-500 italic">No hay asignaturas agregadas. Agregue al menos una asignatura y grado.</p>
+                                <p className="text-sm text-apple-gray font-light italic">No hay asignaturas agregadas. Agregue al menos una asignatura y grado.</p>
                             )}
                         </div>
                     </div>
 
                     {/* Botones de acción */}
-                    <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 sm:mt-8 pt-4 sm:pt-6 border-t flex-shrink-0">
+                    <div className="flex flex-col sm:flex-row justify-end gap-4 mt-8 pt-6 border-t border-apple-gray-light flex-shrink-0">
                         <button 
                             type="button" 
                             onClick={onClose} 
-                            className="w-full sm:w-auto px-6 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed text-base font-medium"
+                            className="w-full sm:w-auto px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg hover:bg-apple-gray-light transition-apple disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
                             disabled={isSubmitting}
                         >
                             Cancelar
                         </button>
                         <button 
                             type="submit" 
-                            className="w-full sm:w-auto px-6 py-2.5 bg-brand-primary text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base font-medium"
+                            className="w-full sm:w-auto px-6 py-3 bg-apple-blue text-white rounded-lg hover:opacity-90 transition-apple disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base font-medium"
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? (
@@ -4352,26 +4231,26 @@ const TeachersView: React.FC<{
     };
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-text-main">Gestión de Docentes</h2>
-                <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-brand-primary text-white px-4 py-2 rounded-md hover:bg-opacity-90">
+        <div className="mb-8">
+            <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl font-bold text-apple-gray-dark tracking-tight">Gestión de Docentes</h2>
+                <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-apple-blue text-white px-6 py-3 rounded-lg hover:opacity-90 font-medium transition-apple">
                     <PlusIcon />
                     Añadir Docente
                 </button>
             </div>
             <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-apple-gray-light">
+                    <thead>
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Docente</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asignaturas</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grados</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Docente</th>
+                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Asignaturas</th>
+                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Grados</th>
+                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Contacto</th>
+                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white divide-y divide-apple-gray-light">
                         {docentes.map(docente => {
                             // Clases regulares asignadas directamente al docente
                             const teacherClasses = clases.filter(c => c.id_docente_asignado === docente.id_docente);
@@ -4402,9 +4281,9 @@ const TeachersView: React.FC<{
                             const aulasNames = allAulas.map(id => aulas.find(a => a.id_aula === id)?.nombre || '').filter(Boolean);
 
                             return (
-                                <tr key={docente.id_docente} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{docente.nombres} {docente.apellidos}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <tr key={docente.id_docente} className="hover:bg-apple-gray-light transition-apple">
+                                    <td className="px-6 py-4 whitespace-nowrap font-medium text-apple-gray-dark">{docente.nombres} {docente.apellidos}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-apple-gray">
                                         {subjects.length > 0 ? (
                                             <div>
                                                 {subjects.join(', ')}
@@ -4416,10 +4295,10 @@ const TeachersView: React.FC<{
                                             </div>
                                         ) : 'N/A'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-apple-gray">
                                         {grades.length > 0 ? grades.join(', ') : 'N/A'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-apple-gray">
                                         <div>{docente.email}</div>
                                         <div>{docente.telefono}</div>
                                         {aulasNames.length > 0 && (
@@ -4444,15 +4323,15 @@ const TeachersView: React.FC<{
                 <div className="mt-8 border-t pt-6">
                     <div className="flex justify-between items-center mb-4">
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-800">Usuarios Autorizados Sin Vincular</h3>
-                            <p className="text-sm text-gray-600 mt-1">
+                            <h3 className="text-lg font-semibold text-apple-gray-dark">Usuarios Autorizados Sin Vincular</h3>
+                            <p className="text-sm text-apple-gray font-light mt-2">
                                 Estos usuarios están en la lista blanca pero no tienen un registro de docente. 
                                 Vincúlalos con un docente existente o crea un nuevo docente.
                             </p>
                         </div>
                         <button
                             onClick={() => setShowUnlinkedSection(!showUnlinkedSection)}
-                            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md text-sm font-medium"
+                            className="px-4 py-2 border border-apple-gray text-apple-gray-dark rounded-lg hover:bg-apple-gray-light text-sm font-medium transition-apple"
                         >
                             {showUnlinkedSection ? 'Ocultar' : 'Mostrar'} ({unlinkedUsers.length})
                         </button>
@@ -4464,8 +4343,8 @@ const TeachersView: React.FC<{
                                 {unlinkedUsers.map(user => (
                                     <div key={user.id} className="flex items-center justify-between bg-white p-3 rounded-md border border-yellow-300">
                                         <div className="flex-1">
-                                            <div className="font-medium text-gray-900">{user.email}</div>
-                                            <div className="text-sm text-gray-500">Rol: {user.role}</div>
+                                            <div className="font-medium text-apple-gray-dark">{user.email}</div>
+                                            <div className="text-sm text-apple-gray font-light">Rol: {user.role}</div>
                                         </div>
                                         <div className="flex items-center gap-3">
                                             {/* Link to existing docente */}
@@ -4490,7 +4369,7 @@ const TeachersView: React.FC<{
                                             {/* Create new docente */}
                                             <button
                                                 onClick={() => handleCreateFromAuthorized(user.email)}
-                                                className="px-4 py-1.5 bg-brand-primary text-white rounded-md hover:bg-opacity-90 text-sm font-medium"
+                                                className="px-4 py-1.5 bg-apple-blue text-white rounded-lg hover:opacity-90 text-sm font-medium transition-apple"
                                             >
                                                 Crear Nuevo Docente
                                             </button>
@@ -4749,7 +4628,7 @@ const LapsosAdminView: React.FC<{
 
     if (isLoading) {
         return (
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="mb-8">
                 <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
                 </div>
@@ -4760,14 +4639,14 @@ const LapsosAdminView: React.FC<{
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="bg-white p-6 rounded-lg shadow-md flex justify-between items-center">
+            <div className="mb-8 flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Gestión de Lapsos Académicos</h2>
-                    <p className="text-gray-600 mt-1">Año Escolar: {anoEscolar}</p>
+                    <h2 className="text-2xl font-bold text-apple-gray-dark tracking-tight">Gestión de Lapsos Académicos</h2>
+                    <p className="text-apple-gray font-light mt-2">Año Escolar: {anoEscolar}</p>
                 </div>
                 <button
                     onClick={() => handleOpenModal(null)}
-                    className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-green-600"
+                    className="flex items-center gap-2 px-6 py-3 bg-apple-blue text-white rounded-lg hover:opacity-90 font-medium transition-apple"
                 >
                     <PlusIcon className="h-5 w-5" />
                     Nuevo Lapso
@@ -4817,21 +4696,21 @@ const LapsosAdminView: React.FC<{
                                             <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
                                                 {lapso.lapso}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-apple-gray">
                                                 {new Date(lapso.fecha_inicio).toLocaleDateString('es-VE', {
                                                     year: 'numeric',
                                                     month: 'long',
                                                     day: 'numeric'
                                                 })}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-apple-gray">
                                                 {new Date(lapso.fecha_fin).toLocaleDateString('es-VE', {
                                                     year: 'numeric',
                                                     month: 'long',
                                                     day: 'numeric'
                                                 })}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-apple-gray">
                                                 {semanas.length} / {lapso.semanas_totales}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
@@ -4954,7 +4833,7 @@ const LapsosAdminView: React.FC<{
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-apple-gray-dark mb-2">
                                         Fecha de Inicio <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -4969,7 +4848,7 @@ const LapsosAdminView: React.FC<{
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-apple-gray-dark mb-2">
                                         Fecha de Fin <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -5014,17 +4893,17 @@ const LapsosAdminView: React.FC<{
                                 </label>
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-4 border-t">
+                            <div className="flex justify-end gap-4 pt-6 border-t border-apple-gray-light">
                                 <button
                                     type="button"
                                     onClick={handleCloseModal}
-                                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                                    className="px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg hover:bg-apple-gray-light font-medium transition-apple"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-green-600"
+                                    className="px-6 py-3 bg-apple-blue text-white rounded-lg hover:opacity-90 font-medium transition-apple"
                                 >
                                     {editingLapso ? 'Actualizar' : 'Crear'} Lapso
                                 </button>
@@ -5056,12 +4935,12 @@ const InputField: React.FC<{
         onChange: onChange,
         required: required,
         disabled: disabled,
-        className: "mt-1 block w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base placeholder:text-gray-400 disabled:bg-gray-100 disabled:cursor-not-allowed",
+        className: "mt-1 block w-full px-4 py-3 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple text-base placeholder:text-apple-gray disabled:bg-apple-gray-light disabled:cursor-not-allowed",
     };
     return (
         <div>
-            <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">
-                {label} {required && <span className="text-red-500">*</span>}
+            <label htmlFor={name} className="block text-sm font-medium text-apple-gray-dark mb-2">
+                {label} {required && <span className="text-apple-red">*</span>}
             </label>
             {as === 'textarea'
                 ? <textarea {...commonProps} rows={rows} className={`${commonProps.className} resize-y`}></textarea>
@@ -5165,36 +5044,32 @@ const PlanningFormModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-4xl max-h-[95vh] overflow-y-auto glass animate-fade-in">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold">
+            <div className="bg-white rounded-2xl p-8 w-full max-w-4xl max-h-[95vh] overflow-y-auto animate-fade-in">
+                <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-2xl font-bold text-apple-gray-dark tracking-tight">
                         {isReadOnly ? 'Detalle de Planificación' : 
                          plan === null ? 'Nueva Planificación' :
                          userRole === 'docente' ? 'Editar Planificación' : 'Revisar Planificación'}
                     </h2>
-                    <button onClick={onClose}><CloseIcon /></button>
+                    <button onClick={onClose} className="p-2 text-apple-gray hover:text-apple-gray-dark transition-apple rounded-lg hover:bg-apple-gray-light"><CloseIcon /></button>
                 </div>
                 <div className="space-y-6">
                     {/* Error de validación */}
                     {validationError && (
-                        <div className="p-4 bg-red-50 border-2 border-red-200 rounded-xl">
-                            <p className="text-sm text-red-800 font-medium">{validationError}</p>
+                        <div className="p-4 bg-red-50 border border-apple-red rounded-lg mb-6">
+                            <p className="text-sm text-apple-red font-medium">{validationError}</p>
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Asignatura <span className="text-red-500">*</span></label>
+                            <label className="block text-sm font-medium text-apple-gray-dark mb-2">Asignatura <span className="text-apple-red">*</span></label>
                             <select 
                                 name="id_clase" 
                                 value={formData.id_clase} 
                                 onChange={handleChange} 
                                 disabled={!canEditTeacherFields} 
-                                className={`mt-1 block w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary transition-smooth text-base ${
-                                    formData.id_clase 
-                                        ? 'border-gray-200 focus:border-brand-primary' 
-                                        : 'border-gray-200 focus:border-brand-primary'
-                                } disabled:bg-gray-100 disabled:cursor-not-allowed`}
+                                className="mt-1 block w-full px-4 py-3 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple text-base disabled:bg-apple-gray-light disabled:cursor-not-allowed"
                             >
                                 <option value="">Seleccione una asignatura</option>
                                 {assignedClasses.map(c => (
@@ -5205,13 +5080,13 @@ const PlanningFormModal: React.FC<{
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Lapso</label>
+                            <label className="block text-sm font-medium text-apple-gray-dark mb-2">Lapso</label>
                              <select 
                                 name="lapso" 
                                 value={formData.lapso} 
                                 onChange={handleChange} 
                                 disabled={!canEditTeacherFields} 
-                                className="mt-1 block w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                className="mt-1 block w-full px-4 py-3 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple text-base disabled:bg-apple-gray-light disabled:cursor-not-allowed"
                             >
                                 <option>I Lapso</option>
                                 <option>II Lapso</option>
@@ -5219,13 +5094,13 @@ const PlanningFormModal: React.FC<{
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Año Escolar</label>
+                            <label className="block text-sm font-medium text-apple-gray-dark mb-2">Año Escolar</label>
                             <select 
                                 name="ano_escolar" 
                                 value={formData.ano_escolar} 
                                 onChange={handleChange} 
                                 disabled={!canEditTeacherFields} 
-                                className="mt-1 block w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                className="mt-1 block w-full px-4 py-3 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple text-base disabled:bg-apple-gray-light disabled:cursor-not-allowed"
                             >
                                 {ANOS_ESCOLARES.map(ano => (
                                     <option key={ano} value={ano}>{ano}</option>
@@ -5240,16 +5115,16 @@ const PlanningFormModal: React.FC<{
                     <InputField as="textarea" rows={2} label="Recursos / Links" name="recursos_links" value={formData.recursos_links || ''} onChange={handleChange} disabled={!canEditTeacherFields} />
                      
                      { (isReviewMode || (isReadOnly && formData.observaciones)) && (
-                        <div className="border-t pt-4">
+                        <div className="border-t border-apple-gray-light pt-6">
                             <InputField as="textarea" rows={4} label="Observaciones del Coordinador" name="observaciones" value={formData.observaciones || ''} onChange={handleChange} disabled={!canEditCoordinatorFields} />
                         </div>
                     )}
 
-                    <div className="flex justify-end gap-4 pt-4 border-t">
+                    <div className="flex justify-end gap-4 pt-6 border-t border-apple-gray-light">
                         <button 
                             type="button" 
                             onClick={onClose} 
-                            className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-300 transition-smooth"
+                            className="px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg font-medium transition-apple hover:bg-apple-gray-light"
                         >
                            {isReadOnly ? 'Cerrar' : 'Cancelar'}
                         </button>
@@ -5259,7 +5134,7 @@ const PlanningFormModal: React.FC<{
                                     type="button" 
                                     onClick={() => handleSubmit('Borrador')} 
                                     disabled={!formData.id_clase || formData.id_clase.trim() === ''}
-                                    className="px-6 py-3 bg-gray-500 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                                    className="px-6 py-3 bg-apple-gray text-white rounded-lg font-medium transition-apple hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Guardar Borrador
                                 </button>
@@ -5267,7 +5142,7 @@ const PlanningFormModal: React.FC<{
                                     type="button" 
                                     onClick={() => handleSubmit('Enviado')} 
                                     disabled={!formData.id_clase || formData.id_clase.trim() === ''}
-                                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                                    className="flex items-center gap-2 px-6 py-3 bg-apple-blue text-white rounded-lg font-medium transition-apple hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <SendIcon className="h-4 w-4" />
                                     Enviar Planificación
@@ -5279,14 +5154,14 @@ const PlanningFormModal: React.FC<{
                                 <button 
                                     type="button" 
                                     onClick={() => handleSubmit('Revisado')} 
-                                    className="px-6 py-3 bg-yellow-500 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale"
+                                    className="px-6 py-3 bg-yellow-500 text-white rounded-lg font-medium transition-apple hover:opacity-90"
                                 >
                                     Marcar como Corregido
                                 </button>
                                 <button 
                                     type="button" 
                                     onClick={() => handleSubmit('Aprobado')} 
-                                    className="flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale"
+                                    className="flex items-center gap-2 px-6 py-3 bg-apple-green text-white rounded-lg font-medium transition-apple hover:opacity-90"
                                 >
                                     <ClipboardCheckIcon className="h-4 w-4" />
                                     Aprobar
@@ -5455,11 +5330,11 @@ const PlanningView: React.FC<{
         }, [planificaciones, boardFilters]);
 
         return (
-            <div className="bg-white p-6 rounded-lg shadow-md">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-text-main">Tablero de Planificaciones</h2>
+            <div className="mb-8">
+                <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-2xl font-bold text-apple-gray-dark tracking-tight">Tablero de Planificaciones</h2>
                     {currentUser.role === 'docente' && (
-                        <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-brand-primary text-white px-4 py-2 rounded-md hover:bg-opacity-90">
+                        <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-apple-blue text-white px-6 py-3 rounded-lg hover:opacity-90 font-medium transition-apple">
                             <PlusIcon />
                             Añadir Planificación
                         </button>
@@ -5467,7 +5342,7 @@ const PlanningView: React.FC<{
                 </div>
                 
                 {/* Filters */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg border">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8 py-6 border-b border-apple-gray-light">
                     <InputField as="select" label="Año Escolar" name="ano_escolar" value={boardFilters.ano_escolar} onChange={handleFilterChange}>
                         <option value="all">Todos</option>
                         {ANOS_ESCOLARES.map(ano => (
@@ -5501,7 +5376,7 @@ const PlanningView: React.FC<{
                                 : 'Docente no disponible');
                         const isHighlighted = navParams?.planId === plan.id_planificacion;
                         return (
-                            <div key={plan.id_planificacion} ref={isHighlighted ? highlightRef : null} className={`border rounded-lg p-4 flex flex-col justify-between ${isHighlighted ? 'ring-2 ring-brand-primary shadow-lg' : 'shadow-sm'}`}>
+                            <div key={plan.id_planificacion} ref={isHighlighted ? highlightRef : null} className={`border border-apple-gray-light rounded-lg p-6 flex flex-col justify-between transition-apple hover:opacity-70 ${isHighlighted ? 'ring-2 ring-apple-blue' : ''}`}>
                                 <div>
                                     <div className="flex justify-between items-start">
                                         <h3 className="font-bold text-lg">{clase?.nombre_materia} - {clase?.grado_asignado}</h3>
@@ -5509,30 +5384,30 @@ const PlanningView: React.FC<{
                                             {plan.status}
                                         </span>
                                     </div>
-                                    <p className="text-sm text-gray-500">Docente: {docenteNombre}</p>
-                                    <p className="text-sm text-gray-500">Semana {plan.semana} | {plan.lapso} | {plan.ano_escolar}</p>
-                                    <p className="text-xs text-gray-400 mt-1">Creado: {new Date(plan.fecha_creacion).toLocaleDateString()}</p>
+                                    <p className="text-sm text-apple-gray font-light mt-2">Docente: {docenteNombre}</p>
+                                    <p className="text-sm text-apple-gray font-light">Semana {plan.semana} | {plan.lapso} | {plan.ano_escolar}</p>
+                                    <p className="text-xs text-apple-gray font-light mt-2">Creado: {new Date(plan.fecha_creacion).toLocaleDateString()}</p>
                                     {plan.competencia_indicadores && (
                                         <div className="mt-4 space-y-1 text-sm">
                                             <p><span className="font-semibold">Competencia:</span> {plan.competencia_indicadores.length > 50 ? plan.competencia_indicadores.substring(0, 50) + '...' : plan.competencia_indicadores}</p>
                                         </div>
                                     )}
                                     {plan.observaciones && (
-                                        <div className="mt-3 bg-yellow-50 border-l-4 border-yellow-400 p-2">
-                                            <p className="text-sm text-yellow-800"><span className="font-bold">Observaciones:</span> {plan.observaciones}</p>
+                                        <div className="mt-4 py-3 px-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg">
+                                            <p className="text-sm text-yellow-800 font-light"><span className="font-medium">Observaciones:</span> {plan.observaciones}</p>
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
-                                    <button onClick={() => handleGetAiSuggestions(plan)} className="flex items-center gap-1 text-xs px-3 py-1 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200">
+                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-apple-gray-light">
+                                    <button onClick={() => handleGetAiSuggestions(plan)} className="flex items-center gap-1 text-xs px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-apple font-medium">
                                         <SparklesIcon className="h-4 w-4" /> Coco
                                     </button>
-                                    <button onClick={() => handleOpenModal(plan, true)} className="text-xs px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300">Ver</button>
+                                    <button onClick={() => handleOpenModal(plan, true)} className="text-xs px-4 py-1.5 border border-apple-gray text-apple-gray-dark rounded-lg hover:bg-apple-gray-light transition-apple font-medium">Ver</button>
                                     { (currentUser.role === 'coordinador' || currentUser.role === 'directivo') &&
-                                        <button onClick={() => handleOpenModal(plan)} className="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">Revisar</button>
+                                        <button onClick={() => handleOpenModal(plan)} className="text-xs px-4 py-1.5 bg-apple-blue text-white rounded-lg hover:opacity-90 transition-apple font-medium">Revisar</button>
                                     }
                                     { currentUser.role === 'docente' && (plan.status === 'Borrador' || plan.status === 'Revisado') &&
-                                        <button onClick={() => handleOpenModal(plan)} className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200">Editar</button>
+                                        <button onClick={() => handleOpenModal(plan)} className="text-xs px-4 py-1.5 bg-apple-green text-white rounded-lg hover:opacity-90 transition-apple font-medium">Editar</button>
                                     }
                                 </div>
                             </div>
@@ -5545,7 +5420,7 @@ const PlanningView: React.FC<{
 
     // Early return if currentUser is not available (after hooks)
     if (!currentUser) {
-        return <div className="bg-white p-6 rounded-lg shadow-md">Cargando...</div>;
+        return <div className="mb-8 py-12 text-center"><p className="text-apple-gray font-light">Cargando...</p></div>;
     }
 
     return (
@@ -5581,15 +5456,15 @@ const PlanningView: React.FC<{
                                     className="w-full h-64 p-4 border rounded-md"
                                     placeholder="Las sugerencias aparecerán aquí..."
                                 />
-                                <div className="flex justify-end gap-2 mt-4">
-                                    <button onClick={() => setAiModalOpen(false)} className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cerrar</button>
+                                <div className="flex justify-end gap-4 mt-6">
+                                    <button onClick={() => setAiModalOpen(false)} className="px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg hover:bg-apple-gray-light font-medium transition-apple">Cerrar</button>
                                     <button onClick={async () => {
                                         if (selectedPlan && aiSuggestions) {
                                             const updatedPlan = { ...selectedPlan, competencia_indicadores: aiSuggestions };
                                             await handleSavePlan(updatedPlan);
                                             setAiModalOpen(false);
                                         }
-                                    }} className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-opacity-90">Aplicar Sugerencias</button>
+                                    }} className="px-6 py-3 bg-apple-blue text-white rounded-lg hover:opacity-90 font-medium transition-apple">Aplicar Sugerencias</button>
                                 </div>
                             </div>
                         )}
@@ -6259,7 +6134,7 @@ const ScheduleView: React.FC<{
 
     return (
         <div className="flex gap-6">
-            <div className="flex-grow bg-white p-6 rounded-lg shadow-md">
+            <div className="flex-grow mb-8">
                 <div className="flex justify-between items-center mb-4">
                     <div className="flex items-center gap-3">
                         <div className="relative">
@@ -6499,7 +6374,7 @@ const ScheduleView: React.FC<{
                                                                     handleOpenEventModal(day, slot, item);
                                                                 }
                                                             }} 
-                                                            className={`bg-gray-200 p-2 rounded-md h-full ${currentUser.role !== 'docente' ? 'cursor-pointer' : 'cursor-default'}`}
+                                                            className={`bg-apple-gray-light p-2 rounded-lg h-full transition-apple ${currentUser.role !== 'docente' ? 'cursor-pointer hover:bg-apple-gray' : 'cursor-default'}`}
                                                         >
                                                              <div className="font-semibold text-gray-700 flex items-center gap-1">
                                                                 <TagIcon className="h-4 w-4 text-gray-500" />
@@ -6720,13 +6595,13 @@ const ScheduleView: React.FC<{
                      <div className="bg-white rounded-lg p-6 w-96">
                          <h2 className="text-xl font-bold mb-4">{eventData.id ? 'Editar Evento' : 'Añadir Evento'}</h2>
                          <InputField as="textarea" label="Descripción del Evento" name="event_desc" value={eventData.desc} onChange={e => setEventData(d => ({...d, desc: e.target.value}))} required />
-                         <div className="flex justify-between items-center mt-4">
+                         <div className="flex justify-between items-center mt-6">
                             <div>
-                                {eventData.id && <button onClick={handleDeleteEvent} className="px-4 py-2 bg-red-500 text-white rounded-md">Eliminar</button>}
+                                {eventData.id && <button onClick={handleDeleteEvent} className="px-6 py-3 bg-apple-red text-white rounded-lg font-medium transition-apple hover:opacity-90">Eliminar</button>}
                             </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setEventModalOpen(false)} className="px-4 py-2 bg-gray-200 rounded-md">Cancelar</button>
-                                <button onClick={handleSaveEvent} className="px-4 py-2 bg-brand-primary text-white rounded-md">Guardar</button>
+                            <div className="flex gap-4">
+                                <button onClick={() => setEventModalOpen(false)} className="px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg font-medium transition-apple hover:bg-apple-gray-light">Cancelar</button>
+                                <button onClick={handleSaveEvent} className="px-6 py-3 bg-apple-blue text-white rounded-lg font-medium transition-apple hover:opacity-90">Guardar</button>
                             </div>
                          </div>
                      </div>
@@ -6908,9 +6783,9 @@ const TeamScheduleView: React.FC<{
     };
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="mb-8">
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-text-main">Horario por Docente</h2>
+                <h2 className="text-2xl font-bold text-apple-gray-dark tracking-tight">Horario por Docente</h2>
                 <div className="flex items-center gap-4">
                     <select value={selectedTeacherId} onChange={e => setSelectedTeacherId(e.target.value)} className="p-2 border rounded-md min-w-[200px]">
                         <option value="">Seleccione un docente</option>
@@ -6953,9 +6828,9 @@ const TeamScheduleView: React.FC<{
                                             <td key={`${day}-${slot}`} className="border p-1 align-top text-xs relative h-24"
                                                 onDoubleClick={() => !item && handleOpenGuardiaModal(day, slot)}>
                                                 {item && (item.evento_descripcion ? (
-                                                    <div onClick={() => handleOpenGuardiaModal(day, slot, item)} className="bg-gray-200 p-2 rounded-md h-full cursor-pointer hover:bg-gray-300">
-                                                        <div className="font-semibold text-gray-800 flex items-center gap-1">
-                                                          <TagIcon className="h-4 w-4 text-gray-500" />
+                                                    <div onClick={() => handleOpenGuardiaModal(day, slot, item)} className="bg-apple-gray-light p-2 rounded-lg h-full cursor-pointer hover:bg-apple-gray transition-apple">
+                                                        <div className="font-semibold text-apple-gray-dark flex items-center gap-1">
+                                                          <TagIcon className="h-4 w-4 text-apple-gray" />
                                                           {item.evento_descripcion}
                                                         </div>
                                                         <div className="text-gray-500 text-[10px] mt-1">({item.grade})</div>
@@ -7007,11 +6882,11 @@ const TeamScheduleView: React.FC<{
                         </div>
                          <div className="flex justify-between items-center mt-6">
                             <div>
-                                {guardiaData.id && <button onClick={handleDeleteGuardia} className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Eliminar</button>}
+                                {guardiaData.id && <button onClick={handleDeleteGuardia} className="px-6 py-3 bg-apple-red text-white rounded-lg font-medium transition-apple hover:opacity-90">Eliminar</button>}
                             </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setGuardiaModalOpen(false)} className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cancelar</button>
-                                <button onClick={handleSaveGuardia} className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-opacity-90">Guardar</button>
+                            <div className="flex gap-4">
+                                <button onClick={() => setGuardiaModalOpen(false)} className="px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg font-medium transition-apple hover:bg-apple-gray-light">Cancelar</button>
+                                <button onClick={handleSaveGuardia} className="px-6 py-3 bg-apple-blue text-white rounded-lg font-medium transition-apple hover:opacity-90">Guardar</button>
                             </div>
                          </div>
                     </div>
@@ -7143,12 +7018,12 @@ const ScheduleGeneratorView: React.FC<{
 
     return (
         <div className="space-y-6">
-            <div className="bg-white p-6 rounded-lg shadow-md">
-                <div className="flex items-center gap-3 mb-6">
-                    <MagicWandIcon className="h-8 w-8 text-purple-600" />
+            <div className="mb-8">
+                <div className="flex items-center gap-4 mb-8">
+                    <MagicWandIcon className="h-8 w-8 text-apple-blue opacity-60" />
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-800">Generador de Horarios</h2>
-                        <p className="text-gray-600">Genera horarios automáticamente usando optimización matemática</p>
+                        <h2 className="text-2xl font-bold text-apple-gray-dark tracking-tight">Generador de Horarios</h2>
+                        <p className="text-apple-gray font-light">Genera horarios automáticamente usando optimización matemática</p>
                     </div>
                 </div>
 
@@ -7375,9 +7250,9 @@ const ScheduleGeneratorView: React.FC<{
                 )}
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-md">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">Información</h3>
-                <div className="space-y-3 text-sm text-gray-600">
+            <div className="mb-8">
+                <h3 className="text-xl font-semibold text-apple-gray-dark mb-6 tracking-tight">Información</h3>
+                <div className="space-y-4 text-sm text-apple-gray font-light">
                     <p>
                         <strong>¿Qué hace el Generador de Horarios?</strong><br />
                         Utiliza algoritmos de optimización matemática para generar horarios que respetan todas las restricciones
@@ -8132,9 +8007,9 @@ const CalendarView: React.FC<{
     };
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="mb-8">
             {/* Header con navegación */}
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={goToPrevious}
@@ -8155,7 +8030,7 @@ const CalendarView: React.FC<{
                     </button>
                     <button
                         onClick={goToToday}
-                        className="ml-4 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md text-sm font-medium"
+                        className="ml-4 px-4 py-2 border border-apple-gray text-apple-gray-dark hover:bg-apple-gray-light rounded-lg text-sm font-medium transition-apple"
                     >
                         Hoy
                     </button>
@@ -8601,7 +8476,7 @@ const EventoModal: React.FC<{
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
+                                className="px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg hover:bg-apple-gray-light font-medium transition-apple"
                             >
                                 Cancelar
                             </button>
@@ -8897,8 +8772,8 @@ const EvaluationView: React.FC<{
         return (
              <div className="space-y-8">
                 {/* Section 1: Filters */}
-                <div className="bg-white p-6 rounded-lg shadow-md">
-                    <h2 className="text-xl font-bold text-text-main mb-4">1. Contexto de la Reunión</h2>
+                <div className="mb-8">
+                    <h2 className="text-xl font-semibold text-apple-gray-dark mb-6 tracking-tight">1. Contexto de la Reunión</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         <InputField as="select" label="Año Escolar" name="ano_escolar" value={filters.ano_escolar} onChange={handleFilterChange}>
                             {ANOS_ESCOLARES.map(ano => (
@@ -8923,7 +8798,7 @@ const EvaluationView: React.FC<{
                 </div>
 
                 {isFormReady && studentsInGrade && (
-                    <div className="bg-white p-6 rounded-lg shadow-md">
+                    <div className="mb-8">
                         <h2 className="text-xl font-bold text-text-main mb-4">2. Carga de Datos de Evaluación</h2>
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
@@ -8975,7 +8850,7 @@ const EvaluationView: React.FC<{
                 )}
                 
                 {isFormReady && (
-                    <div className="bg-white p-6 rounded-lg shadow-md">
+                    <div className="mb-8">
                          <h2 className="text-xl font-bold text-text-main mb-4">3. Análisis Pedagógico Asistido por IA</h2>
                          <button onClick={handleGenerateAnalysis} disabled={isLoading || studentEvals.size === 0} className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 disabled:bg-purple-300 w-full justify-center">
                              <SparklesIcon className="h-6 w-6"/>
@@ -9120,7 +8995,7 @@ const EvaluationView: React.FC<{
         }
 
         return (
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="mb-8">
                 <h2 className="text-xl font-bold text-text-main mb-4">Historial de Minutas de Reunión</h2>
                 <div className="space-y-4">
                     {minutas.length > 0 ? (
@@ -9133,7 +9008,7 @@ const EvaluationView: React.FC<{
                                         <p className="text-sm text-gray-600">{minuta.evaluacion} ({minuta.lapso})</p>
                                         <p className="text-xs text-gray-400">Fecha: {new Date(minuta.fecha_creacion).toLocaleDateString()}</p>
                                     </div>
-                                    <button onClick={() => setSelectedMinuta(minuta)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">
+                                    <button onClick={() => setSelectedMinuta(minuta)} className="px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg hover:bg-apple-gray-light font-medium transition-apple">
                                         Ver Detalles
                                     </button>
                                 </div>
