@@ -162,6 +162,38 @@ export interface Notification {
   created_at?: string;
 }
 
+export interface Guardia {
+  id_guardia: string;
+  id_usuario?: string | null;
+  id_docente?: string | null;
+  fecha: string; // DATE
+  hora_inicio: string; // TIME
+  hora_fin?: string | null; // TIME
+  descripcion: string;
+  ubicacion?: string | null;
+  tipo_guardia?: 'Entrada' | 'Recreo' | 'Salida' | 'Especial' | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LogReunionCoordinacion {
+  id_log: string;
+  id_minuta?: string | null;
+  fecha_reunion: string; // DATE
+  grado: string;
+  materia?: string | null;
+  tipo_alerta?: 'Académica' | 'Conductual' | 'Asistencia' | 'Otro' | null;
+  categoria: string;
+  descripcion?: string | null;
+  frecuencia: number;
+  estudiantes_afectados?: string[] | null;
+  acciones_sugeridas?: string | null;
+  estado?: 'Pendiente' | 'En Proceso' | 'Resuelto' | 'Archivado';
+  creado_por?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // ============================================
 // SCHEDULE OPTIMIZER TYPES
 // ============================================
@@ -1261,6 +1293,160 @@ export const eventosCalendarioService = {
       .from('eventos_calendario')
       .delete()
       .eq('id_evento', id);
+    
+    if (error) throw error;
+  }
+};
+
+// ============================================
+// GUARDIAS SERVICE
+// ============================================
+export const guardiasService = {
+  async getAll(): Promise<Guardia[]> {
+    const { data, error } = await supabase
+      .from('maestra_guardias')
+      .select('*')
+      .order('fecha', { ascending: true })
+      .order('hora_inicio', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByUsuario(idUsuario: string): Promise<Guardia[]> {
+    const { data, error } = await supabase
+      .from('maestra_guardias')
+      .select('*')
+      .eq('id_usuario', idUsuario)
+      .order('fecha', { ascending: true })
+      .order('hora_inicio', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByDate(fecha: string): Promise<Guardia[]> {
+    const { data, error } = await supabase
+      .from('maestra_guardias')
+      .select('*')
+      .eq('fecha', fecha)
+      .order('hora_inicio', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(guardia: Omit<Guardia, 'id_guardia' | 'created_at' | 'updated_at'>): Promise<Guardia> {
+    const { data, error } = await supabase
+      .from('maestra_guardias')
+      .insert([guardia])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, updates: Partial<Guardia>): Promise<Guardia> {
+    const { data, error } = await supabase
+      .from('maestra_guardias')
+      .update(updates)
+      .eq('id_guardia', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('maestra_guardias')
+      .delete()
+      .eq('id_guardia', id);
+    
+    if (error) throw error;
+  }
+};
+
+// ============================================
+// LOG REUNIONES COORDINACION SERVICE
+// ============================================
+export const logReunionesService = {
+  async getAll(): Promise<LogReunionCoordinacion[]> {
+    const { data, error } = await supabase
+      .from('log_reuniones_coordinacion')
+      .select('*')
+      .order('fecha_reunion', { ascending: false })
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByGrado(grado: string): Promise<LogReunionCoordinacion[]> {
+    const { data, error } = await supabase
+      .from('log_reuniones_coordinacion')
+      .select('*')
+      .eq('grado', grado)
+      .order('fecha_reunion', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByTipoAlerta(tipoAlerta: string): Promise<LogReunionCoordinacion[]> {
+    const { data, error } = await supabase
+      .from('log_reuniones_coordinacion')
+      .select('*')
+      .eq('tipo_alerta', tipoAlerta)
+      .order('fecha_reunion', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getAlertasRecientes(limit: number = 10): Promise<LogReunionCoordinacion[]> {
+    const { data, error } = await supabase
+      .from('log_reuniones_coordinacion')
+      .select('*')
+      .eq('estado', 'Pendiente')
+      .order('fecha_reunion', { ascending: false })
+      .order('frecuencia', { ascending: false })
+      .limit(limit);
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(log: Omit<LogReunionCoordinacion, 'id_log' | 'created_at' | 'updated_at'>): Promise<LogReunionCoordinacion> {
+    const { data, error } = await supabase
+      .from('log_reuniones_coordinacion')
+      .insert([log])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, updates: Partial<LogReunionCoordinacion>): Promise<LogReunionCoordinacion> {
+    const { data, error } = await supabase
+      .from('log_reuniones_coordinacion')
+      .update(updates)
+      .eq('id_log', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('log_reuniones_coordinacion')
+      .delete()
+      .eq('id_log', id);
     
     if (error) throw error;
   }

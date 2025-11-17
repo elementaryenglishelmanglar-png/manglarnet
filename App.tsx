@@ -13,6 +13,12 @@ import { getWeekFromDate, getAllWeeksForAnoEscolar, formatDateRange } from './se
 import {
   alumnosService,
   docentesService,
+  guardiasService,
+  logReunionesService,
+  eventosCalendarioService,
+  type Guardia,
+  type LogReunionCoordinacion,
+  type EventoCalendario,
   clasesService,
   planificacionesService,
   horariosService,
@@ -1010,6 +1016,365 @@ const Sidebar: React.FC<{
     );
 };
 
+// ============================================
+// COORDINATOR DASHBOARD WIDGETS
+// ============================================
+
+// Widget 1: Mi Agenda del Día
+const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser }) => {
+    const [guardias, setGuardias] = useState<Guardia[]>([]);
+    const [eventos, setEventos] = useState<EventoCalendario[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const loadAgenda = async () => {
+            if (!currentUser.userId) return;
+            
+            try {
+                setIsLoading(true);
+                const today = new Date().toISOString().split('T')[0];
+                
+                // Cargar guardias del día
+                const guardiasHoy = await guardiasService.getByDate(today);
+                const guardiasUsuario = guardiasHoy.filter(g => g.id_usuario === currentUser.userId);
+                
+                // Cargar eventos del día (usando eventos_calendario)
+                const eventosHoy = await eventosCalendarioService.getByDateRange(
+                    `${today}T00:00:00Z`,
+                    `${today}T23:59:59Z`
+                );
+                
+                setGuardias(guardiasUsuario);
+                setEventos(eventosHoy);
+            } catch (error) {
+                console.error('Error loading agenda:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        
+        loadAgenda();
+    }, [currentUser.userId]);
+
+    const formatTime = (time: string) => {
+        if (!time) return '';
+        const [hours, minutes] = time.split(':');
+        const hour = parseInt(hours);
+        const ampm = hour >= 12 ? 'pm' : 'am';
+        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+        return `${displayHour}:${minutes}${ampm}`;
+    };
+
+    const items = useMemo(() => {
+        const agendaItems: Array<{ hora: string; descripcion: string; tipo: 'guardia' | 'evento' }> = [];
+        
+        guardias.forEach(g => {
+            agendaItems.push({
+                hora: formatTime(g.hora_inicio),
+                descripcion: `${g.descripcion}${g.ubicacion ? ` (${g.ubicacion})` : ''}`,
+                tipo: 'guardia'
+            });
+        });
+        
+        eventos.forEach(e => {
+            const fechaInicio = new Date(e.fecha_inicio);
+            const hora = fechaInicio.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true });
+            agendaItems.push({
+                hora: hora,
+                descripcion: e.titulo,
+                tipo: 'evento'
+            });
+        });
+        
+        return agendaItems.sort((a, b) => {
+            const timeA = a.hora.replace(/[^\d:]/g, '');
+            const timeB = b.hora.replace(/[^\d:]/g, '');
+            return timeA.localeCompare(timeB);
+        });
+    }, [guardias, eventos]);
+
+    if (isLoading) {
+        return (
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                <h3 className="text-lg font-bold text-text-main mb-4">Mi Agenda del Día</h3>
+                <p className="text-gray-500">Cargando...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+            <h3 className="text-lg font-bold text-text-main mb-4">Mi Agenda del Día</h3>
+            {items.length === 0 ? (
+                <p className="text-gray-500 text-sm">No hay actividades programadas para hoy</p>
+            ) : (
+                <div className="space-y-3">
+                    {items.map((item, idx) => (
+                        <div key={idx} className="flex items-start gap-3 border-l-2 border-brand-primary pl-3">
+                            <span className="text-sm font-semibold text-brand-primary min-w-[60px]">
+                                {item.hora}
+                            </span>
+                            <span className="text-sm text-gray-700 flex-1">
+                                {item.descripcion}
+                            </span>
+                            {item.tipo === 'guardia' && (
+                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                    Guardia
+                                </span>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Widget 2: Eventos de la Semana
+const EventosSemanaWidget: React.FC = () => {
+    const [eventos, setEventos] = useState<EventoCalendario[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const loadEventos = async () => {
+            try {
+                setIsLoading(true);
+                const today = new Date();
+                const nextWeek = new Date(today);
+                nextWeek.setDate(today.getDate() + 7);
+                
+                const eventosData = await eventosCalendarioService.getByDateRange(
+                    today.toISOString(),
+                    nextWeek.toISOString()
+                );
+                
+                // Ordenar por fecha y limitar a 7 eventos
+                const eventosOrdenados = eventosData
+                    .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime())
+                    .slice(0, 7);
+                
+                setEventos(eventosOrdenados);
+            } catch (error) {
+                console.error('Error loading eventos:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        
+        loadEventos();
+    }, []);
+
+    const getEventColor = (tipo: string): string => {
+        const colors: { [key: string]: string } = {
+            'Actos Cívicos': '#f0ad4e', // Amarillo
+            'Entregas Administrativas': '#d9534f', // Rojo
+            'Reuniones de Etapa': '#5bc0de', // Azul
+            'Actividades Generales': '#5cb85c' // Verde
+        };
+        return colors[tipo] || '#6c757d';
+    };
+
+    const formatDate = (dateStr: string): string => {
+        const date = new Date(dateStr);
+        const days = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
+        return days[date.getDay()];
+    };
+
+    if (isLoading) {
+        return (
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                <h3 className="text-lg font-bold text-text-main mb-4">Eventos de la Semana</h3>
+                <p className="text-gray-500">Cargando...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+            <h3 className="text-lg font-bold text-text-main mb-4">Eventos de la Semana</h3>
+            {eventos.length === 0 ? (
+                <p className="text-gray-500 text-sm">No hay eventos programados para esta semana</p>
+            ) : (
+                <div className="space-y-2">
+                    {eventos.map((evento) => {
+                        const color = evento.color || getEventColor(evento.tipo_evento);
+                        return (
+                            <div key={evento.id_evento} className="flex items-center gap-2 text-sm">
+                                <span className="font-semibold text-gray-700 min-w-[100px]">
+                                    {formatDate(evento.fecha_inicio)}:
+                                </span>
+                                <span 
+                                    className="inline-block w-3 h-3 rounded-full mr-1"
+                                    style={{ backgroundColor: color }}
+                                ></span>
+                                <span className="text-gray-700">{evento.titulo}</span>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Widget 3: Estado de Mi Equipo
+const EstadoMiEquipoWidget: React.FC<{ docentes: Docente[]; planificaciones: Planificacion[] }> = ({ docentes, planificaciones }) => {
+    const anoEscolar = '2025-2026'; // TODO: Obtener del contexto
+    const lapsoActual = 'I Lapso'; // TODO: Obtener del contexto
+    
+    const stats = useMemo(() => {
+        const totalDocentes = docentes.length;
+        const planificacionesEntregadas = planificaciones.filter(
+            p => p.ano_escolar === anoEscolar && 
+                 p.lapso === lapsoActual && 
+                 (p.status === 'Enviado' || p.status === 'Revisado' || p.status === 'Aprobado')
+        ).length;
+        
+        return {
+            total: totalDocentes,
+            entregadas: planificacionesEntregadas,
+            pendientes: totalDocentes - planificacionesEntregadas,
+            porcentaje: totalDocentes > 0 ? Math.round((planificacionesEntregadas / totalDocentes) * 100) : 0
+        };
+    }, [docentes, planificaciones, anoEscolar, lapsoActual]);
+
+    // Gráfico de dona simple usando SVG
+    const radius = 40;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDasharray = circumference;
+    const strokeDashoffset = circumference - (stats.porcentaje / 100) * circumference;
+
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+            <h3 className="text-lg font-bold text-text-main mb-4">Estado de Mi Equipo</h3>
+            <div className="flex items-center gap-6">
+                <div className="relative">
+                    <svg width="100" height="100" className="transform -rotate-90">
+                        <circle
+                            cx="50"
+                            cy="50"
+                            r={radius}
+                            stroke="#e5e7eb"
+                            strokeWidth="8"
+                            fill="none"
+                        />
+                        <circle
+                            cx="50"
+                            cy="50"
+                            r={radius}
+                            stroke="#78AC40"
+                            strokeWidth="8"
+                            fill="none"
+                            strokeDasharray={strokeDasharray}
+                            strokeDashoffset={strokeDashoffset}
+                            strokeLinecap="round"
+                            className="transition-all duration-500"
+                        />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-2xl font-bold text-gray-800">{stats.porcentaje}%</span>
+                    </div>
+                </div>
+                <div className="flex-1">
+                    <div className="space-y-2">
+                        <div>
+                            <span className="text-sm font-semibold text-gray-700">Planificaciones Entregadas: </span>
+                            <span className="text-sm text-gray-600">{stats.entregadas} de {stats.total}</span>
+                        </div>
+                        <div>
+                            <span className="text-sm font-semibold text-gray-700">Pendientes: </span>
+                            <span className="text-sm text-red-600">{stats.pendientes}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Widget 4: Alertas de Helios (IA Proactiva)
+const AlertasHeliosWidget: React.FC = () => {
+    const [alertas, setAlertas] = useState<LogReunionCoordinacion[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const loadAlertas = async () => {
+            try {
+                setIsLoading(true);
+                const alertasData = await logReunionesService.getAlertasRecientes(5);
+                setAlertas(alertasData);
+            } catch (error) {
+                console.error('Error loading alertas:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        
+        loadAlertas();
+    }, []);
+
+    const getAlertaColor = (tipo: string | null | undefined): string => {
+        const colors: { [key: string]: string } = {
+            'Académica': '#f0ad4e',
+            'Conductual': '#d9534f',
+            'Asistencia': '#5bc0de',
+            'Otro': '#6c757d'
+        };
+        return colors[tipo || 'Otro'] || '#6c757d';
+    };
+
+    if (isLoading) {
+        return (
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                <h3 className="text-lg font-bold text-text-main mb-4">Alertas de Helios</h3>
+                <p className="text-gray-500">Cargando...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="flex items-center gap-2 mb-4">
+                <SparklesIcon className="h-5 w-5 text-brand-primary" />
+                <h3 className="text-lg font-bold text-text-main">Alertas de Helios</h3>
+            </div>
+            {alertas.length === 0 ? (
+                <p className="text-gray-500 text-sm">No hay alertas pendientes</p>
+            ) : (
+                <div className="space-y-3">
+                    {alertas.map((alerta) => {
+                        const color = getAlertaColor(alerta.tipo_alerta);
+                        return (
+                            <div key={alerta.id_log} className="border-l-4 pl-3" style={{ borderLeftColor: color }}>
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span 
+                                                className="text-xs font-semibold px-2 py-1 rounded text-white"
+                                                style={{ backgroundColor: color }}
+                                            >
+                                                {alerta.tipo_alerta || 'Otro'}
+                                            </span>
+                                            <span className="text-xs text-gray-500">{alerta.grado}</span>
+                                        </div>
+                                        <p className="text-sm font-semibold text-gray-800">{alerta.categoria}</p>
+                                        {alerta.descripcion && (
+                                            <p className="text-xs text-gray-600 mt-1">{alerta.descripcion}</p>
+                                        )}
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Aparece en {alerta.frecuencia} reunión{alerta.frecuencia > 1 ? 'es' : ''}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const DashboardView: React.FC<{ 
     stats: { totalStudents: number, totalTeachers: number, classesToday: number };
     currentUser: Usuario;
@@ -1017,7 +1382,8 @@ const DashboardView: React.FC<{
     clases: Clase[];
     docentes: Docente[];
     alumnos: Alumno[];
-}> = ({ stats, currentUser, schedules, clases, docentes, alumnos }) => {
+    planificaciones?: Planificacion[];
+}> = ({ stats, currentUser, schedules, clases, docentes, alumnos, planificaciones = [] }) => {
     
     if (currentUser.role === 'docente') {
         return <TeacherScheduleDashboard 
@@ -1042,45 +1408,60 @@ const DashboardView: React.FC<{
         return GRADOS.filter(g => gradeSet.has(g));
     }, [studentsByGrade]);
 
+    const isCoordinator = currentUser.role === 'coordinador' || currentUser.role === 'directivo';
+
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-2xl font-bold text-text-main mb-6">Resumen de Alumnos por Grado</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                {sortedGrades.map((grade) => {
-                    const gradeColor = getGradeColor(grade);
-                    return (
-                        <div 
-                            key={grade} 
-                            className="p-6 rounded-lg shadow-lg text-white"
-                            style={{ backgroundColor: gradeColor }}
-                        >
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-4xl font-bold">{studentsByGrade[grade]}</p>
-                                    <p className="text-lg font-semibold">{grade}</p>
+        <div className="space-y-6">
+            {/* Widgets existentes para todos los roles */}
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                <h2 className="text-2xl font-bold text-text-main mb-6">Resumen de Alumnos por Grado</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                    {sortedGrades.map((grade) => {
+                        const gradeColor = getGradeColor(grade);
+                        return (
+                            <div 
+                                key={grade} 
+                                className="p-6 rounded-lg shadow-lg text-white"
+                                style={{ backgroundColor: gradeColor }}
+                            >
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="text-4xl font-bold">{studentsByGrade[grade]}</p>
+                                        <p className="text-lg font-semibold">{grade}</p>
+                                    </div>
+                                    <UsersIcon className="h-10 w-10 opacity-75" />
                                 </div>
-                                <UsersIcon className="h-10 w-10 opacity-75" />
                             </div>
+                        );
+                    })}
+                </div>
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-gray-50 p-6 rounded-lg shadow-md flex justify-between items-center">
+                        <div>
+                            <p className="text-4xl font-bold text-gray-800">{stats.totalTeachers}</p>
+                            <p className="text-lg text-gray-600">Docentes Activos</p>
                         </div>
-                    );
-                })}
-            </div>
-             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <div className="bg-gray-50 p-6 rounded-lg shadow-md flex justify-between items-center">
-                    <div>
-                        <p className="text-4xl font-bold text-gray-800">{stats.totalTeachers}</p>
-                        <p className="text-lg text-gray-600">Docentes Activos</p>
+                        <AcademicCapIcon className="h-12 w-12 text-brand-primary" />
                     </div>
-                    <AcademicCapIcon className="h-12 w-12 text-brand-primary" />
-                </div>
-                 <div className="bg-gray-50 p-6 rounded-lg shadow-md flex justify-between items-center">
-                     <div>
-                        <p className="text-4xl font-bold text-gray-800">{stats.classesToday}</p>
-                        <p className="text-lg text-gray-600">Clases Hoy</p>
+                    <div className="bg-gray-50 p-6 rounded-lg shadow-md flex justify-between items-center">
+                        <div>
+                            <p className="text-4xl font-bold text-gray-800">{stats.classesToday}</p>
+                            <p className="text-lg text-gray-600">Clases Hoy</p>
+                        </div>
+                        <CalendarIcon className="h-12 w-12 text-brand-primary" />
                     </div>
-                    <CalendarIcon className="h-12 w-12 text-brand-primary" />
                 </div>
             </div>
+
+            {/* Widgets adicionales solo para coordinadores */}
+            {isCoordinator && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <MiAgendaDelDiaWidget currentUser={currentUser} />
+                    <EventosSemanaWidget />
+                    <EstadoMiEquipoWidget docentes={docentes} planificaciones={planificaciones} />
+                    <AlertasHeliosWidget />
+                </div>
+            )}
         </div>
     );
 };
@@ -7957,6 +8338,7 @@ const App: React.FC = () => {
                     clases={clases}
                     docentes={docentes}
                     alumnos={alumnos}
+                    planificaciones={planificaciones}
                 />;
       case 'students':
         return <StudentListView 
