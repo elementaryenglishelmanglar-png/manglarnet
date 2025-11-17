@@ -1117,8 +1117,8 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
 
     if (isLoading) {
         return (
-            <div className="mb-12">
-                <h3 className="text-xl font-semibold mb-2 tracking-tight">Mi Agenda del Día</h3>
+            <div className="mb-16">
+                <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Mi Agenda del Día</h3>
                 <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-apple-blue"></div>
                 </div>
@@ -1127,24 +1127,24 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
     }
 
     return (
-        <div className="mb-12">
-            <h3 className="text-xl font-semibold mb-2 tracking-tight">Mi Agenda del Día</h3>
-            <p className="text-apple-gray text-sm font-light mb-8">Gestiona tus tareas diarias</p>
+        <div className="mb-16">
+            <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Mi Agenda del Día</h3>
+            <p className="text-apple-gray text-sm font-light mb-10">Gestiona tus tareas diarias</p>
             
-            <div className="mb-8 flex gap-3">
+            <div className="mb-10 flex gap-3">
                 <input
                     type="text"
                     value={nuevaTarea}
                     onChange={(e) => setNuevaTarea(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleAddTarea()}
                     placeholder="Agregar nueva tarea..."
-                    className="flex-1 px-4 py-3 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple"
+                    className="flex-1 px-5 py-3.5 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple text-base placeholder:text-apple-gray"
                     disabled={isAdding}
                 />
                 <button
                     onClick={handleAddTarea}
                     disabled={isAdding || !nuevaTarea.trim()}
-                    className="px-6 py-3 bg-apple-blue text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium transition-apple hover:opacity-90"
+                    className="px-6 py-3.5 bg-apple-blue text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium transition-apple hover:opacity-90 min-h-[48px]"
                 >
                     <PlusIcon className="h-5 w-5" />
                     Agregar
@@ -1152,24 +1152,24 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
             </div>
 
             {tareasPendientes.length > 0 && (
-                <div className="mb-6">
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="w-2 h-2 bg-apple-red rounded-full"></div>
-                        <h4 className="text-sm font-medium text-apple-gray-dark">Pendientes ({tareasPendientes.length})</h4>
+                <div className="mb-8">
+                    <div className="flex items-center gap-3 mb-5">
+                        <div className="w-2.5 h-2.5 bg-apple-red rounded-full"></div>
+                        <h4 className="text-base font-semibold text-apple-gray-dark">Pendientes ({tareasPendientes.length})</h4>
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         {tareasPendientes.map((tarea) => (
-                            <div key={tarea.id_tarea} className="flex items-center gap-4 py-3 border-b border-apple-gray-light transition-apple hover:opacity-70 group">
+                            <div key={tarea.id_tarea} className="flex items-center gap-4 py-4 px-2 border-b border-apple-gray-light transition-apple hover:bg-apple-gray-light/50 group rounded-lg">
                                 <input
                                     type="checkbox"
                                     checked={tarea.completada}
                                     onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
-                                    className="h-5 w-5 text-apple-blue focus:ring-apple-blue border-apple-gray rounded cursor-pointer transition-apple"
+                                    className="h-5 w-5 text-apple-blue focus:ring-apple-blue border-apple-gray rounded cursor-pointer transition-apple flex-shrink-0"
                                 />
-                                <span className="flex-1 text-sm font-light text-apple-gray-dark">{tarea.descripcion}</span>
+                                <span className="flex-1 text-base font-normal text-apple-gray-dark leading-relaxed">{tarea.descripcion}</span>
                                 <button
                                     onClick={() => handleDeleteTarea(tarea.id_tarea)}
-                                    className="opacity-0 group-hover:opacity-100 text-apple-red hover:text-apple-red p-1.5 rounded transition-apple"
+                                    className="opacity-0 group-hover:opacity-100 text-apple-red hover:text-apple-red p-2 rounded-lg transition-apple hover:bg-apple-red/10"
                                     title="Eliminar tarea"
                                 >
                                     <DeleteIcon className="h-4 w-4" />
@@ -1183,26 +1183,26 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
             {tareasCompletadas.length > 0 && (
                 <div>
                     <details className="group">
-                        <summary className="text-sm font-light text-apple-gray cursor-pointer list-none hover:text-apple-gray-dark transition-apple mb-3">
+                        <summary className="text-sm font-medium text-apple-gray cursor-pointer list-none hover:text-apple-gray-dark transition-apple mb-4 py-2">
                             <span className="flex items-center gap-2">
                                 <CheckIcon className="h-4 w-4 text-apple-green" />
                                 <span>Completadas ({tareasCompletadas.length})</span>
                                 <ChevronDownIcon className="h-4 w-4 transform group-open:rotate-180 transition-apple" />
                             </span>
                         </summary>
-                        <div className="mt-2 space-y-3">
+                        <div className="mt-2 space-y-2">
                             {tareasCompletadas.map((tarea) => (
-                                <div key={tarea.id_tarea} className="flex items-center gap-4 py-3 border-b border-apple-gray-light opacity-60">
+                                <div key={tarea.id_tarea} className="flex items-center gap-4 py-4 px-2 border-b border-apple-gray-light opacity-70">
                                     <input
                                         type="checkbox"
                                         checked={tarea.completada}
                                         onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
-                                        className="h-5 w-5 text-apple-green focus:ring-apple-green border-apple-gray rounded cursor-pointer transition-apple"
+                                        className="h-5 w-5 text-apple-green focus:ring-apple-green border-apple-gray rounded cursor-pointer transition-apple flex-shrink-0"
                                     />
-                                    <span className="flex-1 text-sm text-apple-gray line-through font-light">{tarea.descripcion}</span>
+                                    <span className="flex-1 text-base text-apple-gray line-through font-light leading-relaxed">{tarea.descripcion}</span>
                                     <button
                                         onClick={() => handleDeleteTarea(tarea.id_tarea)}
-                                        className="text-apple-red hover:text-apple-red p-1.5 rounded transition-apple"
+                                        className="text-apple-red hover:text-apple-red p-2 rounded-lg transition-apple hover:bg-apple-red/10"
                                         title="Eliminar tarea"
                                     >
                                         <DeleteIcon className="h-4 w-4" />
@@ -1215,9 +1215,9 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
             )}
 
             {tareas.length === 0 && (
-                <div className="text-center py-12">
-                    <p className="text-apple-gray text-sm font-light">No hay tareas pendientes</p>
-                    <p className="text-apple-gray text-xs font-light mt-2">Agrega una nueva tarea para comenzar</p>
+                <div className="text-center py-16">
+                    <p className="text-apple-gray-dark text-base font-light mb-2">No hay tareas pendientes</p>
+                    <p className="text-apple-gray text-sm font-light">Agrega una nueva tarea para comenzar</p>
                 </div>
             )}
         </div>
@@ -1276,8 +1276,8 @@ const EventosSemanaWidget: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="mb-12">
-                <h3 className="text-xl font-semibold mb-2 tracking-tight">Eventos de la Semana</h3>
+            <div className="mb-16">
+                <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Eventos de la Semana</h3>
                 <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-apple-blue"></div>
                 </div>
@@ -1286,34 +1286,34 @@ const EventosSemanaWidget: React.FC = () => {
     }
 
     return (
-        <div className="mb-12">
-            <h3 className="text-xl font-semibold mb-2 tracking-tight">Eventos de la Semana</h3>
-            <p className="text-apple-gray text-sm font-light mb-8">Próximos 7 días</p>
+        <div className="mb-16">
+            <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Eventos de la Semana</h3>
+            <p className="text-apple-gray text-sm font-light mb-10">Próximos 7 días</p>
             
             {eventos.length === 0 ? (
-                <div className="text-center py-12">
-                    <p className="text-apple-gray text-sm font-light">No hay eventos programados</p>
-                    <p className="text-apple-gray text-xs font-light mt-2">Esta semana está libre de eventos</p>
+                <div className="text-center py-16">
+                    <p className="text-apple-gray-dark text-base font-light mb-2">No hay eventos programados</p>
+                    <p className="text-apple-gray text-sm font-light">Esta semana está libre de eventos</p>
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                     {eventos.map((evento) => {
                         const color = evento.color || getEventColor(evento.tipo_evento);
                         return (
-                            <div key={evento.id_evento} className="flex items-center gap-4 py-4 border-b border-apple-gray-light transition-apple hover:opacity-70">
+                            <div key={evento.id_evento} className="flex items-start gap-4 py-5 px-4 border-b border-apple-gray-light transition-apple hover:bg-apple-gray-light/50 rounded-lg group">
                                 <div 
-                                    className="w-3 h-3 rounded-full flex-shrink-0"
+                                    className="w-3.5 h-3.5 rounded-full flex-shrink-0 mt-1"
                                     style={{ backgroundColor: color }}
                                 ></div>
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-3">
-                                        <span className="font-medium text-sm text-apple-gray-dark min-w-[100px]">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-baseline gap-3 mb-2">
+                                        <span className="font-semibold text-base text-apple-gray-dark min-w-[110px] flex-shrink-0">
                                             {formatDate(evento.fecha_inicio)}
                                         </span>
-                                        <span className="text-sm text-apple-gray-dark font-light">{evento.titulo}</span>
+                                        <span className="text-base text-apple-gray-dark font-medium leading-relaxed">{evento.titulo}</span>
                                     </div>
                                     {evento.descripcion && (
-                                        <p className="text-xs text-apple-gray font-light mt-1 ml-[108px]">{evento.descripcion}</p>
+                                        <p className="text-sm text-apple-gray font-light mt-2 ml-[122px] leading-relaxed">{evento.descripcion}</p>
                                     )}
                                 </div>
                             </div>
@@ -1355,27 +1355,27 @@ const EstadoMiEquipoWidget: React.FC<{ docentes: Docente[]; planificaciones: Pla
     const progressColor = stats.porcentaje >= 80 ? '#10b981' : stats.porcentaje >= 50 ? '#f59e0b' : '#ef4444';
 
     return (
-        <div className="mb-12">
-            <h3 className="text-xl font-semibold mb-2 tracking-tight">Estado de Mi Equipo</h3>
-            <p className="text-apple-gray text-sm font-light mb-8">Planificaciones del lapso</p>
+        <div className="mb-16">
+            <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Estado de Mi Equipo</h3>
+            <p className="text-apple-gray text-sm font-light mb-10">Planificaciones del lapso</p>
             
-            <div className="flex items-center gap-6">
+            <div className="flex items-start gap-8">
                 <div className="relative flex-shrink-0">
-                    <svg width="120" height="120" className="transform -rotate-90">
+                    <svg width="140" height="140" className="transform -rotate-90">
                         <circle
-                            cx="60"
-                            cy="60"
+                            cx="70"
+                            cy="70"
                             r={radius}
                             stroke="#e5e7eb"
-                            strokeWidth="10"
+                            strokeWidth="12"
                             fill="none"
                         />
                         <circle
-                            cx="60"
-                            cy="60"
+                            cx="70"
+                            cy="70"
                             r={radius}
                             stroke={progressColor}
-                            strokeWidth="10"
+                            strokeWidth="12"
                             fill="none"
                             strokeDasharray={strokeDasharray}
                             strokeDashoffset={strokeDashoffset}
@@ -1384,24 +1384,24 @@ const EstadoMiEquipoWidget: React.FC<{ docentes: Docente[]; planificaciones: Pla
                         />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-3xl font-bold" style={{ color: progressColor }}>{stats.porcentaje}%</span>
-                        <span className="text-xs text-apple-gray font-medium">Completado</span>
+                        <span className="text-4xl font-bold text-apple-gray-dark">{stats.porcentaje}%</span>
+                        <span className="text-sm text-apple-gray font-medium mt-1">Completado</span>
                     </div>
                 </div>
-                <div className="flex-1 space-y-3">
-                    <div className="py-4 border-b border-apple-gray-light">
+                <div className="flex-1 space-y-4 pt-2">
+                    <div className="py-5 border-b border-apple-gray-light">
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-apple-gray-dark">Entregadas</span>
-                            <span className="text-lg font-semibold text-apple-green">{stats.entregadas}</span>
+                            <span className="text-base font-semibold text-apple-gray-dark">Entregadas</span>
+                            <span className="text-2xl font-bold text-apple-green">{stats.entregadas}</span>
                         </div>
-                        <div className="text-xs text-apple-gray font-light">de {stats.total} docentes</div>
+                        <div className="text-sm text-apple-gray font-light">de {stats.total} docentes</div>
                     </div>
-                    <div className="py-4 border-b border-apple-gray-light">
+                    <div className="py-5 border-b border-apple-gray-light">
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-apple-gray-dark">Pendientes</span>
-                            <span className="text-lg font-semibold text-apple-red">{stats.pendientes}</span>
+                            <span className="text-base font-semibold text-apple-gray-dark">Pendientes</span>
+                            <span className="text-2xl font-bold text-apple-red">{stats.pendientes}</span>
                         </div>
-                        <div className="text-xs text-apple-gray font-light">requieren atención</div>
+                        <div className="text-sm text-apple-gray font-light">por entregar</div>
                     </div>
                 </div>
             </div>
@@ -1442,8 +1442,8 @@ const AlertasCocoWidget: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="mb-12">
-                <h3 className="text-xl font-semibold mb-2 tracking-tight">Alertas de Coco</h3>
+            <div className="mb-16">
+                <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Alertas de Coco</h3>
                 <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-apple-blue"></div>
                 </div>
@@ -1452,14 +1452,14 @@ const AlertasCocoWidget: React.FC = () => {
     }
 
     return (
-        <div className="mb-12">
-            <h3 className="text-xl font-semibold mb-2 tracking-tight">Alertas de Coco</h3>
-            <p className="text-apple-gray text-sm font-light mb-8">IA Proactiva</p>
+        <div className="mb-16">
+            <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Alertas de Coco</h3>
+            <p className="text-apple-gray text-sm font-light mb-10">IA Proactiva</p>
             
             {alertas.length === 0 ? (
-                <div className="text-center py-12">
-                    <p className="text-apple-gray text-sm font-light">No hay alertas pendientes</p>
-                    <p className="text-apple-gray text-xs font-light mt-2">Coco está monitoreando activamente</p>
+                <div className="text-center py-16">
+                    <p className="text-apple-gray-dark text-base font-light mb-2">No hay alertas pendientes</p>
+                    <p className="text-apple-gray text-sm font-light">Coco está monitoreando activamente</p>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -1468,29 +1468,29 @@ const AlertasCocoWidget: React.FC = () => {
                         return (
                             <div 
                                 key={alerta.id_log} 
-                                className="py-4 border-b border-apple-gray-light transition-apple hover:opacity-70"
+                                className="py-5 px-4 border-b border-apple-gray-light transition-apple hover:bg-apple-gray-light/50 rounded-lg"
                             >
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-3">
+                                        <div className="flex items-center gap-3 mb-4">
                                             <span 
-                                                className="text-xs font-medium px-3 py-1.5 rounded-full text-white"
+                                                className="text-xs font-semibold px-3.5 py-1.5 rounded-full text-white"
                                                 style={{ backgroundColor: color }}
                                             >
                                                 {alerta.tipo_alerta || 'Otro'}
                                             </span>
-                                            <span className="text-xs font-light text-apple-gray bg-apple-gray-light px-3 py-1 rounded">
+                                            <span className="text-xs font-medium text-apple-gray-dark bg-apple-gray-light px-3 py-1.5 rounded-lg">
                                                 {alerta.grado}
                                             </span>
                                         </div>
-                                        <p className="text-sm font-semibold text-apple-gray-dark mb-2">{alerta.categoria}</p>
+                                        <p className="text-base font-semibold text-apple-gray-dark mb-3 leading-relaxed">{alerta.categoria}</p>
                                         {alerta.descripcion && (
-                                            <p className="text-xs text-apple-gray font-light mb-3 leading-relaxed">{alerta.descripcion}</p>
+                                            <p className="text-sm text-apple-gray font-light mb-4 leading-relaxed">{alerta.descripcion}</p>
                                         )}
                                         <div className="flex items-center gap-2">
-                                            <BellIcon className="h-3 w-3 text-apple-gray" />
-                                            <p className="text-xs text-apple-gray font-light">
-                                                Aparece en <span className="font-medium">{alerta.frecuencia}</span> reunión{alerta.frecuencia > 1 ? 'es' : ''}
+                                            <BellIcon className="h-4 w-4 text-apple-gray" />
+                                            <p className="text-sm text-apple-gray font-light">
+                                                Aparece en <span className="font-semibold text-apple-gray-dark">{alerta.frecuencia}</span> reunión{alerta.frecuencia > 1 ? 'es' : ''}
                                             </p>
                                         </div>
                                     </div>
