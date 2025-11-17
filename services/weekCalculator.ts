@@ -1,8 +1,35 @@
 // Week Calculator Service
 // Helper functions to calculate weeks from dates and manage lapso-week relationships
 
-import { supabase } from './supabaseClient';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { Lapso, SemanaLapso } from './supabaseDataService';
+
+// Helper to get the appropriate Supabase client (Vite compatibility only)
+// In Next.js, the client should always be passed as a parameter
+let cachedSupabaseClient: SupabaseClient | null = null;
+
+const getSupabaseClient = (): SupabaseClient => {
+  // In Next.js, we should always pass the client
+  // This is a fallback for Vite compatibility only
+  if (typeof window !== 'undefined' && (window as any).__NEXT_DATA__) {
+    throw new Error('Supabase client must be provided in Next.js environment. Pass it as a parameter.');
+  }
+  
+  // Vite environment - use the old client
+  if (cachedSupabaseClient) {
+    return cachedSupabaseClient;
+  }
+  
+  // Only works in Vite where import.meta.env is available
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { supabase } = require('./supabaseClient');
+    cachedSupabaseClient = supabase;
+    return supabase;
+  }
+  
+  throw new Error('Unable to determine environment. Please provide Supabase client explicitly.');
+};
 
 export interface SemanaInfo {
   numero_semana: number;
@@ -17,15 +44,18 @@ export interface SemanaInfo {
  * Obtiene la semana actual basada en una fecha
  * @param date Fecha a evaluar
  * @param anoEscolar Año escolar (ej: '2025-2026')
+ * @param supabaseClient Cliente de Supabase opcional (si no se provee, se detecta automáticamente)
  * @returns Información de la semana o null si no se encuentra
  */
 export const getWeekFromDate = async (
   date: Date,
-  anoEscolar: string
+  anoEscolar: string,
+  supabaseClient?: SupabaseClient
 ): Promise<SemanaInfo | null> => {
   const dateStr = date.toISOString().split('T')[0];
+  const client = supabaseClient || getSupabaseClient();
   
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('semanas_lapso')
     .select(`
       numero_semana,
@@ -60,12 +90,15 @@ export const getWeekFromDate = async (
 /**
  * Obtiene todas las semanas de un lapso específico
  * @param lapsoId ID del lapso
+ * @param supabaseClient Cliente de Supabase opcional
  * @returns Array de información de semanas
  */
 export const getWeeksForLapso = async (
-  lapsoId: string
+  lapsoId: string,
+  supabaseClient?: SupabaseClient
 ): Promise<SemanaInfo[]> => {
-  const { data, error } = await supabase
+  const client = supabaseClient || getSupabaseClient();
+  const { data, error } = await client
     .from('semanas_lapso')
     .select(`
       numero_semana,
@@ -92,12 +125,15 @@ export const getWeeksForLapso = async (
 /**
  * Obtiene todas las semanas de un año escolar
  * @param anoEscolar Año escolar (ej: '2025-2026')
+ * @param supabaseClient Cliente de Supabase opcional
  * @returns Array de información de semanas agrupadas por lapso
  */
 export const getAllWeeksForAnoEscolar = async (
-  anoEscolar: string
+  anoEscolar: string,
+  supabaseClient?: SupabaseClient
 ): Promise<Map<string, SemanaInfo[]>> => {
-  const { data, error } = await supabase
+  const client = supabaseClient || getSupabaseClient();
+  const { data, error } = await client
     .from('semanas_lapso')
     .select(`
       numero_semana,

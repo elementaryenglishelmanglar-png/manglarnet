@@ -1,5 +1,5 @@
 {
-  "name": "manglarnet---conexión-pedagógica",
+  "name": "manglarnet-conexion-pedagogica",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -14,12 +14,15 @@
     "jspdf": "^3.0.3",
     "marked": "^17.0.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "vercel": "^48.10.1"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
