@@ -743,6 +743,73 @@ const hexToRgba = (hex: string, opacity: number): string => {
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 };
 
+// Función para calcular las clases de hoy
+const calculateClassesToday = async (
+    schedules: WeeklySchedules,
+    anoEscolar: string = '2025-2026'
+): Promise<number> => {
+    const today = new Date();
+    
+    // Obtener el día de la semana (JavaScript: 0 = Domingo, 1 = Lunes, ..., 6 = Sábado)
+    // Sistema: 1 = Lunes, 2 = Martes, ..., 5 = Viernes
+    const jsDayOfWeek = today.getDay();
+    
+    // Si es fin de semana, no hay clases
+    if (jsDayOfWeek === 0 || jsDayOfWeek === 6) {
+        return 0;
+    }
+    
+    // Convertir a formato del sistema (1 = Lunes, 5 = Viernes)
+    const systemDayOfWeek = jsDayOfWeek;
+    
+    try {
+        // Obtener la semana actual basada en la fecha de hoy
+        const semanaInfo = await getWeekFromDate(today, anoEscolar);
+        
+        if (!semanaInfo) {
+            // Si no hay semana activa, retornar 0
+            return 0;
+        }
+        
+        const currentWeek = semanaInfo.numero_semana;
+        const currentLapso = semanaInfo.lapso;
+        
+        let count = 0;
+        
+        // Iterar sobre todos los grados
+        for (const grade in schedules) {
+            // Obtener horarios de la semana actual
+            const horarios = schedules[grade]?.[currentWeek] || [];
+            
+            // Contar horarios del día actual que son clases (tienen id_clase)
+            // y que coinciden con el lapso actual (si está disponible)
+            count += horarios.filter(h => {
+                const isToday = h.dia_semana === systemDayOfWeek;
+                const isClass = h.id_clase !== null && h.id_clase !== undefined;
+                const matchesLapso = !h.lapso || h.lapso === currentLapso;
+                
+                return isToday && isClass && matchesLapso;
+            }).length;
+        }
+        
+        return count;
+    } catch (error) {
+        console.error('Error calculating classes today:', error);
+        // En caso de error, hacer un cálculo simple sin considerar lapso
+        let count = 0;
+        for (const grade in schedules) {
+            for (const week in schedules[grade]) {
+                const horarios = schedules[grade][parseInt(week)];
+                count += horarios.filter(h => 
+                    h.dia_semana === systemDayOfWeek && 
+                    h.id_clase !== null && 
+                    h.id_clase !== undefined
+                ).length;
+            }
+        }
+        return count;
+    }
+};
 
 // --- UI COMPONENTS ---
 
@@ -7391,6 +7458,7 @@ const App: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [minutas, setMinutas] = useState<MinutaEvaluacion[]>([]);
   const [aulas, setAulas] = useState<Aula[]>([]);
+  const [classesTodayCount, setClassesTodayCount] = useState<number>(0);
 
   // Loading states
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -7507,6 +7575,21 @@ const App: React.FC = () => {
       loadAllData();
     }
   }, [currentUser]);
+
+  // Calcular clases de hoy cuando cambien los horarios
+  useEffect(() => {
+    const calculateToday = async () => {
+      if (Object.keys(schedules).length > 0) {
+        const anoEscolar = '2025-2026'; // TODO: Obtener del contexto/configuración
+        const count = await calculateClassesToday(schedules, anoEscolar);
+        setClassesTodayCount(count);
+      } else {
+        setClassesTodayCount(0);
+      }
+    };
+    
+    calculateToday();
+  }, [schedules]);
 
   // Sync schedules to Supabase when they change
   const syncSchedulesToSupabase = async (schedulesToSync: WeeklySchedules) => {
@@ -7868,7 +7951,7 @@ const App: React.FC = () => {
     switch (activeView) {
       case 'dashboard':
         return <DashboardView 
-                    stats={{ totalStudents: alumnos.length, totalTeachers: docentes.length, classesToday: 5 }} 
+                    stats={{ totalStudents: alumnos.length, totalTeachers: docentes.length, classesToday: classesTodayCount }} 
                     currentUser={currentUser!}
                     schedules={schedules}
                     clases={clases}
