@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './components/ui/dialog';
 import { Input } from './components/ui/input';
+import { Textarea } from './components/ui/textarea';
 import { InputField } from './components/ui/InputField';
 import { Separator } from './components/ui/separator';
 import { Skeleton } from './components/ui/skeleton';
@@ -26,8 +27,7 @@ const CheckIcon = () => (
 import { getAIPlanSuggestions, getAIEvaluationAnalysis } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
 // Lazy loading para componentes pesados
-// LoginScreen deshabilitado - plataforma abierta
-// const LoginScreen = lazy(() => import('./components/LoginScreen').then(module => ({ default: module.LoginScreen })));
+const LoginScreen = lazy(() => import('./components/LoginScreen').then(module => ({ default: module.LoginScreen })));
 const AuthorizedUsersView = lazy(() => import('./components/AuthorizedUsersView').then(module => ({ default: module.AuthorizedUsersView })));
 import { marked } from 'marked';
 import html2canvas from 'html2canvas';
@@ -76,6 +76,7 @@ type UserRole = 'docente' | 'coordinador' | 'directivo' | 'administrativo';
 interface Usuario {
   id: string; // UUID
   email: string;
+  username: string; // Username/nickname
   role: UserRole;
   // Mapped from docentes table for convenience
   docenteId?: string; // UUID
@@ -9243,33 +9244,33 @@ const EventoModal: React.FC<{
 const GradeChart: React.FC<{ data: { [key in Nota]?: number } }> = ({ data }) => {
     const grades: Nota[] = ['A', 'B', 'C', 'D', 'E', 'SE'];
     const maxCount = Math.max(...Object.values(data).filter(v => typeof v === 'number'), 1);
-    const colors: { [key in Nota]: string } = {
-        'A': 'bg-green-500',
-        'B': 'bg-blue-500',
-        'C': 'bg-yellow-500',
-        'D': 'bg-orange-500',
-        'E': 'bg-red-500',
-        'SE': 'bg-gray-500',
-        '': ''
-    };
+    const chartData = grades.filter(g => g !== '').map(grade => ({
+        name: grade,
+        value: data[grade] || 0,
+        color: gradeColors[grade] || '#D1D5DB'
+    }));
 
     return (
-        <div className="bg-gray-50 p-4 rounded-lg mt-6">
-            <h4 className="font-bold text-center mb-4 text-gray-700">Distribución de Notas</h4>
-            <div className="flex justify-around items-end h-40 gap-3 px-2">
-                {grades.filter(g => g !== '').map(grade => (
-                    <div key={grade} className="flex flex-col items-center flex-1 h-full">
-                        <div className="text-sm font-bold text-gray-800">{data[grade] || 0}</div>
-                        <div
-                            className={`w-full rounded-t-md transition-all duration-300 ease-out ${colors[grade]}`}
-                            style={{ height: `${((data[grade] || 0) / maxCount) * 90}%` }}
-                            title={`${data[grade] || 0} alumnos con nota ${grade}`}
-                        ></div>
-                        <div className="font-semibold text-gray-700 mt-1">{grade}</div>
-                    </div>
-                ))}
-            </div>
-        </div>
+        <Card className="mt-6">
+            <CardHeader>
+                <CardTitle className="text-center">Distribución de Notas</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <RechartsTooltip />
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                            {chartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+            </CardContent>
+        </Card>
     );
 };
 
@@ -9281,11 +9282,15 @@ const PieChart: React.FC<{
     const total = Object.values(data).reduce((sum, value) => sum + value, 0);
     if (total === 0) {
         return (
-            <div className="bg-white p-4 rounded-lg shadow h-full flex flex-col items-center justify-center">
-                <h5 className="font-bold text-center text-gray-700 mb-2">{title}</h5>
-                <p className="text-gray-500">No hay datos para mostrar.</p>
-            </div>
-        )
+            <Card className="h-full flex flex-col items-center justify-center">
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-center text-sm">{title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground text-center">No hay datos para mostrar.</p>
+                </CardContent>
+            </Card>
+        );
     }
 
     let cumulativePercent = 0;
@@ -9303,25 +9308,29 @@ const PieChart: React.FC<{
     }).join(', ');
 
     return (
-        <div className="bg-white p-4 rounded-lg shadow h-full flex flex-col">
-            <h5 className="font-bold text-center text-gray-700 mb-4">{title}</h5>
-            <div className="flex-grow flex items-center justify-center">
-                <div className="w-32 h-32 rounded-full" style={{ background: `conic-gradient(${gradients})` }}></div>
-            </div>
-            <div className="mt-4">
-                <ul className="text-sm space-y-1">
-                    {slices.map(slice => (
-                        <li key={slice.key} className="flex justify-between items-center">
-                            <span className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: slice.color }}></span>
-                                {slice.key}
-                            </span>
-                            <span className="font-semibold">{slice.percent.toFixed(1)}% ({slice.value})</span>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-        </div>
+        <Card className="h-full flex flex-col">
+            <CardHeader className="pb-2">
+                <CardTitle className="text-center text-sm">{title}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-grow flex flex-col">
+                <div className="flex-grow flex items-center justify-center">
+                    <div className="w-32 h-32 rounded-full" style={{ background: `conic-gradient(${gradients})` }}></div>
+                </div>
+                <div className="mt-4">
+                    <ul className="text-sm space-y-1">
+                        {slices.map(slice => (
+                            <li key={slice.key} className="flex justify-between items-center">
+                                <span className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: slice.color }}></span>
+                                    {slice.key}
+                                </span>
+                                <span className="font-semibold">{slice.percent.toFixed(1)}% ({slice.value})</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </CardContent>
+        </Card>
     );
 };
 
@@ -9336,16 +9345,20 @@ const AdaptationGradeDistributionCharts: React.FC<{
     data: { [key in Adaptacion]?: { [key in Nota]?: number } };
 }> = ({ data }) => {
     return (
-        <div className="mt-6">
-             <h4 className="font-semibold text-center text-gray-800 mb-4">Distribución de Notas por Tipo de Adaptación</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <PieChart data={data['Reg'] || {}} title="Regular" colors={gradeColors} />
-                <PieChart data={data['AC+'] || {}} title="AC+" colors={gradeColors} />
-                <PieChart data={data['AC-'] || {}} title="AC-" colors={gradeColors} />
-            </div>
-        </div>
-    )
-}
+        <Card className="mt-6">
+            <CardHeader>
+                <CardTitle className="text-center">Distribución de Notas por Tipo de Adaptación</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <PieChart data={data['Reg'] || {}} title="Regular" colors={gradeColors} />
+                    <PieChart data={data['AC+'] || {}} title="AC+" colors={gradeColors} />
+                    <PieChart data={data['AC-'] || {}} title="AC-" colors={gradeColors} />
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
 
 const EvaluationView: React.FC<{
     alumnos: Alumno[];
@@ -9353,6 +9366,19 @@ const EvaluationView: React.FC<{
     minutas: MinutaEvaluacion[];
     setMinutas: React.Dispatch<React.SetStateAction<MinutaEvaluacion[]>>;
 }> = ({ alumnos, clases, minutas, setMinutas }) => {
+    // Validar que los datos estén disponibles
+    if (!alumnos || !clases || !minutas) {
+        return (
+            <Card>
+                <CardContent className="p-6">
+                    <Alert variant="destructive">
+                        <AlertTitle>Error</AlertTitle>
+                        <AlertDescription>Los datos no están disponibles. Por favor, recarga la página.</AlertDescription>
+                    </Alert>
+                </CardContent>
+            </Card>
+        );
+    }
     const [viewMode, setViewMode] = useState<'new' | 'history'>('new');
     const [selectedMinuta, setSelectedMinuta] = useState<MinutaEvaluacion | null>(null);
 
@@ -9486,7 +9512,7 @@ const EvaluationView: React.FC<{
             };
             
             // Save to Supabase - omitir id_minuta para que Supabase lo genere
-            const { id_minuta, fecha_creacion, updated_at, ...minutaData } = newMinuta;
+            const { id_minuta, fecha_creacion, ...minutaData } = newMinuta;
             
             // Asegurar que los arrays estén en el formato correcto
             const minutaToSave = {
@@ -9520,9 +9546,12 @@ const EvaluationView: React.FC<{
         return (
              <div className="space-y-8">
                 {/* Section 1: Filters */}
-                <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-apple-gray-dark mb-6 tracking-tight">1. Contexto de la Reunión</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>1. Contexto de la Reunión</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         <InputField as="select" label="Año Escolar" name="ano_escolar" value={filters.ano_escolar} onChange={handleFilterChange}>
                             {ANOS_ESCOLARES.map(ano => (
                                 <option key={ano} value={ano}>{ano}</option>
@@ -9544,92 +9573,143 @@ const EvaluationView: React.FC<{
                                 .filter(s => s.nombre_materia && s.nombre_materia.trim() !== '') // Filtrar materias vacías
                                 .map(s => <option key={s.id_clase} value={s.nombre_materia}>{s.nombre_materia}</option>)}
                         </InputField>
-                    </div>
-                </div>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {isFormReady && studentsInGrade && (
-                    <div className="mb-8">
-                        <h2 className="text-xl font-bold text-text-main mb-4">2. Carga de Datos de Evaluación</h2>
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                 <thead className="bg-gray-50">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>2. Carga de Datos de Evaluación</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-border">
+                                 <thead className="bg-muted">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Alumno</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nota</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Adaptación</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/2">Observaciones</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/3">Alumno</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Nota</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Adaptación</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/2">Observaciones</th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {studentsInGrade.map(student => {
+                                <tbody className="bg-background divide-y divide-border">
+                                    {(studentsInGrade || []).map(student => {
                                         const evalData = studentEvals.get(student.id_alumno) || { nota: '', adaptacion: '', observaciones: '' };
                                         return (
-                                            <tr key={student.id_alumno}>
+                                            <tr key={student.id_alumno} className="hover:bg-muted/50">
                                                 <td className="px-4 py-2 whitespace-nowrap font-medium">{student.apellidos}, {student.nombres}</td>
                                                 <td className="px-4 py-2">
-                                                    <select value={evalData.nota} onChange={e => handleStudentEvalChange(student.id_alumno, 'nota', e.target.value)} className="p-1 border rounded-md w-full">
-                                                        <option value=""></option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="SE">SE</option>
-                                                    </select>
+                                                    <Select 
+                                                        value={evalData.nota || undefined} 
+                                                        onValueChange={(value) => handleStudentEvalChange(student.id_alumno, 'nota', value === 'none' ? '' : value)}
+                                                    >
+                                                        <SelectTrigger className="w-full">
+                                                            <SelectValue placeholder="Seleccionar nota" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="none">Sin nota</SelectItem>
+                                                            <SelectItem value="A">A</SelectItem>
+                                                            <SelectItem value="B">B</SelectItem>
+                                                            <SelectItem value="C">C</SelectItem>
+                                                            <SelectItem value="D">D</SelectItem>
+                                                            <SelectItem value="E">E</SelectItem>
+                                                            <SelectItem value="SE">SE</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
                                                 </td>
                                                 <td className="px-4 py-2">
-                                                    <select value={evalData.adaptacion} onChange={e => handleStudentEvalChange(student.id_alumno, 'adaptacion', e.target.value)} className="p-1 border rounded-md w-full">
-                                                        <option value=""></option><option value="Reg">Reg</option><option value="AC+">AC+</option><option value="AC-">AC-</option>
-                                                    </select>
+                                                    <Select 
+                                                        value={evalData.adaptacion || undefined} 
+                                                        onValueChange={(value) => handleStudentEvalChange(student.id_alumno, 'adaptacion', value === 'none' ? '' : value)}
+                                                    >
+                                                        <SelectTrigger className="w-full">
+                                                            <SelectValue placeholder="Seleccionar adaptación" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="none">Sin adaptación</SelectItem>
+                                                            <SelectItem value="Reg">Reg</SelectItem>
+                                                            <SelectItem value="AC+">AC+</SelectItem>
+                                                            <SelectItem value="AC-">AC-</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
                                                 </td>
                                                 <td className="px-4 py-2">
-                                                    <input type="text" value={evalData.observaciones} onChange={e => handleStudentEvalChange(student.id_alumno, 'observaciones', e.target.value)} className="p-1 border rounded-md w-full" />
+                                                    <Input 
+                                                        type="text" 
+                                                        value={evalData.observaciones} 
+                                                        onChange={e => handleStudentEvalChange(student.id_alumno, 'observaciones', e.target.value)} 
+                                                        placeholder="Observaciones..."
+                                                    />
                                                 </td>
                                             </tr>
                                         )
                                     })}
                                 </tbody>
                             </table>
-                        </div>
-                        <GradeChart data={liveGradeDistribution} />
-                        
-                        <div className="mt-8 border-t pt-6">
-                             <h3 className="text-xl font-bold text-text-main mb-4">Análisis Gráfico Avanzado</h3>
-                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <PieChart title="Estudiantes por Adaptación" data={advancedAnalytics.adaptationCounts} colors={adaptationColors} />
-                                <PieChart title="Porcentaje Global de Notas" data={advancedAnalytics.overallGradeCounts} colors={gradeColors} />
-                             </div>
-                             <AdaptationGradeDistributionCharts data={advancedAnalytics.gradeDistributionByAdaptation as any} />
-                        </div>
-
-                    </div>
+                            </div>
+                            <GradeChart data={liveGradeDistribution} />
+                            
+                            <div className="mt-8 border-t pt-6">
+                                <h3 className="text-xl font-bold mb-4">Análisis Gráfico Avanzado</h3>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <PieChart title="Estudiantes por Adaptación" data={advancedAnalytics.adaptationCounts} colors={adaptationColors} />
+                                    <PieChart title="Porcentaje Global de Notas" data={advancedAnalytics.overallGradeCounts} colors={gradeColors} />
+                                </div>
+                                <AdaptationGradeDistributionCharts data={advancedAnalytics.gradeDistributionByAdaptation as any} />
+                            </div>
+                        </CardContent>
+                    </Card>
                 )}
                 
                 {isFormReady && (
-                    <div className="mb-8">
-                         <h2 className="text-xl font-bold text-text-main mb-4">3. Análisis Pedagógico Asistido por IA</h2>
-                         <button onClick={handleGenerateAnalysis} disabled={isLoading || studentEvals.size === 0} className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 disabled:bg-purple-300 w-full justify-center">
-                             <SparklesIcon className="h-6 w-6"/>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>3. Análisis Pedagógico Asistido por IA</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <Button 
+                             onClick={handleGenerateAnalysis} 
+                             disabled={isLoading || studentEvals.size === 0} 
+                             className="w-full"
+                             size="lg"
+                         >
+                             <SparklesIcon className="h-5 w-5 mr-2"/>
                              {isLoading ? 'Analizando datos...' : 'Generar Análisis Pedagógico con IA'}
-                         </button>
+                         </Button>
                          {isLoading && <div className="text-center mt-4">La IA está procesando la información, esto puede tardar unos segundos...</div>}
 
                          {aiAnalysis.length > 0 && (
                             <div className="mt-6">
                                  <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
+                                    <table className="min-w-full divide-y divide-border">
+                                        <thead className="bg-muted">
                                             <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dificultad Detectada</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frec.</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estudiantes</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Acciones Sugeridas</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Dificultad Detectada</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Categoría</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Frec.</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Estudiantes</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/3">Acciones Sugeridas</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
-                                            {aiAnalysis.map((item, index) => (
-                                                <tr key={index}>
+                                        <tbody className="bg-background divide-y divide-border">
+                                            {(aiAnalysis || []).map((item, index) => (
+                                                <tr key={index} className="hover:bg-muted/50">
                                                     <td className="px-4 py-2 align-top font-medium">{item.dificultad}</td>
-                                                    <td className="px-4 py-2 align-top"><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.categoria === 'Académico' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>{item.categoria}</span></td>
+                                                    <td className="px-4 py-2 align-top">
+                                                        <Badge variant={item.categoria === 'Académico' ? 'default' : 'secondary'}>
+                                                            {item.categoria}
+                                                        </Badge>
+                                                    </td>
                                                     <td className="px-4 py-2 align-top text-center">{item.frecuencia}</td>
                                                     <td className="px-4 py-2 align-top text-sm">{item.estudiantes}</td>
                                                     <td className="px-4 py-2 align-top">
-                                                        <textarea value={item.accionesSugeridas} onChange={(e) => handleAiActionChange(index, e.target.value)} rows={4} className="w-full p-1 border rounded-md text-sm bg-yellow-50"></textarea>
+                                                        <Textarea 
+                                                            value={item.accionesSugeridas} 
+                                                            onChange={(e) => handleAiActionChange(index, e.target.value)} 
+                                                            rows={4} 
+                                                            className="w-full"
+                                                        />
                                                     </td>
                                                 </tr>
                                             ))}
@@ -9637,13 +9717,14 @@ const EvaluationView: React.FC<{
                                     </table>
                                  </div>
                                  <div className="mt-6 flex justify-end">
-                                     <button onClick={handleSaveMinuta} className="px-6 py-3 bg-brand-primary text-white font-semibold rounded-lg hover:bg-opacity-90">
+                                     <Button onClick={handleSaveMinuta} size="lg">
                                          Guardar Minuta de Reunión
-                                     </button>
+                                     </Button>
                                  </div>
                             </div>
                          )}
-                    </div>
+                        </CardContent>
+                    </Card>
                 )}
             </div>
         );
@@ -9654,11 +9735,16 @@ const EvaluationView: React.FC<{
         if (selectedMinuta) {
              const advancedAnalytics = calculateAdvancedAnalytics(selectedMinuta.datos_alumnos);
             return (
-                <div className="bg-white p-6 rounded-lg shadow-md space-y-8">
-                     <button onClick={() => setSelectedMinuta(null)} className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4">
-                        <ArrowLeftIcon />
+                <Card className="space-y-8">
+                    <CardContent className="pt-6">
+                        <Button 
+                         onClick={() => setSelectedMinuta(null)} 
+                         variant="ghost" 
+                         className="mb-4"
+                     >
+                        <ArrowLeftIcon className="h-4 w-4 mr-2" />
                         Volver al Historial
-                    </button>
+                    </Button>
 
                     {/* Minuta Context */}
                     <div>
@@ -9677,23 +9763,33 @@ const EvaluationView: React.FC<{
                      <div>
                         <h3 className="text-xl font-bold text-text-main mb-4">Datos de Evaluación Registrados</h3>
                         <div className="overflow-x-auto border rounded-lg">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
+                            <table className="min-w-full divide-y divide-border">
+                                <thead className="bg-muted">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Alumno</th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Nota</th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Adaptación</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/2">Observaciones</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/3">Alumno</th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">Nota</th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">Adaptación</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/2">Observaciones</th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {selectedMinuta.datos_alumnos.map(evalData => {
+                                <tbody className="bg-background divide-y divide-border">
+                                    {(selectedMinuta.datos_alumnos || []).map(evalData => {
                                         const student = alumnos.find(a => a.id_alumno === evalData.id_alumno);
                                         return (
-                                            <tr key={evalData.id_alumno}>
+                                            <tr key={evalData.id_alumno} className="hover:bg-muted/50">
                                                 <td className="px-4 py-2 whitespace-nowrap font-medium">{student ? `${student.apellidos}, ${student.nombres}` : 'Alumno no encontrado'}</td>
-                                                <td className="px-4 py-2 text-center">{evalData.nota || '-'}</td>
-                                                <td className="px-4 py-2 text-center">{evalData.adaptacion || '-'}</td>
+                                                <td className="px-4 py-2 text-center">
+                                                    {evalData.nota ? (
+                                                        <Badge variant={evalData.nota === 'A' || evalData.nota === 'B' ? 'default' : evalData.nota === 'C' ? 'secondary' : 'destructive'}>
+                                                            {evalData.nota}
+                                                        </Badge>
+                                                    ) : '-'}
+                                                </td>
+                                                <td className="px-4 py-2 text-center">
+                                                    {evalData.adaptacion ? (
+                                                        <Badge variant="outline">{evalData.adaptacion}</Badge>
+                                                    ) : '-'}
+                                                </td>
                                                 <td className="px-4 py-2 text-sm">{evalData.observaciones || '-'}</td>
                                             </tr>
                                         );
@@ -9716,21 +9812,25 @@ const EvaluationView: React.FC<{
                     <div>
                         <h3 className="text-xl font-bold text-text-main mb-4">Análisis Pedagógico de IA</h3>
                          <div className="overflow-x-auto border rounded-lg">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
+                            <table className="min-w-full divide-y divide-border">
+                                <thead className="bg-muted">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dificultad Detectada</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Frec.</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estudiantes</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Acciones Sugeridas</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Dificultad Detectada</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Categoría</th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">Frec.</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Estudiantes</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/3">Acciones Sugeridas</th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {selectedMinuta.analisis_ia.map((item, index) => (
-                                        <tr key={index}>
+                                <tbody className="bg-background divide-y divide-border">
+                                    {(selectedMinuta.analisis_ia || []).map((item, index) => (
+                                        <tr key={index} className="hover:bg-muted/50">
                                             <td className="px-4 py-2 align-top font-medium">{item.dificultad}</td>
-                                            <td className="px-4 py-2 align-top"><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.categoria === 'Académico' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>{item.categoria}</span></td>
+                                            <td className="px-4 py-2 align-top">
+                                                <Badge variant={item.categoria === 'Académico' ? 'default' : 'secondary'}>
+                                                    {item.categoria}
+                                                </Badge>
+                                            </td>
                                             <td className="px-4 py-2 align-top text-center">{item.frecuencia}</td>
                                             <td className="px-4 py-2 align-top text-sm">{item.estudiantes}</td>
                                             <td className="px-4 py-2 align-top text-sm whitespace-pre-wrap">{item.accionesSugeridas}</td>
@@ -9740,52 +9840,64 @@ const EvaluationView: React.FC<{
                             </table>
                          </div>
                     </div>
-                </div>
+                    </CardContent>
+                </Card>
             );
         }
 
         return (
-            <div className="mb-8">
-                <h2 className="text-xl font-bold text-text-main mb-4">Historial de Minutas de Reunión</h2>
-                <div className="space-y-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Historial de Minutas de Reunión</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
                     {minutas.length > 0 ? (
                         minutas
                             .sort((a,b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime())
                             .map(minuta => (
-                                <div key={minuta.id_minuta} className="border rounded-lg p-4 flex justify-between items-center">
-                                    <div>
-                                        <p className="font-bold">{minuta.grado} - {minuta.materia}</p>
-                                        <p className="text-sm text-gray-600">{minuta.evaluacion} ({minuta.lapso})</p>
-                                        <p className="text-xs text-gray-400">Fecha: {new Date(minuta.fecha_creacion).toLocaleDateString()}</p>
-                                    </div>
-                                    <button onClick={() => setSelectedMinuta(minuta)} className="px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg hover:bg-apple-gray-light font-medium transition-apple">
-                                        Ver Detalles
-                                    </button>
-                                </div>
+                                <Card key={minuta.id_minuta} className="hover:shadow-md transition-shadow">
+                                    <CardContent className="p-4 flex justify-between items-center">
+                                        <div>
+                                            <p className="font-bold">{minuta.grado} - {minuta.materia}</p>
+                                            <p className="text-sm text-muted-foreground">{minuta.evaluacion} ({minuta.lapso})</p>
+                                            <p className="text-xs text-muted-foreground">Fecha: {new Date(minuta.fecha_creacion).toLocaleDateString()}</p>
+                                        </div>
+                                        <Button 
+                                            onClick={() => setSelectedMinuta(minuta)} 
+                                            variant="outline"
+                                        >
+                                            Ver Detalles
+                                        </Button>
+                                    </CardContent>
+                                </Card>
                             ))
                     ) : (
-                        <p className="text-center text-gray-500 py-8">No hay minutas guardadas todavía.</p>
+                        <p className="text-center text-muted-foreground py-8">No hay minutas guardadas todavía.</p>
                     )}
-                </div>
-            </div>
+                    </div>
+                </CardContent>
+            </Card>
         );
     };
 
     return (
-        <div>
-             <div className="flex border-b mb-6">
-                <button
+        <div className="space-y-6">
+            <div className="flex border-b mb-6">
+                <Button
+                    variant={viewMode === 'new' ? 'default' : 'ghost'}
                     onClick={() => { setViewMode('new'); setSelectedMinuta(null); }}
-                    className={`px-4 py-2 text-sm font-medium ${viewMode === 'new' ? 'border-b-2 border-brand-primary text-brand-primary' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`rounded-none border-b-2 ${viewMode === 'new' ? 'border-primary' : 'border-transparent'}`}
                 >
                     Nueva Reunión
-                </button>
-                <button
+                </Button>
+                <Button
+                    variant={viewMode === 'history' ? 'default' : 'ghost'}
                     onClick={() => { setViewMode('history'); setSelectedMinuta(null); }}
-                    className={`px-4 py-2 text-sm font-medium ${viewMode === 'history' ? 'border-b-2 border-brand-primary text-brand-primary' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`rounded-none border-b-2 ${viewMode === 'history' ? 'border-primary' : 'border-transparent'}`}
                 >
                     Historial de Reuniones
-                </button>
+                </Button>
             </div>
             {viewMode === 'new' ? renderNewMeetingForm() : renderHistoryView()}
         </div>
@@ -9797,12 +9909,8 @@ const EvaluationView: React.FC<{
 
 const App: React.FC = () => {
   // Usuario por defecto sin requerir login
-  const [currentUser, setCurrentUser] = useState<Usuario | null>({
-    id: '00000000-0000-0000-0000-000000000000', // UUID válido para usuario por defecto
-    email: 'usuario@elmanglar.edu',
-    role: 'coordinador' as UserRole,
-    fullName: 'Usuario del Sistema',
-  });
+  const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
+  const [showLogin, setShowLogin] = useState(true);
   const [activeView, setActiveView] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -9874,29 +9982,34 @@ const App: React.FC = () => {
     setDataError(null);
     
     try {
-      // Helper function to handle rate limiting
-      const handleRateLimit = (err: any, serviceName: string) => {
+      // Helper function to handle errors
+      const handleError = (err: any, serviceName: string) => {
+        // Rate limiting
         if (err?.message?.includes('429') || err?.code === 'PGRST301') {
           console.warn(`Rate limit for ${serviceName}. Will retry later.`);
           return [];
         }
-        // Solo registrar errores no relacionados con rate limiting
-        if (!err?.message?.includes('429') && !err?.code?.includes('429')) {
-          console.error(`Error loading ${serviceName}:`, err);
+        // RLS/permission errors
+        if (err?.code === '42501' || err?.message?.includes('permission') || err?.message?.includes('row-level security')) {
+          console.error(`❌ RLS bloqueando acceso a ${serviceName}. Ejecuta DESHABILITAR_RLS_TODAS_TABLAS_COMPLETO.sql`, err);
+          setDataError(`Error de permisos al cargar ${serviceName}. Verifica las políticas RLS.`);
+          return [];
         }
+        // Other errors
+        console.error(`Error loading ${serviceName}:`, err);
         return [];
       };
       
-      // Load all data in parallel with rate limit handling
+      // Load all data in parallel with error handling
       const [alumnosData, docentesData, clasesData, planificacionesData, horariosData, minutasData, notificationsData, aulasData] = await Promise.all([
-        alumnosService.getAll().catch((err) => handleRateLimit(err, 'alumnos')),
-        docentesService.getAll().catch((err) => handleRateLimit(err, 'docentes')),
-        clasesService.getAll().catch((err) => handleRateLimit(err, 'clases')),
-        planificacionesService.getAll().catch((err) => handleRateLimit(err, 'planificaciones')),
-        horariosService.getAll().catch((err) => handleRateLimit(err, 'horarios')),
-        minutasService.getAll().catch((err) => handleRateLimit(err, 'minutas')),
-        notificacionesService.getAll().catch((err) => handleRateLimit(err, 'notificaciones')),
-        aulasService.getAll().catch((err) => handleRateLimit(err, 'aulas'))
+        alumnosService.getAll().catch((err) => handleError(err, 'alumnos')),
+        docentesService.getAll().catch((err) => handleError(err, 'docentes')),
+        clasesService.getAll().catch((err) => handleError(err, 'clases')),
+        planificacionesService.getAll().catch((err) => handleError(err, 'planificaciones')),
+        horariosService.getAll().catch((err) => handleError(err, 'horarios')),
+        minutasService.getAll().catch((err) => handleError(err, 'minutas')),
+        notificacionesService.getAll().catch((err) => handleError(err, 'notificaciones')),
+        aulasService.getAll().catch((err) => handleError(err, 'aulas'))
       ]);
 
       setAlumnos(alumnosData.map(convertAlumno));
@@ -10249,7 +10362,7 @@ const App: React.FC = () => {
   }, []);
   */
   
-  const handleLoginSuccess = async (user: { id: string; email: string; role: string; fullName?: string }) => {
+  const handleLoginSuccess = async (user: { id: string; email: string; username: string; role: string; fullName?: string }) => {
     // For docentes, try to link to existing docente record by email
     let docenteId: string | undefined = undefined;
     if (user.role === 'docente') {
@@ -10301,18 +10414,19 @@ const App: React.FC = () => {
     setCurrentUser({
       id: user.id,
       email: user.email,
+      username: user.username,
       role: user.role as UserRole,
-      fullName: user.fullName,
+      fullName: user.fullName || user.username,
       docenteId: docenteId,
     });
+    setShowLogin(false);
     setActiveView('dashboard');
   };
 
   const handleLogout = async () => {
-    // Logout deshabilitado - la plataforma está abierta
-    // await supabase.auth.signOut();
-    // setCurrentUser(null);
-    console.log('Logout deshabilitado - plataforma abierta');
+    await supabase.auth.signOut();
+    setCurrentUser(null);
+    setShowLogin(true);
   };
 
   const handleNavigate = (view: string, params: any = null) => {
@@ -10450,24 +10564,16 @@ const App: React.FC = () => {
       'lapsos-admin': 'Gestión de Lapsos',
   };
 
-  // Login deshabilitado - plataforma abierta
-  // Asegurar que siempre haya un usuario (nunca mostrar login)
-  if (!currentUser) {
-    // Si por alguna razón currentUser es null, establecer el usuario por defecto
-    setCurrentUser({
-      id: '00000000-0000-0000-0000-000000000000', // UUID válido para usuario por defecto
-      email: 'usuario@elmanglar.edu',
-      role: 'coordinador' as UserRole,
-      fullName: 'Usuario del Sistema',
-    });
-    // Retornar loading mientras se establece
+  // Show login screen if no user is logged in
+  if (!currentUser || showLogin) {
     return (
+      <Suspense fallback={
       <div className="flex h-screen bg-background items-center justify-center">
-        <div className="text-center space-y-4 w-full max-w-md px-4">
           <Skeleton className="h-12 w-12 mx-auto rounded-full" />
-          <Skeleton className="h-4 w-32 mx-auto" />
         </div>
-      </div>
+      }>
+        <LoginScreen onLoginSuccess={handleLoginSuccess} />
+      </Suspense>
     );
   }
 

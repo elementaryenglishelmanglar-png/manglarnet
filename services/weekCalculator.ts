@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Lapso, SemanaLapso } from './supabaseDataService';
+import { supabase } from './supabaseClient';
 
 // Helper to get the appropriate Supabase client (Vite compatibility only)
 // In Next.js, the client should always be passed as a parameter
@@ -15,20 +16,14 @@ const getSupabaseClient = (): SupabaseClient => {
     throw new Error('Supabase client must be provided in Next.js environment. Pass it as a parameter.');
   }
   
-  // Vite environment - use the old client
+  // Vite environment - use the imported client
   if (cachedSupabaseClient) {
     return cachedSupabaseClient;
   }
   
-  // Only works in Vite where import.meta.env is available
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { supabase } = require('./supabaseClient');
-    cachedSupabaseClient = supabase;
-    return supabase;
-  }
-  
-  throw new Error('Unable to determine environment. Please provide Supabase client explicitly.');
+  // Cache and return the imported supabase client
+  cachedSupabaseClient = supabase;
+  return supabase;
 };
 
 export interface SemanaInfo {

@@ -1,327 +1,259 @@
 import React, { useState } from 'react';
-import { supabase, AuthorizedUser } from '../services/supabaseClient';
+import { supabase } from '../services/supabaseClient';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 
 interface LoginScreenProps {
-  onLoginSuccess: (user: { id: string; email: string; role: string; fullName?: string }) => void;
+  onLoginSuccess: (user: { id: string; email: string; username: string; role: string; fullName?: string }) => void;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
 
-  const handleGoogleLogin = async () => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsLoading(true);
     setError(null);
 
+    if (!username.trim() || !password.trim()) {
+      setError('Por favor, ingresa tu usuario y contraseña');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      // Sign in with Google OAuth
-      const { data, error: signInError } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}`,
-          queryParams: {
-            // Force account selection screen to allow choosing between multiple Google accounts
-            prompt: 'select_account',
-            access_type: 'offline',
-          },
-        },
+      // Normalize username (treat as email for Supabase Auth)
+      const email = username.includes('@') ? username.toLowerCase().trim() : `${username.toLowerCase().trim()}@manglarnet.local`;
+      
+      // Sign in with email and password
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
       });
 
       if (signInError) {
         throw signInError;
       }
+
+      if (!authData.user) {
+        throw new Error('No se pudo autenticar el usuario');
+      }
+
+      // Skip RPC call - it may not exist or may be blocked by RLS
+      // We'll check directly in checkAuthorization
+
+      // Check authorization in usuarios table
+      const role = await checkAuthorization(authData.user.id, email);
+      
+      if (role) {
+        // Get user details from usuarios table
+        const { data: userData, error: userError } = await supabase
+          .from('usuarios')
+          .select('username, role, email, is_active')
+          .eq('id', authData.user.id)
+          .single();
+
+        if (userError) {
+          console.error('Error fetching user data:', userError);
+          console.error('Error details:', {
+            code: userError.code,
+            message: userError.message,
+            details: userError.details,
+            hint: userError.hint
+          });
+          
+          // If user doesn't exist in usuarios table
+          if (userError.code === 'PGRST116') {
+            // User not found in usuarios table
+            setError('Usuario no encontrado en la base de datos. El usuario existe en Supabase Auth pero no en la tabla usuarios. Por favor, ejecuta el script SQL para crear el usuario en la tabla usuarios.');
+            await supabase.auth.signOut();
+            setIsLoading(false);
+            return;
+          }
+          
+          // If it's a permission error (RLS blocking)
+          if (userError.code === '42501' || userError.message?.includes('permission') || userError.message?.includes('row-level security')) {
+            setError('Error de permisos: Las políticas RLS están bloqueando el acceso. Por favor, ejecuta el script SQL para corregir las políticas RLS.');
+            await supabase.auth.signOut();
+            setIsLoading(false);
+            return;
+          }
+          
+          throw new Error(`Error al verificar usuario: ${userError.message}`);
+        }
+
+        if (!userData) {
+          throw new Error('Usuario no encontrado en la base de datos');
+        }
+
+        if (!userData.is_active) {
+          await supabase.auth.signOut();
+          setError('Tu cuenta está desactivada. Contacta al administrador.');
+          setIsLoading(false);
+          return;
+        }
+
+        onLoginSuccess({
+          id: authData.user.id,
+          email: userData.email || email,
+          username: userData.username,
+          role: userData.role,
+          fullName: userData.username,
+        });
+      } else {
+        await supabase.auth.signOut();
+        setError('Usuario no autorizado. Asegúrate de que tu usuario esté registrado en la tabla usuarios con rol asignado.');
+      }
     } catch (err: any) {
-      console.error('Error signing in with Google:', err);
-      setError('Error al iniciar sesión con Google. Por favor, inténtalo de nuevo.');
+      console.error('Error signing in:', err);
+      if (err.message?.includes('Invalid login credentials') || err.message?.includes('Email not confirmed')) {
+        setError('Usuario o contraseña incorrectos');
+      } else {
+        setError(err.message || 'Error al iniciar sesión. Por favor, inténtalo de nuevo.');
+      }
       setIsLoading(false);
     }
   };
 
-  // Check if user is authorized after OAuth callback
-  const checkAuthorization = async (email: string) => {
-    setIsChecking(true);
+  // Check if user is authorized
+  const checkAuthorization = async (userId: string, email: string): Promise<string | false> => {
     try {
-      const normalizedEmail = email.toLowerCase().trim();
-      console.log('Checking authorization for:', normalizedEmail);
+      console.log('Checking authorization for user:', userId, email);
       
-      // Verificar que Supabase esté configurado
-      if (!supabase || !(supabase as any).isConfigured) {
-        console.error('Supabase no está configurado correctamente');
-        setError('Error de configuración. Verifica que las variables de entorno estén configuradas.');
-        setIsChecking(false);
-        return false;
-      }
+      // Skip RPC call - check directly
+      
+      // Try to get user from usuarios table
+      const { data: usuario, error: usuarioError } = await supabase
+        .from('usuarios')
+        .select('id, username, role, is_active')
+        .eq('id', userId)
+        .maybeSingle(); // Use maybeSingle instead of single to avoid errors if not found
 
-      // Verificar que el usuario esté autenticado y obtener la sesión completa
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session) {
-        console.error('Error obteniendo sesión:', sessionError);
-        setError('No se pudo verificar la autenticación. Por favor, intenta iniciar sesión de nuevo.');
-        setIsChecking(false);
-        return false;
-      }
-      
-      const currentUser = session.user;
-      if (!currentUser || !currentUser.email) {
-        console.error('Usuario no encontrado en sesión');
-        setError('No se pudo verificar la autenticación. Por favor, intenta iniciar sesión de nuevo.');
-        setIsChecking(false);
-        return false;
-      }
-      
-      console.log('Usuario autenticado:', currentUser.email);
-      console.log('Token de sesión presente:', !!session.access_token);
-      console.log('Ejecutando consulta a authorized_users...');
-      console.log('Email a buscar:', normalizedEmail);
-      const startTime = Date.now();
-      
-      // Hacer la consulta con timeout explícito
-      let queryResult: any;
-      try {
-        console.log('Iniciando consulta a authorized_users...');
-        
-        // Crear una promesa con timeout
-        const queryPromise = supabase
-          .from('authorized_users')
-          .select('id, email, role')
-          .eq('email', normalizedEmail)
-          .maybeSingle();
-        
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout: La consulta tardó más de 10 segundos')), 10000)
-        );
-        
-        queryResult = await Promise.race([queryPromise, timeoutPromise]);
-        
-        const elapsedTime = Date.now() - startTime;
-        console.log(`Consulta completada en ${elapsedTime}ms`);
-        
-        if (elapsedTime > 5000) {
-          console.warn('⚠️ La consulta tardó más de 5 segundos, esto puede indicar un problema de conexión o RLS');
-        }
-      } catch (queryError: any) {
-        console.error('Error ejecutando consulta:', queryError);
-        console.error('Tipo de error:', typeof queryError);
-        console.error('Mensaje:', queryError?.message);
-        
-        if (queryError?.message?.includes('Timeout')) {
-          setError('La consulta está tardando demasiado. Esto puede indicar un problema con las políticas RLS en Supabase. Por favor, verifica las políticas de la tabla authorized_users.');
-        } else {
-          setError('Error al consultar la base de datos. Verifica tu conexión y las políticas RLS.');
-        }
-        setIsChecking(false);
-        return false;
-      }
-      
-      const { data: authorizedUser, error: checkError } = queryResult;
-
-      console.log('Authorization check result:', { 
-        authorizedUser: authorizedUser ? { email: authorizedUser.email, role: authorizedUser.role } : null, 
-        checkError: checkError ? {
-          code: checkError.code,
-          message: checkError.message,
-          details: checkError.details,
-          hint: checkError.hint
-        } : null
-      });
-
-      // If there's an error and it's not a "not found" error, handle it
-      if (checkError) {
-        console.error('Database error checking authorization:', {
-          code: checkError.code,
-          message: checkError.message,
-          details: checkError.details,
-          hint: checkError.hint,
-          fullError: checkError
+      if (usuarioError) {
+        console.error('Error checking usuarios table:', usuarioError);
+        console.error('Error details:', {
+          code: usuarioError.code,
+          message: usuarioError.message,
+          details: usuarioError.details,
+          hint: usuarioError.hint
         });
         
-        // Si el error es "requested path is invalid", puede ser un problema de configuración
-        if (checkError.message?.includes('requested path is invalid') || checkError.message?.includes('invalid')) {
-          console.error('Error de ruta inválida - posible problema con la configuración de Supabase');
-          setError('Error de configuración de Supabase. Verifica que la URL y la API key sean correctas.');
-          setIsChecking(false);
-          return false;
+        // If it's a permission error, it might be RLS blocking access
+        if (usuarioError.code === '42501' || usuarioError.message?.includes('permission')) {
+          console.error('RLS policy blocking access. User might not have permission to read usuarios table.');
+          // Try one more time after a brief delay
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const { data: retryUsuario, error: retryError } = await supabase
+            .from('usuarios')
+            .select('id, username, role, is_active')
+            .eq('id', userId)
+            .maybeSingle();
+          
+          if (!retryError && retryUsuario && retryUsuario.is_active) {
+            console.log('Retry successful, user found:', retryUsuario.username, retryUsuario.role);
+            return retryUsuario.role;
+          }
         }
         
-        // Check if it's a permission error (RLS issue)
-        if (checkError.code === '42501' || checkError.message?.includes('permission') || checkError.message?.includes('row-level security')) {
-          setError('Error de permisos al verificar autorización. Por favor, contacta al administrador.');
-          setIsChecking(false);
-          return false;
-        }
-        
-        // Check if it's a 500 error or rate limit
-        if (checkError.code === 'PGRST301' || checkError.message?.includes('500') || checkError.message?.includes('429')) {
-          setError('Error del servidor al verificar autorización. Por favor, espera unos momentos e intenta de nuevo.');
-          setIsChecking(false);
-          return false;
-        }
-        
-        // Para otros errores, mostrar mensaje pero no hacer signOut
-        setError('Error al verificar autorización. Por favor, intenta de nuevo.');
-        setIsChecking(false);
         return false;
       }
 
-      if (!authorizedUser) {
-        // User is not in whitelist
-        console.log('User not found in authorized_users');
-        await supabase.auth.signOut();
-        setError(`Acceso denegado. El correo "${normalizedEmail}" no está autorizado para acceder a este sistema. Por favor, contacta al administrador.`);
-        setIsChecking(false);
-        return false;
+      if (usuario) {
+        if (!usuario.is_active) {
+          console.log('User is inactive');
+          return false;
+        }
+        console.log('User found in usuarios table:', usuario.username, usuario.role);
+        return usuario.role;
       }
 
-      // User is authorized, return their role
-      console.log('User authorized with role:', authorizedUser.role);
-      setIsChecking(false);
-      return authorizedUser.role;
+      // User not found in usuarios table
+      console.log('User not found in usuarios table. User ID:', userId);
+      console.log('This usually means:');
+      console.log('1. RLS policies are blocking access');
+      console.log('2. User does not exist in usuarios table');
+      console.log('3. User ID mismatch between auth.users and usuarios');
+      return false;
     } catch (err: any) {
       console.error('Error checking authorization:', err);
-      const errorMessage = err.message || 'Error al verificar autorización. Por favor, inténtalo de nuevo.';
-      setError(errorMessage);
-      setIsChecking(false);
       return false;
     }
   };
 
-  // Check session on mount and after OAuth redirect
+  // Check session on mount
   React.useEffect(() => {
     let isMounted = true;
-    let timeoutId: NodeJS.Timeout | null = null;
 
     const checkSession = async () => {
       try {
-        console.log('Checking session...');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        // Esperar un momento para que Supabase procese el callback de OAuth
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        if (code) {
-          console.log('OAuth callback detectado, esperando procesamiento...');
-          // Esperar 2 segundos para que Supabase procese el código y establezca la sesión
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          // Limpiar la URL después de esperar
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-        
-        console.log('Obteniendo sesión...');
-        // Intentar obtener la sesión hasta 3 veces con espera entre intentos
-        let session = null;
-        let sessionError = null;
-        for (let i = 0; i < 3; i++) {
-          const result = await supabase.auth.getSession();
-          session = result.data.session;
-          sessionError = result.error;
-          if (session || sessionError) break;
-          if (i < 2) {
-            console.log(`Sesión no disponible, reintentando en 1 segundo... (intento ${i + 1}/3)`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-        }
-        
-        const finalSession = session;
-        const finalSessionError = sessionError;
-        
-        if (finalSessionError) {
-          console.error('Session error:', finalSessionError);
-          if (isMounted) {
-            setIsChecking(false);
-            setError('Error al obtener la sesión. Por favor, intenta de nuevo.');
-          }
-          return;
-        }
-        
-        console.log('Session found:', finalSession?.user?.email);
-        console.log('Session token present:', !!finalSession?.access_token);
-        
-        if (!finalSession?.user?.email) {
-          console.log('No session found, setting isChecking to false');
+        if (sessionError || !session?.user) {
           if (isMounted) {
             setIsChecking(false);
           }
           return;
         }
 
-        console.log('Calling checkAuthorization for:', finalSession.user.email);
-        const role = await checkAuthorization(finalSession.user.email);
-        console.log('checkAuthorization returned:', role);
+        const role = await checkAuthorization(session.user.id, session.user.email || '');
         
         if (role && isMounted) {
-          // Get user metadata
-          console.log('Getting user metadata...');
-          const { data: userData } = await supabase.auth.getUser();
-          const fullName = userData.user?.user_metadata?.full_name || 
-                          userData.user?.user_metadata?.name ||
-                          finalSession.user.email.split('@')[0];
+          // Get user details from usuarios table
+          const { data: userData } = await supabase
+            .from('usuarios')
+            .select('username, role, email')
+            .eq('id', session.user.id)
+            .single();
 
-          console.log('Calling onLoginSuccess with role:', role, 'fullName:', fullName);
+          if (userData) {
+            onLoginSuccess({
+              id: session.user.id,
+              email: userData.email || session.user.email || '',
+              username: userData.username,
+              role: userData.role,
+              fullName: userData.username,
+            });
+          } else {
+            // Fallback to email-based username
+            const email = session.user.email || '';
           onLoginSuccess({
-            id: finalSession.user.id,
-            email: finalSession.user.email,
+              id: session.user.id,
+              email: email,
+              username: email.split('@')[0],
             role: role,
-            fullName: fullName,
-          });
-          if (isMounted) {
-            setIsChecking(false);
+              fullName: email.split('@')[0],
+            });
           }
-        } else if (isMounted) {
-          // Si no hay rol, asegurarse de que isChecking sea false
-          console.log('No role returned, setting isChecking to false');
+        }
+        
+        if (isMounted) {
           setIsChecking(false);
         }
       } catch (error) {
         console.error('Error in checkSession:', error);
         if (isMounted) {
           setIsChecking(false);
-          setError('Error al verificar la sesión. Por favor, intenta de nuevo.');
         }
       }
     };
-
-    // Timeout de seguridad: si después de 15 segundos no se completa, resetear
-    timeoutId = setTimeout(() => {
-      if (isMounted) {
-        console.warn('Timeout en verificación de autorización después de 15 segundos');
-        console.warn('Esto puede indicar un problema con la conexión a Supabase o con las políticas RLS');
-        setIsChecking(false);
-        setError('La verificación está tomando demasiado tiempo. Verifica tu conexión a internet y las políticas RLS en Supabase. Si el problema persiste, recarga la página.');
-      }
-    }, 15000);
 
     checkSession();
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state change:', event);
-      if (event === 'SIGNED_IN' && session?.user?.email && isMounted) {
-        const role = await checkAuthorization(session.user.email);
-        
-        if (role && isMounted) {
-          const fullName = session.user.user_metadata?.full_name || 
-                          session.user.user_metadata?.name ||
-                          session.user.email.split('@')[0];
-
-          onLoginSuccess({
-            id: session.user.id,
-            email: session.user.email,
-            role: role,
-            fullName: fullName,
-          });
-        }
-      } else if (event === 'SIGNED_OUT' && isMounted) {
+      if (event === 'SIGNED_OUT' && isMounted) {
         setIsChecking(false);
       }
     });
 
     return () => {
       isMounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
       subscription.unsubscribe();
     };
   }, []);
@@ -347,52 +279,61 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             <span className="text-brand-primary">Bienvenido a ManglarNet</span>
           </CardTitle>
           <CardDescription className="text-base">
-            Inicia sesión con tu cuenta de Google
+            Ingresa tu usuario y contraseña para acceder
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
           {error && (
             <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
               <p className="text-sm text-destructive">{error}</p>
             </div>
           )}
 
+            <div className="space-y-2">
+              <Label htmlFor="username">Usuario</Label>
+              <Input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Ingresa tu usuario"
+                disabled={isLoading}
+                autoComplete="username"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Ingresa tu contraseña"
+                disabled={isLoading}
+                autoComplete="current-password"
+                required
+              />
+            </div>
+
           <Button
-            onClick={handleGoogleLogin}
+              type="submit"
             disabled={isLoading}
-            variant="outline"
-            className="w-full h-11 gap-3"
+              className="w-full h-11"
           >
             {isLoading ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-foreground"></div>
-                <span className="font-medium">Conectando...</span>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-foreground mr-2"></div>
+                  <span className="font-medium">Iniciando sesión...</span>
               </>
             ) : (
-              <>
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  />
-                </svg>
-                <span className="font-medium">Continuar con Google</span>
-              </>
+                <span className="font-medium">Iniciar Sesión</span>
             )}
           </Button>
+          </form>
         </CardContent>
 
         <CardFooter className="flex flex-col">

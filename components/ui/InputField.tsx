@@ -52,9 +52,11 @@ export const InputField: React.FC<InputFieldProps> = ({
           className="min-h-[80px]"
         />
       ) : as === 'select' ? (
-        <Select value={value} onValueChange={(val) => {
+        <Select value={value === '' ? 'none' : value} onValueChange={(val) => {
+          // Convert "none" back to empty string for compatibility
+          const actualValue = val === 'none' ? '' : val;
           const event = {
-            target: { name, value: val }
+            target: { name, value: actualValue }
           } as React.ChangeEvent<HTMLSelectElement>;
           onChange(event);
         }}>
@@ -64,8 +66,11 @@ export const InputField: React.FC<InputFieldProps> = ({
           <SelectContent>
             {React.Children.map(children, (child) => {
               if (React.isValidElement(child) && child.type === 'option') {
+                const optionValue = child.props.value;
+                // Radix UI doesn't allow empty string values, convert to "none"
+                const selectValue = optionValue === '' || optionValue === undefined ? 'none' : String(optionValue);
                 return (
-                  <SelectItem key={child.props.value} value={child.props.value}>
+                  <SelectItem key={selectValue} value={selectValue}>
                     {child.props.children}
                   </SelectItem>
                 );

@@ -8,7 +8,7 @@ Sistema de gestión pedagógica con integración de IA para planificaciones y an
 
 ## 🚀 Características
 
-- **Autenticación con Google OAuth**: Sistema seguro de login con Google
+- **Autenticación con Usuario y Contraseña**: Sistema seguro de login con autenticación propia
 - **Sistema de Whitelist**: Control de acceso mediante lista de usuarios autorizados
 - **Gestión de Roles**: Roles diferenciados (Directivo, Coordinador, Docente, Administrativo)
 - **Gestión de Alumnos**: Registro completo de información estudiantil
@@ -24,7 +24,6 @@ Sistema de gestión pedagógica con integración de IA para planificaciones y an
 - npm o yarn
 - Cuenta de Supabase (para hosting y autenticación)
 - API Key de Google Gemini (para funcionalidades de IA)
-- Cuenta de Google Cloud Platform (para OAuth)
 
 ## 🛠️ Instalación Local
 
@@ -47,9 +46,13 @@ Sistema de gestión pedagógica con integración de IA para planificaciones y an
    VITE_SUPABASE_ANON_KEY=your-anon-key-here
    ```
 
-4. **Configurar Google OAuth en Supabase**
+4. **Configurar el primer usuario administrador**
    
-   Sigue las instrucciones en [AUTH_SETUP.md](./AUTH_SETUP.md) para configurar la autenticación con Google.
+   Ejecuta las migraciones SQL en Supabase Dashboard (SQL Editor):
+   - `supabase/migrations/026_create_custom_auth_system.sql`
+   - `supabase/migrations/027_create_super_admin.sql`
+   
+   Luego crea el primer usuario super administrador siguiendo las instrucciones en la migración 027.
 
 5. **Ejecutar migraciones de base de datos**
    
@@ -74,12 +77,25 @@ Sistema de gestión pedagógica con integración de IA para planificaciones y an
 2. Crea un nuevo proyecto
 3. Anota tu **Project URL** y **anon key** desde Settings > API
 
-### Paso 2: Configurar Google OAuth
+### Paso 2: Configurar Sistema de Autenticación
 
-Sigue las instrucciones detalladas en [AUTH_SETUP.md](./AUTH_SETUP.md) para:
-1. Configurar Google OAuth en Google Cloud Platform
-2. Configurar OAuth en Supabase Dashboard
-3. Ejecutar la migración de base de datos para crear la tabla de usuarios autorizados
+1. Ejecuta las migraciones SQL en Supabase Dashboard (SQL Editor):
+   - `supabase/migrations/026_create_custom_auth_system.sql` - Crea la tabla usuarios y sistema de autenticación
+   - `supabase/migrations/027_create_super_admin.sql` - Crea función para super administrador
+   - `supabase/migrations/028_update_rls_policies_for_usuarios.sql` - Actualiza políticas RLS
+
+2. Crea el primer usuario super administrador:
+   - Ve a Supabase Dashboard > Authentication > Users
+   - Crea un nuevo usuario con email y contraseña
+   - Copia el User UID
+   - Ejecuta en SQL Editor:
+     ```sql
+     SELECT create_super_admin_user(
+       'USER_UID_AQUI'::UUID,
+       'admin',
+       'admin@manglarnet.local'
+     );
+     ```
 
 ### Paso 3: Configurar Edge Function para Gemini API
 
