@@ -699,7 +699,6 @@ const subjectColors: { [key: string]: string } = {
   // Clubes
   'Club (Teatro)': '#feff99',
   'Club (Estudiantina)': '#feff99',
-  'Club (Música)': '#feff99',
   
   // Otras materias
   'Evaluación': '#F3F4F6',
@@ -2368,6 +2367,7 @@ const TeacherScheduleDashboard: React.FC<{
                                 </div>
                             </div>
                         )}
+                        </div>
                     </div>
                 </div>
             </div>
