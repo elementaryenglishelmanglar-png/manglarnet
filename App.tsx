@@ -1573,7 +1573,8 @@ const DashboardView: React.FC<{
     docentes: Docente[];
     alumnos: Alumno[];
     planificaciones?: Planificacion[];
-}> = ({ stats, currentUser, schedules, clases, docentes, alumnos, planificaciones = [] }) => {
+    aulas?: Aula[];
+}> = ({ stats, currentUser, schedules, clases, docentes, alumnos, planificaciones = [], aulas = [] }) => {
     
     if (currentUser.role === 'docente') {
         return <TeacherScheduleDashboard 
@@ -9712,6 +9713,7 @@ const App: React.FC = () => {
                     docentes={docentes}
                     alumnos={alumnos}
                     planificaciones={planificaciones}
+                    aulas={aulas}
                 />;
       case 'students':
         return <StudentListView 
