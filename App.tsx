@@ -1031,38 +1031,53 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
 
     useEffect(() => {
         const loadTareas = async () => {
-            if (!currentUser.userId) return;
+            if (!currentUser.id) {
+                setIsLoading(false);
+                return;
+            }
             
             try {
                 setIsLoading(true);
-                const tareasData = await tareasCoordinadorService.getByUsuario(currentUser.userId);
+                const tareasData = await tareasCoordinadorService.getByUsuario(currentUser.id);
                 setTareas(tareasData);
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Error loading tareas:', error);
+                // Si la tabla no existe aún, simplemente mostrar lista vacía
+                if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+                    console.warn('Tabla tareas_coordinador no existe aún. Ejecuta la migración 020_create_tareas_coordinador.sql');
+                    setTareas([]);
+                } else {
+                    // Para otros errores, mostrar mensaje
+                    console.error('Error desconocido:', error);
+                }
             } finally {
                 setIsLoading(false);
             }
         };
         
         loadTareas();
-    }, [currentUser.userId]);
+    }, [currentUser.id]);
 
     const handleAddTarea = async () => {
-        if (!nuevaTarea.trim() || !currentUser.userId) return;
+        if (!nuevaTarea.trim() || !currentUser.id) return;
         
         try {
             setIsAdding(true);
             const nueva = await tareasCoordinadorService.create({
-                id_usuario: currentUser.userId,
+                id_usuario: currentUser.id,
                 descripcion: nuevaTarea.trim(),
                 completada: false,
                 prioridad: 'Normal'
             });
             setTareas(prev => [nueva, ...prev]);
             setNuevaTarea('');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error adding tarea:', error);
-            alert('Error al agregar la tarea. Por favor, inténtalo de nuevo.');
+            if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+                alert('La tabla de tareas aún no está creada. Por favor, ejecuta la migración SQL 020_create_tareas_coordinador.sql en Supabase.');
+            } else {
+                alert('Error al agregar la tarea. Por favor, inténtalo de nuevo.');
+            }
         } finally {
             setIsAdding(false);
         }
