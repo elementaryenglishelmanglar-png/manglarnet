@@ -9738,7 +9738,13 @@ const EvaluationView: React.FC<{
 // --- MAIN APP COMPONENT ---
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
+  // Usuario por defecto sin requerir login
+  const [currentUser, setCurrentUser] = useState<Usuario | null>({
+    id: 'default-user-id',
+    email: 'usuario@elmanglar.edu',
+    role: 'coordinador' as UserRole,
+    fullName: 'Usuario del Sistema',
+  });
   const [activeView, setActiveView] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -9804,7 +9810,7 @@ const App: React.FC = () => {
 
   // Load all data from Supabase
   const loadAllData = async () => {
-    if (!currentUser) return;
+    // Removido: if (!currentUser) return; - Ahora la plataforma está abierta
     
     setIsLoadingData(true);
     setDataError(null);
@@ -10005,6 +10011,9 @@ const App: React.FC = () => {
   }, [schedules, currentUser]);
 
 
+  // AUTENTICACIÓN DESHABILITADA - Plataforma abierta
+  // useEffect para verificación de sesión comentado
+  /*
   useEffect(() => {
     // Check for existing session
     const checkSession = async () => {
@@ -10180,6 +10189,7 @@ const App: React.FC = () => {
       subscription.unsubscribe();
     };
   }, []);
+  */
   
   const handleLoginSuccess = async (user: { id: string; email: string; role: string; fullName?: string }) => {
     // For docentes, try to link to existing docente record by email
@@ -10241,8 +10251,10 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setCurrentUser(null);
+    // Logout deshabilitado - la plataforma está abierta
+    // await supabase.auth.signOut();
+    // setCurrentUser(null);
+    console.log('Logout deshabilitado - plataforma abierta');
   };
 
   const handleNavigate = (view: string, params: any = null) => {
@@ -10380,20 +10392,14 @@ const App: React.FC = () => {
       'lapsos-admin': 'Gestión de Lapsos',
   };
 
-  if (!currentUser) {
-    return (
-      <Suspense fallback={
-        <div className="flex h-screen bg-background items-center justify-center">
-          <div className="text-center space-y-4 w-full max-w-md px-4">
-            <Skeleton className="h-12 w-12 mx-auto rounded-full" />
-            <Skeleton className="h-4 w-32 mx-auto" />
-          </div>
-        </div>
-      }>
-        <LoginScreen onLoginSuccess={handleLoginSuccess} />
-      </Suspense>
-    );
-  }
+  // Login deshabilitado - plataforma abierta
+  // if (!currentUser) {
+  //   return (
+  //     <Suspense fallback={...}>
+  //       <LoginScreen onLoginSuccess={handleLoginSuccess} />
+  //     </Suspense>
+  //   );
+  // }
 
   if (isLoadingData) {
     return (
