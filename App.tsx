@@ -1582,6 +1582,8 @@ const DashboardView: React.FC<{
             docentes={docentes}
             currentUser={currentUser}
             alumnos={alumnos}
+            planificaciones={planificaciones}
+            aulas={aulas}
         />;
     }
 
@@ -1656,13 +1658,666 @@ const DashboardView: React.FC<{
     );
 };
 
+// ============================================
+// WIDGETS PARA DOCENTES
+// ============================================
+
+// Widget 1: Resumen de Alumnos por Grado (solo grados del docente)
+const ResumenAlumnosDocenteWidget: React.FC<{ 
+    alumnos: Alumno[];
+    clases: Clase[];
+    currentUser: Usuario;
+}> = ({ alumnos, clases, currentUser }) => {
+    const studentsByGrade = useMemo(() => {
+        // Obtener solo los grados que enseña este docente
+        const teacherGrades = new Set<string>();
+        clases.forEach(clase => {
+            if (clase.id_docente_asignado === currentUser.docenteId) {
+                teacherGrades.add(clase.grado_asignado);
+            }
+        });
+        
+        const counts: { [key: string]: number } = {};
+        alumnos.forEach(student => {
+            if (teacherGrades.has(student.salon)) {
+                counts[student.salon] = (counts[student.salon] || 0) + 1;
+            }
+        });
+        return counts;
+    }, [alumnos, clases, currentUser.docenteId]);
+
+    const sortedGrades = useMemo(() => {
+        const gradeSet = new Set(Object.keys(studentsByGrade));
+        return GRADOS.filter(g => gradeSet.has(g));
+    }, [studentsByGrade]);
+
+    if (sortedGrades.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+            <h2 className="text-2xl font-bold text-text-main mb-6">Mis Alumnos por Grado</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                {sortedGrades.map((grade) => {
+                    const gradeColor = getGradeColor(grade);
+                    return (
+                        <div 
+                            key={grade} 
+                            className="p-6 rounded-xl shadow-lg text-white hover:shadow-xl transition-smooth hover-lift"
+                            style={{ backgroundColor: gradeColor }}
+                        >
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-4xl font-bold">{studentsByGrade[grade]}</p>
+                                    <p className="text-lg font-semibold">{grade}</p>
+                                </div>
+                                <UsersIcon className="h-10 w-10 opacity-75" />
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+// Widget 2: Mis Clases de Hoy
+const MisClasesHoyWidget: React.FC<{
+    schedules: WeeklySchedules;
+    clases: Clase[];
+    currentUser: Usuario;
+    aulas: Aula[];
+}> = ({ schedules, clases, currentUser, aulas }) => {
+    const [classesToday, setClassesToday] = useState<Array<{
+        hora: string;
+        materia: string;
+        grado: string;
+        aula?: string;
+        id_clase: string;
+    }>>([]);
+
+    useEffect(() => {
+        const loadClassesToday = async () => {
+            try {
+                const today = new Date();
+                const jsDayOfWeek = today.getDay();
+                
+                // Si es fin de semana, no hay clases
+                if (jsDayOfWeek === 0 || jsDayOfWeek === 6) {
+                    setClassesToday([]);
+                    return;
+                }
+                
+                // Convertir a formato del sistema (1 = Lunes, 5 = Viernes)
+                const systemDayOfWeek = jsDayOfWeek;
+                
+                // Obtener la semana actual
+                const semanaInfo = await getWeekFromDate(today, '2025-2026');
+                if (!semanaInfo) {
+                    setClassesToday([]);
+                    return;
+                }
+                
+                const currentWeek = semanaInfo.numeroSemana;
+                
+                // Obtener todas las clases del docente para hoy
+                const todayClasses: Array<{
+                    hora: string;
+                    materia: string;
+                    grado: string;
+                    aula?: string;
+                    id_clase: string;
+                }> = [];
+                
+                // Iterar sobre todos los grados en schedules
+                Object.keys(schedules).forEach(grado => {
+                    const weekSchedule = schedules[grado]?.[currentWeek] || [];
+                    weekSchedule.forEach(horario => {
+                        if (horario.dia_semana === systemDayOfWeek && 
+                            horario.id_docente === currentUser.docenteId) {
+                            const clase = clases.find(c => c.id_clase === horario.id_clase);
+                            if (clase) {
+                                const aula = horario.id_aula 
+                                    ? aulas.find(a => a.id_aula === horario.id_aula)
+                                    : clase.id_aula 
+                                        ? aulas.find(a => a.id_aula === clase.id_aula)
+                                        : null;
+                                
+                                todayClasses.push({
+                                    hora: horario.hora_inicio,
+                                    materia: clase.nombre_materia,
+                                    grado: grado,
+                                    aula: aula?.nombre_aula,
+                                    id_clase: clase.id_clase
+                                });
+                            }
+                        }
+                    });
+                });
+                
+                // Ordenar por hora
+                todayClasses.sort((a, b) => {
+                    const [h1, m1] = a.hora.split(':').map(Number);
+                    const [h2, m2] = b.hora.split(':').map(Number);
+                    return (h1 * 60 + m1) - (h2 * 60 + m2);
+                });
+                
+                setClassesToday(todayClasses);
+            } catch (error) {
+                console.error('Error loading classes today:', error);
+                setClassesToday([]);
+            }
+        };
+        
+        loadClassesToday();
+    }, [schedules, clases, currentUser.docenteId, aulas]);
+
+    return (
+        <div className="bg-gradient-to-br from-green-50 via-white to-emerald-50 p-6 rounded-xl shadow-lg border border-green-100 hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-md">
+                    <CalendarIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-gray-800">Mis Clases de Hoy</h3>
+                    <p className="text-xs text-gray-500">{new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                </div>
+            </div>
+            
+            {classesToday.length === 0 ? (
+                <div className="text-center py-8">
+                    <div className="inline-block p-4 bg-green-100 rounded-full mb-3">
+                        <CalendarIcon className="h-8 w-8 text-green-600" />
+                    </div>
+                    <p className="text-gray-500 text-sm font-medium">No hay clases programadas para hoy</p>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {classesToday.map((clase, index) => (
+                        <div key={`${clase.id_clase}-${index}`} className="flex items-center gap-3 p-3 rounded-lg bg-white hover:shadow-md transition-all border-l-4 border-green-500">
+                            <div className="flex-shrink-0 w-16 text-center">
+                                <p className="text-sm font-bold text-green-600">{clase.hora}</p>
+                            </div>
+                            <div className="flex-1">
+                                <p className="font-semibold text-gray-800">{clase.materia}</p>
+                                <p className="text-sm text-gray-600">{clase.grado} {clase.aula && `• ${clase.aula}`}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Widget 4: Planificaciones Pendientes
+const PlanificacionesPendientesWidget: React.FC<{
+    planificaciones: Planificacion[];
+    clases: Clase[];
+    currentUser: Usuario;
+}> = ({ planificaciones, clases, currentUser }) => {
+    const pendientes = useMemo(() => {
+        return planificaciones
+            .filter(p => 
+                p.id_docente === currentUser.docenteId && 
+                (p.status === 'Borrador' || p.status === 'Revisado')
+            )
+            .sort((a, b) => a.semana - b.semana)
+            .slice(0, 5);
+    }, [planificaciones, currentUser.docenteId, clases]);
+
+    const getStatusColor = (status: string): string => {
+        if (status === 'Borrador') return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+        if (status === 'Revisado') return 'bg-blue-100 text-blue-800 border-blue-300';
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+    };
+
+    return (
+        <div className="bg-gradient-to-br from-purple-50 via-white to-pink-50 p-6 rounded-xl shadow-lg border border-purple-100 hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-md">
+                    <PlanningIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-gray-800">Planificaciones Pendientes</h3>
+                    <p className="text-xs text-gray-500">{pendientes.length} pendiente{pendientes.length !== 1 ? 's' : ''}</p>
+                </div>
+            </div>
+            
+            {pendientes.length === 0 ? (
+                <div className="text-center py-8">
+                    <div className="inline-block p-4 bg-purple-100 rounded-full mb-3">
+                        <CheckIcon className="h-8 w-8 text-purple-600" />
+                    </div>
+                    <p className="text-gray-500 text-sm font-medium">¡Todo al día!</p>
+                    <p className="text-gray-400 text-xs mt-1">No tienes planificaciones pendientes</p>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {pendientes.map((plan) => {
+                        const clase = clases.find(c => c.id_clase === plan.id_clase);
+                        return (
+                            <div key={plan.id_planificacion} className="flex items-center gap-3 p-3 rounded-lg bg-white hover:shadow-md transition-all border-l-4 border-purple-500">
+                                <div className="flex-1">
+                                    <p className="font-semibold text-gray-800">{clase?.nombre_materia || 'Sin asignatura'}</p>
+                                    <p className="text-sm text-gray-600">Semana {plan.semana} • {plan.lapso} • {clase?.grado_asignado}</p>
+                                </div>
+                                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(plan.status)}`}>
+                                    {plan.status}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Widget 5: Mis Asignaturas y Grados
+const MisAsignaturasWidget: React.FC<{
+    clases: Clase[];
+    alumnos: Alumno[];
+    currentUser: Usuario;
+}> = ({ clases, alumnos, currentUser }) => {
+    const misAsignaturas = useMemo(() => {
+        const asignaturasMap = new Map<string, {
+            materia: string;
+            grados: Set<string>;
+            totalAlumnos: number;
+        }>();
+        
+        clases.forEach(clase => {
+            if (clase.id_docente_asignado === currentUser.docenteId) {
+                const key = clase.nombre_materia;
+                if (!asignaturasMap.has(key)) {
+                    asignaturasMap.set(key, {
+                        materia: clase.nombre_materia,
+                        grados: new Set(),
+                        totalAlumnos: 0
+                    });
+                }
+                const asignatura = asignaturasMap.get(key)!;
+                asignatura.grados.add(clase.grado_asignado);
+                
+                // Contar alumnos de este grado
+                const alumnosGrado = alumnos.filter(a => a.salon === clase.grado_asignado);
+                asignatura.totalAlumnos += alumnosGrado.length;
+            }
+        });
+        
+        return Array.from(asignaturasMap.values());
+    }, [clases, alumnos, currentUser.docenteId]);
+
+    if (misAsignaturas.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-6 rounded-xl shadow-lg border border-indigo-100 hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl shadow-md">
+                    <AcademicCapIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-gray-800">Mis Asignaturas</h3>
+                    <p className="text-xs text-gray-500">{misAsignaturas.length} asignatura{misAsignaturas.length !== 1 ? 's' : ''}</p>
+                </div>
+            </div>
+            
+            <div className="space-y-3">
+                {misAsignaturas.map((asignatura, index) => (
+                    <div key={index} className="p-4 rounded-lg bg-white hover:shadow-md transition-all border-l-4 border-indigo-500">
+                        <p className="font-semibold text-gray-800 mb-2">{asignatura.materia}</p>
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <span className="flex items-center gap-1">
+                                <UsersIcon className="h-4 w-4" />
+                                {Array.from(asignatura.grados).join(', ')}
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <UserCircleIcon className="h-4 w-4" />
+                                {asignatura.totalAlumnos} alumno{asignatura.totalAlumnos !== 1 ? 's' : ''}
+                            </span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// Widget 6: Próximos Eventos (similar al de coordinadores)
+const EventosDocenteWidget: React.FC = () => {
+    const [eventos, setEventos] = useState<EventoCalendario[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const loadEventos = async () => {
+            try {
+                setIsLoading(true);
+                const today = new Date();
+                const nextWeek = new Date(today);
+                nextWeek.setDate(today.getDate() + 7);
+                
+                const eventosData = await eventosCalendarioService.getByDateRange(
+                    today.toISOString(),
+                    nextWeek.toISOString()
+                );
+                
+                const eventosOrdenados = eventosData
+                    .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime())
+                    .slice(0, 5);
+                
+                setEventos(eventosOrdenados);
+            } catch (error) {
+                console.error('Error loading eventos:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        
+        loadEventos();
+    }, []);
+
+    const getEventColor = (tipo: string): string => {
+        const colors: { [key: string]: string } = {
+            'Actos Cívicos': '#f0ad4e',
+            'Entregas Administrativas': '#d9534f',
+            'Reuniones de Etapa': '#5bc0de',
+            'Actividades Generales': '#5cb85c'
+        };
+        return colors[tipo] || '#6c757d';
+    };
+
+    const formatDate = (dateStr: string): string => {
+        const date = new Date(dateStr);
+        const days = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
+        return days[date.getDay()];
+    };
+
+    if (isLoading) {
+        return (
+            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-xl shadow-lg border border-yellow-100">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-yellow-500 rounded-lg">
+                        <CalendarIcon className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800">Próximos Eventos</h3>
+                </div>
+                <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500"></div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-gradient-to-br from-yellow-50 via-white to-orange-50 p-6 rounded-xl shadow-lg border border-yellow-100 hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl shadow-md">
+                    <CalendarIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-gray-800">Próximos Eventos</h3>
+                    <p className="text-xs text-gray-500">Próximos 7 días</p>
+                </div>
+            </div>
+            
+            {eventos.length === 0 ? (
+                <div className="text-center py-8">
+                    <div className="inline-block p-4 bg-yellow-100 rounded-full mb-3">
+                        <CalendarIcon className="h-8 w-8 text-yellow-600" />
+                    </div>
+                    <p className="text-gray-500 text-sm font-medium">No hay eventos programados</p>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {eventos.map((evento) => {
+                        const color = evento.color || getEventColor(evento.tipo_evento);
+                        return (
+                            <div key={evento.id_evento} className="flex items-center gap-3 p-3 rounded-lg bg-white hover:shadow-md transition-all border-l-4" style={{ borderLeftColor: color }}>
+                                <div 
+                                    className="w-4 h-4 rounded-full shadow-sm flex-shrink-0"
+                                    style={{ backgroundColor: color }}
+                                ></div>
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-sm text-gray-800 min-w-[90px]">
+                                            {formatDate(evento.fecha_inicio)}:
+                                        </span>
+                                        <span className="text-sm text-gray-700">{evento.nombre_evento}</span>
+                                    </div>
+                                    {evento.responsable && (
+                                        <p className="text-xs text-gray-500 mt-1">Resp: {evento.responsable}</p>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Mi Agenda Diaria para Docentes (similar al de coordinadores)
+const MiAgendaDocenteWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser }) => {
+    const [tareas, setTareas] = useState<TareaCoordinador[]>([]);
+    const [nuevaTarea, setNuevaTarea] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const [isAdding, setIsAdding] = useState(false);
+
+    useEffect(() => {
+        const loadTareas = async () => {
+            if (!currentUser.id) {
+                setIsLoading(false);
+                return;
+            }
+            
+            try {
+                setIsLoading(true);
+                const tareasData = await tareasCoordinadorService.getByUsuario(currentUser.id);
+                setTareas(tareasData);
+            } catch (error: any) {
+                console.error('Error loading tareas:', error);
+                if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+                    console.warn('Tabla tareas_coordinador no existe aún. Ejecuta la migración 020_create_tareas_coordinador.sql');
+                    setTareas([]);
+                } else {
+                    console.error('Error desconocido:', error);
+                }
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        
+        loadTareas();
+    }, [currentUser.id]);
+
+    const handleAddTarea = async () => {
+        if (!nuevaTarea.trim() || !currentUser.id) return;
+        
+        try {
+            setIsAdding(true);
+            const nueva = await tareasCoordinadorService.create({
+                id_usuario: currentUser.id,
+                descripcion: nuevaTarea.trim(),
+                completada: false,
+                prioridad: 'Normal'
+            });
+            setTareas(prev => [nueva, ...prev]);
+            setNuevaTarea('');
+        } catch (error: any) {
+            console.error('Error adding tarea:', error);
+            if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+                alert('La tabla de tareas aún no está creada. Por favor, ejecuta la migración SQL 020_create_tareas_coordinador.sql en Supabase.');
+            } else {
+                alert('Error al agregar la tarea. Por favor, inténtalo de nuevo.');
+            }
+        } finally {
+            setIsAdding(false);
+        }
+    };
+
+    const handleToggleCompletada = async (id: string, completada: boolean) => {
+        try {
+            const updated = await tareasCoordinadorService.update(id, { completada: !completada });
+            setTareas(prev => prev.map(t => t.id_tarea === id ? updated : t));
+        } catch (error) {
+            console.error('Error updating tarea:', error);
+            alert('Error al actualizar la tarea. Por favor, inténtalo de nuevo.');
+        }
+    };
+
+    const handleDeleteTarea = async (id: string) => {
+        if (!window.confirm('¿Estás seguro de que deseas eliminar esta tarea?')) return;
+        
+        try {
+            await tareasCoordinadorService.delete(id);
+            setTareas(prev => prev.filter(t => t.id_tarea !== id));
+        } catch (error) {
+            console.error('Error deleting tarea:', error);
+            alert('Error al eliminar la tarea. Por favor, inténtalo de nuevo.');
+        }
+    };
+
+    const tareasPendientes = tareas.filter(t => !t.completada);
+    const tareasCompletadas = tareas.filter(t => t.completada);
+
+    if (isLoading) {
+        return (
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl shadow-lg border border-blue-100">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-blue-500 rounded-lg">
+                        <CalendarIcon className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800">Mi Agenda del Día</h3>
+                </div>
+                <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md">
+                    <CalendarIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-gray-800">Mi Agenda del Día</h3>
+                    <p className="text-xs text-gray-500">Gestiona tus tareas diarias</p>
+                </div>
+            </div>
+            
+            <div className="mb-6 flex gap-2">
+                <input
+                    type="text"
+                    value={nuevaTarea}
+                    onChange={(e) => setNuevaTarea(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddTarea()}
+                    placeholder="Agregar nueva tarea..."
+                    className="flex-1 px-4 py-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm"
+                    disabled={isAdding}
+                />
+                <button
+                    onClick={handleAddTarea}
+                    disabled={isAdding || !nuevaTarea.trim()}
+                    className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-semibold shadow-md hover:shadow-lg transition-all transform hover:scale-105"
+                >
+                    <PlusIcon className="h-5 w-5" />
+                    Agregar
+                </button>
+            </div>
+
+            {tareasPendientes.length > 0 && (
+                <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Pendientes ({tareasPendientes.length})</h4>
+                    </div>
+                    <div className="space-y-2">
+                        {tareasPendientes.map((tarea) => (
+                            <div key={tarea.id_tarea} className="flex items-center gap-3 p-3 rounded-lg bg-white border-l-4 border-blue-500 hover:bg-blue-50 hover:shadow-md transition-all group">
+                                <input
+                                    type="checkbox"
+                                    checked={tarea.completada}
+                                    onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
+                                    className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                                />
+                                <span className="flex-1 text-sm font-medium text-gray-800">{tarea.descripcion}</span>
+                                <button
+                                    onClick={() => handleDeleteTarea(tarea.id_tarea)}
+                                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded transition-all"
+                                    title="Eliminar tarea"
+                                >
+                                    <DeleteIcon className="h-4 w-4" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {tareasCompletadas.length > 0 && (
+                <div>
+                    <details className="group">
+                        <summary className="text-sm font-semibold text-gray-500 cursor-pointer list-none hover:text-gray-700 transition-colors">
+                            <span className="flex items-center gap-2">
+                                <CheckIcon className="h-4 w-4 text-green-500" />
+                                <span>Completadas ({tareasCompletadas.length})</span>
+                                <ChevronDownIcon className="h-4 w-4 transform group-open:rotate-180 transition-transform" />
+                            </span>
+                        </summary>
+                        <div className="mt-2 space-y-2">
+                            {tareasCompletadas.map((tarea) => (
+                                <div key={tarea.id_tarea} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 opacity-75 border-l-4 border-green-400">
+                                    <input
+                                        type="checkbox"
+                                        checked={tarea.completada}
+                                        onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
+                                        className="h-5 w-5 text-green-600 focus:ring-green-500 border-gray-300 rounded cursor-pointer"
+                                    />
+                                    <span className="flex-1 text-sm text-gray-500 line-through">{tarea.descripcion}</span>
+                                    <button
+                                        onClick={() => handleDeleteTarea(tarea.id_tarea)}
+                                        className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded transition-all"
+                                        title="Eliminar tarea"
+                                    >
+                                        <DeleteIcon className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </details>
+                </div>
+            )}
+
+            {tareas.length === 0 && (
+                <div className="text-center py-8">
+                    <div className="inline-block p-4 bg-blue-100 rounded-full mb-3">
+                        <CalendarIcon className="h-8 w-8 text-blue-500" />
+                    </div>
+                    <p className="text-gray-500 text-sm font-medium">No hay tareas pendientes</p>
+                    <p className="text-gray-400 text-xs mt-1">Agrega una nueva tarea para comenzar</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const TeacherScheduleDashboard: React.FC<{
     schedules: WeeklySchedules;
     clases: Clase[];
     docentes: Docente[];
     currentUser: Usuario;
     alumnos: Alumno[];
-}> = ({ schedules, clases, docentes, currentUser, alumnos }) => {
+    planificaciones?: Planificacion[];
+    aulas: Aula[];
+}> = ({ schedules, clases, docentes, currentUser, alumnos, planificaciones = [], aulas }) => {
     const scheduleTableRef = useRef<HTMLTableElement>(null);
     const [isDownloadMenuOpen, setDownloadMenuOpen] = useState(false);
     
@@ -1722,7 +2377,47 @@ const TeacherScheduleDashboard: React.FC<{
     const selectedGradeColor = getGradeColor(selectedGrade);
 
     return (
-        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+        <div className="space-y-6">
+            {/* Widget 1: Resumen de Alumnos por Grado */}
+            <ResumenAlumnosDocenteWidget 
+                alumnos={alumnos}
+                clases={clases}
+                currentUser={currentUser}
+            />
+
+            {/* Widgets en grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Widget 2: Mis Clases de Hoy */}
+                <MisClasesHoyWidget 
+                    schedules={schedules}
+                    clases={clases}
+                    currentUser={currentUser}
+                    aulas={aulas}
+                />
+
+                {/* Widget 4: Planificaciones Pendientes */}
+                <PlanificacionesPendientesWidget 
+                    planificaciones={planificaciones}
+                    clases={clases}
+                    currentUser={currentUser}
+                />
+
+                {/* Widget 5: Mis Asignaturas */}
+                <MisAsignaturasWidget 
+                    clases={clases}
+                    alumnos={alumnos}
+                    currentUser={currentUser}
+                />
+
+                {/* Mi Agenda Diaria */}
+                <MiAgendaDocenteWidget currentUser={currentUser} />
+            </div>
+
+            {/* Widget 6: Próximos Eventos */}
+            <EventosDocenteWidget />
+
+            {/* Horario de Clases (mantener el existente) */}
+            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
             <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
                 <div className="flex items-center gap-3">
                     <h3 className="text-xl font-bold text-text-main">Mi Horario de Clases</h3>
