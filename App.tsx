@@ -954,7 +954,7 @@ const Sidebar: React.FC<{
         { id: 'calendar', label: 'Calendario', icon: CalendarIcon, roles: ['directivo', 'coordinador', 'docente'] },
         { id: 'planning', label: 'Planificaciones', icon: PlanningIcon, roles: ['directivo', 'coordinador', 'docente'] },
         { id: 'evaluation', label: 'Evaluación', icon: EvaluationIcon, roles: ['directivo', 'coordinador'] },
-        { id: 'authorized-users', label: 'Usuarios Autorizados', icon: UsersIcon, roles: ['directivo'] },
+        { id: 'authorized-users', label: 'Gestión de Usuarios', icon: UsersIcon, roles: ['directivo', 'coordinador'] },
         { id: 'lapsos-admin', label: 'Gestión de Lapsos', icon: CalendarIcon, roles: ['coordinador', 'directivo'] },
     ];
     
@@ -8570,7 +8570,7 @@ const App: React.FC = () => {
       calendar: 'Calendario',
       planning: 'Planificaciones',
       evaluation: 'Seguimiento Pedagógico',
-      'authorized-users': 'Usuarios Autorizados',
+      'authorized-users': 'Gestión de Usuarios',
       'lapsos-admin': 'Gestión de Lapsos',
   };
 
