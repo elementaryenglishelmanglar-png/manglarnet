@@ -1951,7 +1951,12 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
             .map(m => m.evaluacion)
             .filter(e => e && e.trim() !== '') // Filtrar valores vacíos
         );
-        return ['Todas', ...Array.from(evaluaciones).sort()];
+        const evaluacionesList = Array.from(evaluaciones).sort();
+        // Si no hay evaluaciones, usar valores por defecto
+        if (evaluacionesList.length === 0) {
+            return ['Todas', 'I Mensual', 'II Mensual', 'Examen de Lapso'];
+        }
+        return ['Todas', ...evaluacionesList];
     }, [minutas]);
     const uniqueGrados = useMemo(() => {
         const grados = new Set([
@@ -2028,13 +2033,13 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                         </div>
                         <div className="space-y-2">
                             <Label>Evaluación</Label>
-                            <Select value={filters.evaluacion} onValueChange={(value) => setFilters(prev => ({ ...prev, evaluacion: value }))}>
+                            <Select value={filters.evaluacion || 'I Mensual'} onValueChange={(value) => setFilters(prev => ({ ...prev, evaluacion: value }))}>
                                 <SelectTrigger>
-                                    <SelectValue />
+                                    <SelectValue placeholder="Seleccione evaluación" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {uniqueEvaluaciones
-                                        .filter(evaluacion => evaluacion && evaluacion.trim() !== '') // Filtrar valores vacíos
+                                        .filter(evaluacion => evaluacion && evaluacion.trim() !== '' && evaluacion !== 'Todas') // Filtrar valores vacíos y "Todas"
                                         .map(evaluacion => (
                                             <SelectItem key={evaluacion} value={evaluacion}>{evaluacion}</SelectItem>
                                         ))}
@@ -2043,13 +2048,14 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                         </div>
                         <div className="space-y-2">
                             <Label>Grado</Label>
-                            <Select value={filters.grado} onValueChange={(value) => setFilters(prev => ({ ...prev, grado: value }))}>
+                            <Select value={filters.grado || 'Todos'} onValueChange={(value) => setFilters(prev => ({ ...prev, grado: value === 'Todos' ? '' : value }))}>
                                 <SelectTrigger>
-                                    <SelectValue />
+                                    <SelectValue placeholder="Seleccione grado" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="Todos">Todos</SelectItem>
                                     {uniqueGrados
-                                        .filter(grado => grado && grado.trim() !== '') // Filtrar valores vacíos
+                                        .filter(grado => grado && grado.trim() !== '' && grado !== 'Todos') // Filtrar valores vacíos y "Todos"
                                         .map(grado => (
                                             <SelectItem key={grado} value={grado}>{grado}</SelectItem>
                                         ))}
@@ -2058,13 +2064,14 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                         </div>
                         <div className="space-y-2">
                             <Label>Materia</Label>
-                            <Select value={filters.materia} onValueChange={(value) => setFilters(prev => ({ ...prev, materia: value }))}>
+                            <Select value={filters.materia || 'Todas'} onValueChange={(value) => setFilters(prev => ({ ...prev, materia: value === 'Todas' ? '' : value }))}>
                                 <SelectTrigger>
-                                    <SelectValue />
+                                    <SelectValue placeholder="Seleccione materia" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="Todas">Todas</SelectItem>
                                     {uniqueMaterias
-                                        .filter(materia => materia && materia.trim() !== '') // Filtrar valores vacíos
+                                        .filter(materia => materia && materia.trim() !== '' && materia !== 'Todas') // Filtrar valores vacíos y "Todas"
                                         .map(materia => (
                                             <SelectItem key={materia} value={materia}>{materia}</SelectItem>
                                         ))}
@@ -2073,13 +2080,14 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                         </div>
                         <div className="space-y-2">
                             <Label>Docente</Label>
-                            <Select value={filters.docente} onValueChange={(value) => setFilters(prev => ({ ...prev, docente: value }))}>
+                            <Select value={filters.docente || 'Todos'} onValueChange={(value) => setFilters(prev => ({ ...prev, docente: value }))}>
                                 <SelectTrigger>
-                                    <SelectValue />
+                                    <SelectValue placeholder="Seleccione docente" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="Todos">Todos</SelectItem>
                                     {uniqueDocentes
-                                        .filter(docente => docente && docente.trim() !== '') // Filtrar valores vacíos
+                                        .filter(docente => docente && docente.trim() !== '' && docente !== 'Todos') // Filtrar valores vacíos y "Todos"
                                         .map(docente => (
                                             <SelectItem key={docente} value={docente}>{docente}</SelectItem>
                                         ))}
@@ -9361,7 +9369,9 @@ const EvaluationView: React.FC<{
     
     const availableSubjects = useMemo(() => {
         if (!filters.grado) return [];
-        return clases.filter(c => c.grado_asignado === filters.grado);
+        return clases
+            .filter(c => c.grado_asignado === filters.grado)
+            .filter(c => c.nombre_materia && c.nombre_materia.trim() !== ''); // Filtrar materias vacías
     }, [filters.grado, clases]);
 
     const studentsInGrade = useMemo(() => {
@@ -9530,7 +9540,9 @@ const EvaluationView: React.FC<{
                         </InputField>
                         <InputField as="select" label="Materia" name="materia" value={filters.materia} onChange={handleFilterChange} disabled={!filters.grado}>
                             <option value="">Seleccione una materia</option>
-                            {availableSubjects.map(s => <option key={s.id_clase} value={s.nombre_materia}>{s.nombre_materia}</option>)}
+                            {availableSubjects
+                                .filter(s => s.nombre_materia && s.nombre_materia.trim() !== '') // Filtrar materias vacías
+                                .map(s => <option key={s.id_clase} value={s.nombre_materia}>{s.nombre_materia}</option>)}
                         </InputField>
                     </div>
                 </div>
