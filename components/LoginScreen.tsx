@@ -55,42 +55,46 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         return false;
       }
 
-      // Verificar que el usuario esté autenticado antes de consultar
-      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
-      if (userError || !currentUser) {
-        console.error('Usuario no autenticado o error:', userError);
+      // Verificar que el usuario esté autenticado y obtener la sesión completa
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        console.error('Error obteniendo sesión:', sessionError);
+        setError('No se pudo verificar la autenticación. Por favor, intenta iniciar sesión de nuevo.');
+        setIsChecking(false);
+        return false;
+      }
+      
+      const currentUser = session.user;
+      if (!currentUser || !currentUser.email) {
+        console.error('Usuario no encontrado en sesión');
         setError('No se pudo verificar la autenticación. Por favor, intenta iniciar sesión de nuevo.');
         setIsChecking(false);
         return false;
       }
       
       console.log('Usuario autenticado:', currentUser.email);
+      console.log('Token de sesión presente:', !!session.access_token);
       console.log('Ejecutando consulta a authorized_users...');
       console.log('Email a buscar:', normalizedEmail);
       const startTime = Date.now();
       
-      // Hacer la consulta con mejor manejo de errores
+      // Hacer la consulta con timeout explícito
       let queryResult: any;
       try {
         console.log('Iniciando consulta a authorized_users...');
         
-        // Usar una consulta más simple y directa
-        // Intentar primero con select específico, si falla, usar select('*')
-        try {
-          queryResult = await supabase
-            .from('authorized_users')
-            .select('id, email, role')
-            .eq('email', normalizedEmail)
-            .maybeSingle();
-        } catch (selectError: any) {
-          console.warn('Error con select específico, intentando con select(*)...', selectError);
-          // Si falla, intentar con select('*')
-          queryResult = await supabase
-            .from('authorized_users')
-            .select('*')
-            .eq('email', normalizedEmail)
-            .maybeSingle();
-        }
+        // Crear una promesa con timeout
+        const queryPromise = supabase
+          .from('authorized_users')
+          .select('id, email, role')
+          .eq('email', normalizedEmail)
+          .maybeSingle();
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout: La consulta tardó más de 10 segundos')), 10000)
+        );
+        
+        queryResult = await Promise.race([queryPromise, timeoutPromise]);
         
         const elapsedTime = Date.now() - startTime;
         console.log(`Consulta completada en ${elapsedTime}ms`);
@@ -101,8 +105,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       } catch (queryError: any) {
         console.error('Error ejecutando consulta:', queryError);
         console.error('Tipo de error:', typeof queryError);
-        console.error('Stack:', queryError?.stack);
-        setError('Error al consultar la base de datos. Verifica tu conexión y las políticas RLS.');
+        console.error('Mensaje:', queryError?.message);
+        
+        if (queryError?.message?.includes('Timeout')) {
+          setError('La consulta está tardando demasiado. Esto puede indicar un problema con las políticas RLS en Supabase. Por favor, verifica las políticas de la tabla authorized_users.');
+        } else {
+          setError('Error al consultar la base de datos. Verifica tu conexión y las políticas RLS.');
+        }
         setIsChecking(false);
         return false;
       }
@@ -193,17 +202,32 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         const code = urlParams.get('code');
         if (code) {
           console.log('OAuth callback detectado, esperando procesamiento...');
-          // Esperar 1 segundo para que Supabase procese el código
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Esperar 2 segundos para que Supabase procese el código y establezca la sesión
+          await new Promise(resolve => setTimeout(resolve, 2000));
           // Limpiar la URL después de esperar
           window.history.replaceState({}, document.title, window.location.pathname);
         }
         
         console.log('Obteniendo sesión...');
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        // Intentar obtener la sesión hasta 3 veces con espera entre intentos
+        let session = null;
+        let sessionError = null;
+        for (let i = 0; i < 3; i++) {
+          const result = await supabase.auth.getSession();
+          session = result.data.session;
+          sessionError = result.error;
+          if (session || sessionError) break;
+          if (i < 2) {
+            console.log(`Sesión no disponible, reintentando en 1 segundo... (intento ${i + 1}/3)`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
         
-        if (sessionError) {
-          console.error('Session error:', sessionError);
+        const finalSession = session;
+        const finalSessionError = sessionError;
+        
+        if (finalSessionError) {
+          console.error('Session error:', finalSessionError);
           if (isMounted) {
             setIsChecking(false);
             setError('Error al obtener la sesión. Por favor, intenta de nuevo.');
@@ -211,15 +235,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           return;
         }
         
-        console.log('Session found:', session?.user?.email);
+        console.log('Session found:', finalSession?.user?.email);
+        console.log('Session token present:', !!finalSession?.access_token);
         
-        if (!session?.user?.email) {
+        if (!finalSession?.user?.email) {
           console.log('No session found, setting isChecking to false');
           if (isMounted) {
             setIsChecking(false);
           }
           return;
         }
+        
+        // Usar la sesión obtenida
+        const session = finalSession;
 
         console.log('Calling checkAuthorization for:', session.user.email);
         const role = await checkAuthorization(session.user.email);
