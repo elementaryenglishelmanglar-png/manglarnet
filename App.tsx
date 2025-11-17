@@ -1073,8 +1073,10 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = React.memo(({ c
 
     useEffect(() => {
         const loadTareas = async () => {
-            if (!currentUser.id) {
+            // No cargar tareas para usuario por defecto (UUID todo ceros)
+            if (!currentUser.id || currentUser.id === '00000000-0000-0000-0000-000000000000') {
                 setIsLoading(false);
+                setTareas([]);
                 return;
             }
             
@@ -1101,7 +1103,13 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = React.memo(({ c
     }, [currentUser.id]);
 
     const handleAddTarea = async () => {
-        if (!nuevaTarea.trim() || !currentUser.id) return;
+        // No permitir agregar tareas para usuario por defecto
+        if (!nuevaTarea.trim() || !currentUser.id || currentUser.id === '00000000-0000-0000-0000-000000000000') {
+            if (currentUser.id === '00000000-0000-0000-0000-000000000000') {
+                alert('No se pueden agregar tareas con el usuario por defecto. Por favor, inicia sesión con una cuenta válida.');
+            }
+            return;
+        }
         
         try {
             setIsAdding(true);
@@ -2759,8 +2767,10 @@ const MiAgendaDocenteWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser
 
     useEffect(() => {
         const loadTareas = async () => {
-            if (!currentUser.id) {
+            // No cargar tareas para usuario por defecto (UUID todo ceros)
+            if (!currentUser.id || currentUser.id === '00000000-0000-0000-0000-000000000000') {
                 setIsLoading(false);
+                setTareas([]);
                 return;
             }
             
@@ -2785,7 +2795,13 @@ const MiAgendaDocenteWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser
     }, [currentUser.id]);
 
     const handleAddTarea = async () => {
-        if (!nuevaTarea.trim() || !currentUser.id) return;
+        // No permitir agregar tareas para usuario por defecto
+        if (!nuevaTarea.trim() || !currentUser.id || currentUser.id === '00000000-0000-0000-0000-000000000000') {
+            if (currentUser.id === '00000000-0000-0000-0000-000000000000') {
+                alert('No se pueden agregar tareas con el usuario por defecto. Por favor, inicia sesión con una cuenta válida.');
+            }
+            return;
+        }
         
         try {
             setIsAdding(true);
@@ -9770,7 +9786,7 @@ const EvaluationView: React.FC<{
 const App: React.FC = () => {
   // Usuario por defecto sin requerir login
   const [currentUser, setCurrentUser] = useState<Usuario | null>({
-    id: 'default-user-id',
+    id: '00000000-0000-0000-0000-000000000000', // UUID válido para usuario por defecto
     email: 'usuario@elmanglar.edu',
     role: 'coordinador' as UserRole,
     fullName: 'Usuario del Sistema',
@@ -10427,7 +10443,7 @@ const App: React.FC = () => {
   if (!currentUser) {
     // Si por alguna razón currentUser es null, establecer el usuario por defecto
     setCurrentUser({
-      id: 'default-user-id',
+      id: '00000000-0000-0000-0000-000000000000', // UUID válido para usuario por defecto
       email: 'usuario@elmanglar.edu',
       role: 'coordinador' as UserRole,
       fullName: 'Usuario del Sistema',
