@@ -941,9 +941,6 @@ const Sidebar: React.FC<{
     isOpen: boolean;
     onClose: () => void;
 }> = ({ activeView, onNavigate, userRole, isOpen, onClose }) => {
-    // Debug: verificar que el componente se ejecuta
-    console.log('[SIDEBAR] Renderizando Sidebar con userRole:', userRole);
-    
     const navLinks = [
         { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon, roles: ['directivo', 'coordinador', 'docente', 'administrativo'] },
         { id: 'students', label: 'Alumnos', icon: StudentsIcon, roles: ['directivo', 'coordinador', 'administrativo'] },
@@ -959,16 +956,9 @@ const Sidebar: React.FC<{
     ];
     
     // Filtrar links basado en el rol del usuario
-    const navLinksToRender = navLinks.filter(link => {
-        const hasAccess = link.roles.includes(userRole);
-        if (link.id === 'lapsos-admin') {
-            console.log('[SIDEBAR] Lapsos Admin - userRole:', userRole, 'roles permitidos:', link.roles, 'hasAccess:', hasAccess);
-        }
-        return hasAccess;
-    });
-    
-    console.log('[SIDEBAR] Total links:', navLinks.length, 'Links filtrados:', navLinksToRender.length);
-    console.log('[SIDEBAR] Links visibles:', navLinksToRender.map(l => l.label));
+    const navLinksToRender = useMemo(() => {
+        return navLinks.filter(link => link.roles.includes(userRole));
+    }, [userRole]);
 
     const handleNavigate = (view: string) => {
         onNavigate(view);
@@ -8282,20 +8272,29 @@ const App: React.FC = () => {
     setDataError(null);
     
     try {
-      // Load all data in parallel
+      // Helper function to handle rate limiting
+      const handleRateLimit = (err: any, serviceName: string) => {
+        if (err?.message?.includes('429') || err?.code === 'PGRST301') {
+          console.warn(`Rate limit for ${serviceName}. Will retry later.`);
+          return [];
+        }
+        // Solo registrar errores no relacionados con rate limiting
+        if (!err?.message?.includes('429') && !err?.code?.includes('429')) {
+          console.error(`Error loading ${serviceName}:`, err);
+        }
+        return [];
+      };
+      
+      // Load all data in parallel with rate limit handling
       const [alumnosData, docentesData, clasesData, planificacionesData, horariosData, minutasData, notificationsData, aulasData] = await Promise.all([
-        alumnosService.getAll().catch((err) => { console.error('Error loading alumnos:', err); return []; }),
-        docentesService.getAll().catch((err) => { console.error('Error loading docentes:', err); return []; }),
-        clasesService.getAll().catch((err) => { console.error('Error loading clases:', err); return []; }),
-        planificacionesService.getAll().catch((err) => { console.error('Error loading planificaciones:', err); return []; }),
-        horariosService.getAll().catch((err) => { console.error('Error loading horarios:', err); return []; }),
-        minutasService.getAll().catch((err) => { 
-          console.error('Error loading minutas:', err); 
-          console.error('Minutas error details:', JSON.stringify(err, null, 2));
-          return []; 
-        }),
-        notificacionesService.getAll().catch((err) => { console.error('Error loading notifications:', err); return []; }),
-        aulasService.getAll().catch((err) => { console.error('Error loading aulas:', err); return []; })
+        alumnosService.getAll().catch((err) => handleRateLimit(err, 'alumnos')),
+        docentesService.getAll().catch((err) => handleRateLimit(err, 'docentes')),
+        clasesService.getAll().catch((err) => handleRateLimit(err, 'clases')),
+        planificacionesService.getAll().catch((err) => handleRateLimit(err, 'planificaciones')),
+        horariosService.getAll().catch((err) => handleRateLimit(err, 'horarios')),
+        minutasService.getAll().catch((err) => handleRateLimit(err, 'minutas')),
+        notificacionesService.getAll().catch((err) => handleRateLimit(err, 'notificaciones')),
+        aulasService.getAll().catch((err) => handleRateLimit(err, 'aulas'))
       ]);
 
       setAlumnos(alumnosData.map(convertAlumno));
@@ -8490,23 +8489,29 @@ const App: React.FC = () => {
 
           // Si hay un error de RLS, red o rate limiting, no hacer signOut
           if (authError) {
-            console.error('Error checking authorization:', authError);
-            
-            // Si es un error 429 (Too Many Requests), 406 (Not Acceptable), o error de RLS,
-            // no hacer signOut - son errores temporales
+            // Si es un error 429 (Too Many Requests), esperar y reintentar más tarde
             if (authError.code === 'PGRST301' || 
-                authError.code === '42501' ||
                 authError.message?.includes('429') || 
-                authError.message?.includes('406') ||
-                authError.message?.includes('permission') ||
-                authError.message?.includes('row-level security')) {
-              console.warn('Temporary error checking authorization, will not sign out user');
+                authError.message?.includes('Too Many Requests')) {
+              console.warn('Rate limit reached (429). Will retry later. Maintaining session.');
               // Mantener la sesión actual si existe
               return;
             }
             
+            // Si es un error 406 (Not Acceptable) o error de RLS, no hacer signOut
+            if (authError.code === '42501' ||
+                authError.message?.includes('406') ||
+                authError.message?.includes('permission') ||
+                authError.message?.includes('row-level security')) {
+              console.warn('Temporary error checking authorization, will not sign out user');
+              return;
+            }
+            
             // Para otros errores desconocidos, también no hacer signOut automáticamente
-            // Solo registrar el error
+            // Solo registrar el error (sin console.error para evitar spam)
+            if (!authError.message?.includes('JWT') && !authError.message?.includes('token')) {
+              console.warn('Error checking authorization:', authError.message || authError.code);
+            }
             return;
           }
 
@@ -8604,7 +8609,7 @@ const App: React.FC = () => {
           .from('docentes')
           .select('id_docente, id_usuario')
           .eq('email', user.email.toLowerCase())
-          .single();
+          .maybeSingle(); // Use maybeSingle to avoid errors
 
         if (docente) {
           docenteId = docente.id_docente;
@@ -8628,14 +8633,17 @@ const App: React.FC = () => {
               especialidad: '',
             })
             .select('id_docente')
-            .single();
+            .maybeSingle(); // Use maybeSingle to avoid errors
 
           if (newDocente) {
             docenteId = newDocente.id_docente;
           }
         }
-      } catch (error) {
-        console.error('Error linking docente:', error);
+      } catch (error: any) {
+        // Only log non-rate-limit errors
+        if (!error?.message?.includes('429') && !error?.code?.includes('429')) {
+          console.error('Error linking docente:', error);
+        }
         // Continue even if linking fails
       }
     }
