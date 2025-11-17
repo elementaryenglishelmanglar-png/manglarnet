@@ -2236,30 +2236,90 @@ const TeacherFormModal: React.FC<{
         especialidad: teacher?.especialidad || '',
     });
     
-    const initialAssignments = useMemo(() => {
-        if (!teacher) return [];
-        // For English classes in 5to-6to, we need to get the nivel_ingles from asignacion_docente_nivel_ingles
-        // For now, we'll create assignments from classes, and the nivel_ingles will be set when loading
-        return clases
-            .filter(c => c.id_docente_asignado === teacher.id_docente)
-            .map(c => {
-                // Check if it's an English class for 5to-6to that has nivel_ingles
-                const isEnglishHighGrade = (c.nombre_materia?.toLowerCase().includes('inglés') || 
-                    c.nombre_materia?.toLowerCase().includes('ingles')) &&
-                    (c.grado_asignado === '5to Grado' || c.grado_asignado === '6to Grado');
-                
-                // For English 5to-6to, we'll need to load nivel_ingles from asignacion_docente_nivel_ingles
-                // For now, return without nivel_ingles and it will be set when user selects it again
-                return { 
-                    subject: c.nombre_materia, 
-                    grade: c.grado_asignado,
-                    nivel_ingles: isEnglishHighGrade ? (c as any).nivel_ingles : undefined,
-                    id_aula: c.id_aula || undefined // Cargar aula asignada
-                };
-            });
-    }, [teacher, clases]);
+    const [assignments, setAssignments] = useState<Assignment[]>([]);
+    const [isLoadingAssignments, setIsLoadingAssignments] = useState(false);
 
-    const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
+    // Cargar asignaciones existentes cuando se edita un docente
+    useEffect(() => {
+        const loadExistingAssignments = async () => {
+            if (!teacher) {
+                setAssignments([]);
+                return;
+            }
+
+            setIsLoadingAssignments(true);
+            try {
+                const anoEscolar = '2025-2026'; // TODO: Obtener del contexto
+                const loadedAssignments: Assignment[] = [];
+
+                // 1. Cargar clases regulares (no inglés de niveles 5to-6to)
+                const regularClasses = clases.filter(c => {
+                    if (c.id_docente_asignado !== teacher.id_docente) return false;
+                    // Excluir clases consolidadas de inglés 5to-6to (que tienen nivel_ingles: null y skill_rutina)
+                    const isConsolidatedEnglish = (c.nombre_materia?.toLowerCase().includes('inglés') || 
+                        c.nombre_materia?.toLowerCase().includes('ingles')) &&
+                        (c.grado_asignado === '5to Grado' || c.grado_asignado === '6to Grado') &&
+                        (c as any).nivel_ingles === null && (c as any).skill_rutina;
+                    return !isConsolidatedEnglish;
+                });
+
+                regularClasses.forEach(c => {
+                    loadedAssignments.push({
+                        subject: c.nombre_materia,
+                        grade: c.grado_asignado,
+                        nivel_ingles: undefined,
+                        id_aula: c.id_aula || undefined
+                    });
+                });
+
+                // 2. Cargar asignaciones de inglés de niveles (5to-6to) desde asignacion_docente_nivel_ingles
+                const { data: englishAssignments, error: englishError } = await supabase
+                    .from('asignacion_docente_nivel_ingles')
+                    .select('nivel_ingles')
+                    .eq('id_docente', teacher.id_docente)
+                    .eq('ano_escolar', anoEscolar)
+                    .eq('activa', true);
+
+                if (englishError) {
+                    console.error('Error loading English level assignments:', englishError);
+                } else if (englishAssignments) {
+                    // Cargar aulas para cada nivel
+                    const { data: aulasData } = await supabase
+                        .from('asignacion_aula_nivel_ingles')
+                        .select('nivel_ingles, id_aula')
+                        .eq('ano_escolar', anoEscolar)
+                        .eq('activa', true);
+
+                    const aulasMap: {[nivel: string]: string} = {};
+                    if (aulasData) {
+                        aulasData.forEach(item => {
+                            aulasMap[item.nivel_ingles] = item.id_aula;
+                        });
+                    }
+
+                    // Crear asignaciones para cada nivel de inglés (5to y 6to grado)
+                    englishAssignments.forEach(assignment => {
+                        ['5to Grado', '6to Grado'].forEach(grade => {
+                            loadedAssignments.push({
+                                subject: 'Inglés',
+                                grade: grade,
+                                nivel_ingles: assignment.nivel_ingles,
+                                id_aula: aulasMap[assignment.nivel_ingles] || undefined
+                            });
+                        });
+                    });
+                }
+
+                setAssignments(loadedAssignments);
+            } catch (error) {
+                console.error('Error loading assignments:', error);
+            } finally {
+                setIsLoadingAssignments(false);
+            }
+        };
+
+        loadExistingAssignments();
+    }, [teacher, clases]);
     const [currentSubject, setCurrentSubject] = useState('');
     const [currentGrade, setCurrentGrade] = useState('');
     const [currentNivelIngles, setCurrentNivelIngles] = useState('');
@@ -2637,7 +2697,8 @@ const TeacherFormModal: React.FC<{
                 grade: currentGrade.trim(),
                 nivel_ingles: requiereNivelIngles(currentSubject, currentGrade) 
                     ? currentNivelIngles 
-                    : undefined
+                    : undefined,
+                id_aula: currentAula || undefined // Incluir aula si está asignada
             }]);
         }
 
@@ -2773,6 +2834,11 @@ const TeacherFormModal: React.FC<{
                     {/* Asignaturas y Grados */}
                     <div className="border-t pt-6">
                         <h3 className="text-lg font-semibold mb-4 text-gray-700">Asignaturas y Grados</h3>
+                        {isLoadingAssignments && teacher && (
+                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                <p className="text-sm text-blue-800">Cargando asignaciones existentes...</p>
+                            </div>
+                        )}
                         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                             <div className="flex flex-wrap items-end gap-4 mb-4">
                                 <div className="flex-grow min-w-[200px]">
