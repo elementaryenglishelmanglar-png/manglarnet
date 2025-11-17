@@ -154,21 +154,21 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
         </div>
         <button
           onClick={() => handleOpenModal()}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-green-600 transition-colors"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl hover:bg-opacity-90 font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale"
         >
           <PlusIcon />
           Agregar Usuario
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+      <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6">
         <div className="mb-4">
           <input
             type="text"
             placeholder="Buscar por correo electrónico..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-base"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base placeholder:text-gray-400"
           />
         </div>
 
@@ -180,7 +180,7 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
             </div>
           ) : (
             filteredUsers.map((user) => (
-              <div key={user.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <div key={user.id} className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:shadow-md transition-smooth hover-lift">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
                     <p className="font-semibold text-gray-900 text-sm">{user.email}</p>
@@ -233,7 +233,7 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
                 </tr>
               ) : (
                 filteredUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-smooth">
                     <td className="py-3 px-4 text-gray-800">{user.email}</td>
                     <td className="py-3 px-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
@@ -275,8 +275,8 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white rounded-none sm:rounded-lg shadow-xl max-w-md w-full h-full sm:h-auto sm:mx-4 flex flex-col">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-0 sm:p-4 animate-fade-in">
+          <div className="bg-white rounded-none sm:rounded-2xl shadow-xl max-w-md w-full h-full sm:h-auto sm:mx-4 flex flex-col glass animate-fade-in">
             <div className="flex justify-between items-center p-4 sm:p-6 border-b flex-shrink-0">
               <h3 className="text-lg sm:text-xl font-bold text-gray-800">
                 {editingUser ? 'Editar Usuario' : 'Agregar Usuario'}
@@ -304,7 +304,7 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base placeholder:text-gray-400 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="usuario@ejemplo.com"
                   disabled={!!editingUser}
                 />
@@ -320,7 +320,7 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as AuthorizedUser['role'] })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base"
                 >
                   <option value="docente">Docente</option>
                   <option value="coordinador">Coordinador</option>
@@ -333,13 +333,13 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
             <div className="flex flex-col sm:flex-row justify-end gap-3 p-4 sm:p-6 border-t flex-shrink-0">
               <button
                 onClick={handleCloseModal}
-                className="w-full sm:w-auto px-4 py-2.5 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-base font-medium"
+                className="w-full sm:w-auto px-6 py-3 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-smooth text-base font-medium"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSave}
-                className="w-full sm:w-auto px-4 py-2.5 bg-brand-primary text-white rounded-lg hover:bg-green-600 transition-colors text-base font-medium"
+                className="w-full sm:w-auto px-6 py-3 bg-brand-primary text-white rounded-xl hover:bg-opacity-90 font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale text-base"
               >
                 {editingUser ? 'Guardar Cambios' : 'Agregar Usuario'}
               </button>

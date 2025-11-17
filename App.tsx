@@ -856,12 +856,12 @@ const Header: React.FC<{
     }
 
     return (
-        <header className="bg-white shadow-sm p-4 flex justify-between items-center sticky top-0 z-30">
+        <header className="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-30 border-b border-gray-100">
             <div className="flex items-center gap-3">
                 {onMenuToggle && (
                     <button
                         onClick={onMenuToggle}
-                        className="lg:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                        className="lg:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-smooth"
                         aria-label="Toggle menu"
                     >
                         <MenuIcon className="h-6 w-6" />
@@ -879,7 +879,7 @@ const Header: React.FC<{
                             )}
                         </button>
                         {isNotificationsOpen && (
-                            <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20">
+                            <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-xl shadow-xl glass z-20 border border-gray-100 animate-fade-in">
                                 <div className="p-2 border-b">
                                     <h3 className="font-semibold text-gray-800">Notificaciones</h3>
                                 </div>
@@ -919,7 +919,7 @@ const Header: React.FC<{
                         <ChevronDownIcon className="hidden sm:block" />
                     </button>
                     {isMenuOpen && (
-                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-xl shadow-xl glass z-10 border border-gray-100 animate-fade-in">
                             <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
                                 <a href="#" onClick={onLogout} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
                                     <LogoutIcon />
@@ -1009,10 +1009,10 @@ const Sidebar: React.FC<{
                             key={id}
                             href="#"
                             onClick={(e) => { e.preventDefault(); handleNavigate(id); }}
-                            className={`flex items-center gap-3 px-3 lg:px-4 py-3 my-1 rounded-md text-sm font-medium transition-colors ${
+                            className={`flex items-center gap-3 px-4 lg:px-5 py-3.5 my-1 rounded-xl text-sm font-medium transition-smooth ${
                                 activeView === id
-                                    ? 'bg-brand-primary text-white'
-                                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                                    ? 'bg-brand-primary text-white shadow-brand'
+                                    : 'text-gray-300 hover:bg-gray-700/80 hover:text-white'
                             }`}
                         >
                             <Icon className="h-5 w-5 flex-shrink-0" />
@@ -1602,7 +1602,7 @@ const DashboardView: React.FC<{
     return (
         <div className="space-y-6">
             {/* Widgets existentes para todos los roles */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
                 <h2 className="text-2xl font-bold text-text-main mb-6">Resumen de Alumnos por Grado</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                     {sortedGrades.map((grade) => {
@@ -1610,7 +1610,7 @@ const DashboardView: React.FC<{
                         return (
                             <div 
                                 key={grade} 
-                                className="p-6 rounded-lg shadow-lg text-white"
+                                className="p-6 rounded-xl shadow-lg text-white hover:shadow-xl transition-smooth hover-lift"
                                 style={{ backgroundColor: gradeColor }}
                             >
                                 <div className="flex justify-between items-start">
@@ -1721,7 +1721,7 @@ const TeacherScheduleDashboard: React.FC<{
     const selectedGradeColor = getGradeColor(selectedGrade);
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
             <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
                 <div className="flex items-center gap-3">
                     <h3 className="text-xl font-bold text-text-main">Mi Horario de Clases</h3>
@@ -1900,10 +1900,10 @@ const StudentListView: React.FC<{
     }, [students, searchTerm, filterGrade]);
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-text-main">Lista de Alumnos</h2>
-                <button onClick={onAddStudent} className="flex items-center gap-2 bg-brand-primary text-white px-4 py-2.5 rounded-md hover:bg-opacity-90 text-sm sm:text-base font-medium min-h-[44px]">
+                <button onClick={onAddStudent} className="flex items-center gap-2 bg-brand-primary text-white px-6 py-3 rounded-xl hover:bg-opacity-90 text-sm sm:text-base font-semibold min-h-[44px] shadow-md hover:shadow-lg transition-smooth hover-scale">
                     <PlusIcon />
                     <span className="hidden sm:inline">Añadir Alumno</span>
                     <span className="sm:hidden">Añadir</span>
@@ -1919,7 +1919,7 @@ const StudentListView: React.FC<{
                         placeholder="Buscar por nombre..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="pl-10 p-2.5 border border-gray-300 rounded-md w-full text-base"
+                        className="pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base placeholder:text-gray-400"
                     />
                 </div>
                 <select
@@ -1933,7 +1933,7 @@ const StudentListView: React.FC<{
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
                 {filteredStudents.map(student => (
-                    <div key={student.id_alumno} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                    <div key={student.id_alumno} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-smooth hover-lift">
                         <div className="flex justify-between items-start mb-3">
                             <div className="flex-1">
                                 <h3 className="font-semibold text-gray-900 text-lg">{student.nombres} {student.apellidos}</h3>
