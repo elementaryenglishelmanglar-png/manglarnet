@@ -3054,6 +3054,50 @@ const TeachersView: React.FC<{
     const [selectedTeacher, setSelectedTeacher] = useState<Docente | null>(null);
     const [unlinkedUsers, setUnlinkedUsers] = useState<Array<{id: string, email: string, role: string}>>([]);
     const [showUnlinkedSection, setShowUnlinkedSection] = useState(false);
+    const [englishLevelAssignments, setEnglishLevelAssignments] = useState<Array<{id_docente: string, nivel_ingles: string, id_aula?: string}>>([]);
+    
+    // Cargar asignaciones de niveles de inglés
+    useEffect(() => {
+        const loadEnglishAssignments = async () => {
+            try {
+                const anoEscolar = '2025-2026';
+                const { data: assignments, error } = await supabase
+                    .from('asignacion_docente_nivel_ingles')
+                    .select('id_docente, nivel_ingles')
+                    .eq('ano_escolar', anoEscolar)
+                    .eq('activa', true);
+                
+                if (error) {
+                    console.error('Error loading English level assignments:', error);
+                    return;
+                }
+                
+                // Cargar también las aulas asignadas a cada nivel
+                const assignmentsWithAulas = await Promise.all(
+                    (assignments || []).map(async (assignment) => {
+                        const { data: aulaAssignment } = await supabase
+                            .from('asignacion_aula_nivel_ingles')
+                            .select('id_aula')
+                            .eq('nivel_ingles', assignment.nivel_ingles)
+                            .eq('ano_escolar', anoEscolar)
+                            .eq('activa', true)
+                            .maybeSingle();
+                        
+                        return {
+                            ...assignment,
+                            id_aula: aulaAssignment?.id_aula
+                        };
+                    })
+                );
+                
+                setEnglishLevelAssignments(assignmentsWithAulas);
+            } catch (error) {
+                console.error('Error loading English assignments:', error);
+            }
+        };
+        
+        loadEnglishAssignments();
+    }, [docentes]);
 
     const handleOpenModal = (teacher: Docente | null = null) => {
         setSelectedTeacher(teacher);
@@ -3547,28 +3591,48 @@ const TeachersView: React.FC<{
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {docentes.map(docente => {
+                            // Clases regulares asignadas directamente al docente
                             const teacherClasses = clases.filter(c => c.id_docente_asignado === docente.id_docente);
-                            const subjects = [...new Set(teacherClasses.map(c => c.nombre_materia))];
+                            
+                            // Asignaciones de inglés de niveles (5to-6to)
+                            const englishAssignments = englishLevelAssignments.filter(a => a.id_docente === docente.id_docente);
+                            
+                            // Construir lista de asignaturas
+                            const regularSubjects = [...new Set(teacherClasses.map(c => c.nombre_materia))];
+                            const englishSubjects = englishAssignments.length > 0 ? ['Inglés (Niveles)'] : [];
+                            const subjects = [...regularSubjects, ...englishSubjects];
+                            
+                            // Construir lista de grados
                             let grades = [...new Set(teacherClasses.map(c => c.grado_asignado))];
                             
-                            // Para clases de inglés de niveles (5to-6to), agregar "6to Grado" si hay clases con "5to Grado"
-                            // porque las clases de inglés de niveles están agrupadas para ambos grados
-                            const hasEnglishLevelClasses = teacherClasses.some(c => 
-                                c.es_ingles_primaria && 
-                                c.nivel_ingles && 
-                                c.grado_asignado === '5to Grado'
-                            );
-                            
-                            if (hasEnglishLevelClasses && !grades.includes('6to Grado')) {
-                                grades.push('6to Grado');
-                                grades.sort(); // Ordenar para mantener consistencia
+                            // Para docentes de inglés de niveles, agregar 5to y 6to Grado
+                            if (englishAssignments.length > 0) {
+                                if (!grades.includes('5to Grado')) grades.push('5to Grado');
+                                if (!grades.includes('6to Grado')) grades.push('6to Grado');
                             }
+                            
+                            grades.sort(); // Ordenar para mantener consistencia
+                            
+                            // Obtener aulas asignadas
+                            const regularAulas = [...new Set(teacherClasses.map(c => c.id_aula).filter(Boolean))];
+                            const englishAulas = [...new Set(englishAssignments.map(a => a.id_aula).filter(Boolean))];
+                            const allAulas = [...regularAulas, ...englishAulas];
+                            const aulasNames = allAulas.map(id => aulas.find(a => a.id_aula === id)?.nombre || '').filter(Boolean);
 
                             return (
                                 <tr key={docente.id_docente} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{docente.nombres} {docente.apellidos}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {subjects.length > 0 ? subjects.join(', ') : 'N/A'}
+                                        {subjects.length > 0 ? (
+                                            <div>
+                                                {subjects.join(', ')}
+                                                {englishAssignments.length > 0 && (
+                                                    <div className="text-xs text-purple-600 mt-1">
+                                                        Niveles: {englishAssignments.map(a => a.nivel_ingles).join(', ')}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : 'N/A'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         {grades.length > 0 ? grades.join(', ') : 'N/A'}
@@ -3576,6 +3640,11 @@ const TeachersView: React.FC<{
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         <div>{docente.email}</div>
                                         <div>{docente.telefono}</div>
+                                        {aulasNames.length > 0 && (
+                                            <div className="text-xs text-gray-400 mt-1">
+                                                Aulas: {aulasNames.join(', ')}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex gap-4">
                                         <button onClick={() => handleOpenModal(docente)} className="text-blue-600 hover:text-blue-800"><EditIcon /></button>
@@ -4300,15 +4369,6 @@ const PlanningFormModal: React.FC<{
                     <button onClick={onClose}><CloseIcon /></button>
                 </div>
                 <div className="space-y-6">
-                    {/* Mensaje si no hay clases asignadas */}
-                    {assignedClasses.length === 0 && canEditTeacherFields && (
-                        <div className="p-4 bg-yellow-50 border-2 border-yellow-200 rounded-xl">
-                            <p className="text-sm text-yellow-800 font-medium">
-                                <strong>⚠️ No tiene clases asignadas.</strong> Por favor, contacte al coordinador para que le asigne clases antes de crear planificaciones.
-                            </p>
-                        </div>
-                    )}
-
                     {/* Error de validación */}
                     {validationError && (
                         <div className="p-4 bg-red-50 border-2 border-red-200 rounded-xl">
@@ -4323,16 +4383,14 @@ const PlanningFormModal: React.FC<{
                                 name="id_clase" 
                                 value={formData.id_clase} 
                                 onChange={handleChange} 
-                                disabled={!canEditTeacherFields || assignedClasses.length === 0} 
+                                disabled={!canEditTeacherFields} 
                                 className={`mt-1 block w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary transition-smooth text-base ${
-                                    assignedClasses.length === 0 
-                                        ? 'border-red-300 bg-red-50' 
-                                        : formData.id_clase 
-                                            ? 'border-gray-200 focus:border-brand-primary' 
-                                            : 'border-red-300 bg-red-50'
+                                    formData.id_clase 
+                                        ? 'border-gray-200 focus:border-brand-primary' 
+                                        : 'border-gray-200 focus:border-brand-primary'
                                 } disabled:bg-gray-100 disabled:cursor-not-allowed`}
                             >
-                                <option value="">{assignedClasses.length === 0 ? 'No hay clases asignadas' : 'Seleccione una asignatura'}</option>
+                                <option value="">Seleccione una asignatura</option>
                                 {assignedClasses.map(c => (
                                     <option key={c.id_clase} value={c.id_clase}>
                                         {c.nombre_materia} ({c.grado_asignado})
@@ -4394,7 +4452,7 @@ const PlanningFormModal: React.FC<{
                                 <button 
                                     type="button" 
                                     onClick={() => handleSubmit('Borrador')} 
-                                    disabled={assignedClasses.length === 0 || !formData.id_clase || formData.id_clase.trim() === ''}
+                                    disabled={!formData.id_clase || formData.id_clase.trim() === ''}
                                     className="px-6 py-3 bg-gray-500 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                                 >
                                     Guardar Borrador
@@ -4402,7 +4460,7 @@ const PlanningFormModal: React.FC<{
                                 <button 
                                     type="button" 
                                     onClick={() => handleSubmit('Enviado')} 
-                                    disabled={assignedClasses.length === 0 || !formData.id_clase || formData.id_clase.trim() === ''}
+                                    disabled={!formData.id_clase || formData.id_clase.trim() === ''}
                                     className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                                 >
                                     <SendIcon className="h-4 w-4" />
@@ -4535,10 +4593,22 @@ const PlanningView: React.FC<{
     };
 
     const teacherClasses = useMemo(() => {
-        if (!currentUser || currentUser.role !== 'docente' || !currentUser.docenteId) return [];
+        if (!currentUser || currentUser.role !== 'docente') return [];
+        // Para docentes, mostrar TODAS las clases disponibles, no solo las asignadas
+        // Esto permite que docentes sin clases asignadas también puedan crear planificaciones
         return clases
-            .filter(c => c.id_docente_asignado === currentUser.docenteId)
-            .map(c => ({ id_clase: c.id_clase, nombre_materia: c.nombre_materia, grado_asignado: c.grado_asignado}));
+            .map(c => ({ id_clase: c.id_clase, nombre_materia: c.nombre_materia, grado_asignado: c.grado_asignado}))
+            .filter((c, index, self) => 
+                // Eliminar duplicados basados en id_clase
+                index === self.findIndex((clase) => clase.id_clase === c.id_clase)
+            )
+            .sort((a, b) => {
+                // Ordenar primero por grado, luego por nombre de materia
+                if (a.grado_asignado !== b.grado_asignado) {
+                    return a.grado_asignado.localeCompare(b.grado_asignado);
+                }
+                return a.nombre_materia.localeCompare(b.nombre_materia);
+            });
     }, [clases, currentUser]);
 
     const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -4987,11 +5057,14 @@ const ScheduleView: React.FC<{
         );
 
         // Create new item with updated position
-        // Para clases consolidadas de inglés, id_docente será null (se consultará de asignaciones)
+        // Para clases consolidadas de inglés (SOLO 5to-6to), id_docente será null (se consultará de asignaciones)
         const clase = clases.find(c => c.id_clase === draggedItem.id);
+        // SOLO las clases de inglés de 5to-6to sin nivel específico son consolidadas
+        // Las clases de 1er-4to tienen id_docente_asignado directamente y NO son consolidadas
         const isConsolidatedEnglish = clase?.es_ingles_primaria && 
                                       clase?.nivel_ingles === null && 
-                                      clase?.skill_rutina;
+                                      clase?.skill_rutina &&
+                                      (clase?.grado_asignado === '5to Grado' || clase?.grado_asignado === '6to Grado');
         
         const slotParts = slot.split(' - ');
         const hora_inicio = slotParts[0];
@@ -5000,7 +5073,7 @@ const ScheduleView: React.FC<{
         const newItem: Horario = draggedItem.type === 'class'
             ? {
                 id_horario: `h-${selectedGrade.replace(/\s+/g, '-')}-${currentWeek}-${day}-${hora_inicio.replace(':', '')}-${draggedItem.id}`,
-                // CORRECCIÓN: Para clases consolidadas de inglés, usar null, pero para otras clases usar el docente de la clase si no está en draggedItem
+                // CORRECCIÓN: Para clases consolidadas de inglés (5to-6to), usar null. Para otras clases (incluyendo inglés 1er-4to), usar el docente de la clase
                 id_docente: isConsolidatedEnglish ? null : (draggedItem.docenteId || clase?.id_docente_asignado || null),
                 id_clase: draggedItem.id,
                 id_aula: clase?.id_aula || null, // Incluir aula de la clase
@@ -5069,12 +5142,17 @@ const ScheduleView: React.FC<{
         return clases.filter(c => {
             // Incluir clases del grado seleccionado normalmente
             if (c.grado_asignado === selectedGrade && !assignedClassIds.has(c.id_clase)) {
-                // Para clases de inglés consolidadas (5to-6to), solo mostrar si no están asignadas
-                if (c.es_ingles_primaria && c.nivel_ingles === null && c.skill_rutina) {
-                    return true; // Clase consolidada de inglés
+                // Para clases de inglés consolidadas (SOLO 5to-6to), solo mostrar si no están asignadas
+                const isConsolidatedEnglish = c.es_ingles_primaria && 
+                                             c.nivel_ingles === null && 
+                                             c.skill_rutina &&
+                                             (c.grado_asignado === '5to Grado' || c.grado_asignado === '6to Grado');
+                
+                if (isConsolidatedEnglish) {
+                    return true; // Clase consolidada de inglés (5to-6to)
                 }
-                // Para otras clases normales
-                if (!c.es_ingles_primaria || c.nivel_ingles !== null) {
+                // Para otras clases normales (incluyendo inglés de 1er-4to que tienen id_docente_asignado)
+                if (!c.es_ingles_primaria || c.nivel_ingles !== null || !c.skill_rutina) {
                     return true;
                 }
             }
@@ -5162,15 +5240,45 @@ const ScheduleView: React.FC<{
             const existingHorarios = await horariosService.getByGradeAndWeek(selectedGrade, currentWeek);
             
             // Create a map of existing horarios by key (dia_semana-hora_inicio-id_clase o evento_descripcion)
-            // Usar una clave más específica para evitar conflictos
+            // Para clases consolidadas de inglés, incluir el nivel en la clave
             const existingMap = new Map<string, HorarioDB>();
             existingHorarios.forEach(h => {
-                // Para eventos, usar evento_descripcion como parte de la clave
-                // Para clases, usar id_clase
-                const key = h.evento_descripcion 
-                    ? `${h.dia_semana}-${h.hora_inicio}-event-${h.evento_descripcion}`
-                    : `${h.dia_semana}-${h.hora_inicio}-class-${h.id_clase || 'null'}`;
-                existingMap.set(key, h);
+                if (h.evento_descripcion) {
+                    // Para eventos
+                    const key = `${h.dia_semana}-${h.hora_inicio}-event-${h.evento_descripcion}`;
+                    existingMap.set(key, h);
+                } else if (h.id_clase) {
+                    // Para clases, verificar si es consolidada de inglés
+                    const clase = clases.find(c => c.id_clase === h.id_clase);
+                    // SOLO las clases de inglés de 5to-6to sin nivel específico son consolidadas
+                    // Las clases de 1er-4to tienen id_docente_asignado directamente y NO son consolidadas
+                    const isConsolidatedEnglish = clase?.es_ingles_primaria && 
+                                                 clase?.nivel_ingles === null && 
+                                                 clase?.skill_rutina &&
+                                                 (clase?.grado_asignado === '5to Grado' || clase?.grado_asignado === '6to Grado');
+                    
+                    if (isConsolidatedEnglish) {
+                        // Para clases consolidadas, necesitamos identificar el nivel por el docente
+                        // Buscar el nivel basado en el docente asignado
+                        const assignment = englishLevelAssignments.find(a => a.id_docente === h.id_docente);
+                        if (assignment) {
+                            const key = `${h.dia_semana}-${h.hora_inicio}-class-${h.id_clase}-${assignment.nivel_ingles}`;
+                            existingMap.set(key, h);
+                        } else {
+                            // Si no encontramos el nivel, usar clave genérica
+                            const key = `${h.dia_semana}-${h.hora_inicio}-class-${h.id_clase}`;
+                            existingMap.set(key, h);
+                        }
+                    } else {
+                        // Para clases regulares
+                        const key = `${h.dia_semana}-${h.hora_inicio}-class-${h.id_clase}`;
+                        existingMap.set(key, h);
+                    }
+                } else {
+                    // Clase sin id_clase
+                    const key = `${h.dia_semana}-${h.hora_inicio}-class-null`;
+                    existingMap.set(key, h);
+                }
             });
 
             // Get current schedule for this week
@@ -5183,48 +5291,107 @@ const ScheduleView: React.FC<{
 
             // Process each item in the current schedule
             for (const horario of currentSchedule) {
-                // Usar la misma lógica de clave
-                const key = horario.evento_descripcion 
-                    ? `${horario.dia_semana}-${horario.hora_inicio}-event-${horario.evento_descripcion}`
-                    : `${horario.dia_semana}-${horario.hora_inicio}-class-${horario.id_clase || 'null'}`;
-                
-                // CORRECCIÓN: Si id_docente es null pero la clase tiene docente, usar el de la clase
                 const clase = horario.id_clase ? clases.find(c => c.id_clase === horario.id_clase) : null;
-                const correctedIdDocente = horario.id_docente || clase?.id_docente_asignado || null;
+                // SOLO las clases de inglés de 5to-6to sin nivel específico son consolidadas
+                // Las clases de 1er-4to tienen id_docente_asignado directamente y NO son consolidadas
+                const isConsolidatedEnglish = clase?.es_ingles_primaria && 
+                                             clase?.nivel_ingles === null && 
+                                             clase?.skill_rutina &&
+                                             (clase?.grado_asignado === '5to Grado' || clase?.grado_asignado === '6to Grado');
                 
-                const newHorario = {
-                    grado: selectedGrade,
-                    semana: currentWeek,
-                    lapso: selectedLapso || null, // NUEVO: Incluir lapso
-                    ano_escolar: anoEscolar, // NUEVO: Incluir año escolar
-                    id_docente: correctedIdDocente, // Usar el docente corregido
-                    id_clase: horario.id_clase,
-                    id_aula: horario.id_aula || null, // Incluir aula al guardar
-                    dia_semana: horario.dia_semana,
-                    hora_inicio: horario.hora_inicio,
-                    hora_fin: horario.hora_fin,
-                    evento_descripcion: horario.evento_descripcion
-                };
-                newHorariosMap.set(key, newHorario);
-
-                const existing = existingMap.get(key);
-                if (!existing) {
-                    // New horario to create
-                    horariosToCreate.push(newHorario);
+                if (isConsolidatedEnglish && horario.id_clase) {
+                    // Para clases consolidadas de inglés, crear un horario por cada nivel con su docente
+                    const niveles = ['Basic', 'Lower', 'Upper'];
+                    
+                    for (const nivel of niveles) {
+                        const assignment = englishLevelAssignments.find(a => a.nivel_ingles === nivel);
+                        if (!assignment) continue; // Solo crear horarios para niveles con docente asignado
+                        
+                        // Obtener aula para este nivel
+                        const aulaAssignment = await supabase
+                            .from('asignacion_aula_nivel_ingles')
+                            .select('id_aula')
+                            .eq('nivel_ingles', nivel)
+                            .eq('ano_escolar', anoEscolar)
+                            .eq('activa', true)
+                            .maybeSingle();
+                        
+                        const key = `${horario.dia_semana}-${horario.hora_inicio}-class-${horario.id_clase}-${nivel}`;
+                        
+                        const newHorario = {
+                            grado: selectedGrade,
+                            semana: currentWeek,
+                            lapso: selectedLapso || null,
+                            ano_escolar: anoEscolar,
+                            id_docente: assignment.id_docente, // Docente del nivel
+                            id_clase: horario.id_clase, // Mantener referencia a clase consolidada
+                            id_aula: aulaAssignment?.data?.id_aula || null,
+                            dia_semana: horario.dia_semana,
+                            hora_inicio: horario.hora_inicio,
+                            hora_fin: horario.hora_fin,
+                            evento_descripcion: null
+                        };
+                        
+                        newHorariosMap.set(key, newHorario);
+                        
+                        const existing = existingMap.get(key);
+                        if (!existing) {
+                            horariosToCreate.push(newHorario);
+                        } else {
+                            if (existing.id_docente !== newHorario.id_docente || 
+                                existing.id_clase !== newHorario.id_clase ||
+                                existing.id_aula !== newHorario.id_aula ||
+                                existing.hora_fin !== newHorario.hora_fin) {
+                                await horariosService.update(existing.id_horario, {
+                                    id_docente: newHorario.id_docente,
+                                    id_clase: newHorario.id_clase,
+                                    id_aula: newHorario.id_aula,
+                                    hora_fin: newHorario.hora_fin
+                                });
+                            }
+                        }
+                    }
                 } else {
-                    // Check if it needs updating (incluyendo corrección de id_docente)
-                    if (existing.id_docente !== newHorario.id_docente || 
-                        existing.id_clase !== newHorario.id_clase ||
-                        existing.id_aula !== newHorario.id_aula ||
-                        existing.hora_fin !== newHorario.hora_fin ||
-                        existing.evento_descripcion !== newHorario.evento_descripcion) {
-                        await horariosService.update(existing.id_horario, {
-                            id_docente: newHorario.id_docente, // Ya incluye la corrección
-                            id_clase: newHorario.id_clase,
-                            id_aula: newHorario.id_aula,
-                            hora_fin: newHorario.hora_fin,
-                            evento_descripcion: newHorario.evento_descripcion
-                        });
+                    // Para clases regulares o eventos
+                    const key = horario.evento_descripcion 
+                        ? `${horario.dia_semana}-${horario.hora_inicio}-event-${horario.evento_descripcion}`
+                        : `${horario.dia_semana}-${horario.hora_inicio}-class-${horario.id_clase || 'null'}`;
+                    
+                    // CORRECCIÓN: Si id_docente es null pero la clase tiene docente, usar el de la clase
+                    const correctedIdDocente = horario.id_docente || clase?.id_docente_asignado || null;
+                    
+                    const newHorario = {
+                        grado: selectedGrade,
+                        semana: currentWeek,
+                        lapso: selectedLapso || null,
+                        ano_escolar: anoEscolar,
+                        id_docente: correctedIdDocente,
+                        id_clase: horario.id_clase,
+                        id_aula: horario.id_aula || clase?.id_aula || null,
+                        dia_semana: horario.dia_semana,
+                        hora_inicio: horario.hora_inicio,
+                        hora_fin: horario.hora_fin,
+                        evento_descripcion: horario.evento_descripcion
+                    };
+                    newHorariosMap.set(key, newHorario);
+
+                    const existing = existingMap.get(key);
+                    if (!existing) {
+                        horariosToCreate.push(newHorario);
+                    } else {
+                        if (existing.id_docente !== newHorario.id_docente || 
+                            existing.id_clase !== newHorario.id_clase ||
+                            existing.id_aula !== newHorario.id_aula ||
+                            existing.hora_fin !== newHorario.hora_fin ||
+                            existing.evento_descripcion !== newHorario.evento_descripcion) {
+                            await horariosService.update(existing.id_horario, {
+                                id_docente: newHorario.id_docente,
+                                id_clase: newHorario.id_clase,
+                                id_aula: newHorario.id_aula,
+                                hora_fin: newHorario.hora_fin,
+                                evento_descripcion: newHorario.evento_descripcion
+                            });
+                        }
                     }
                 }
             }
@@ -5840,10 +6007,14 @@ const TeamScheduleView: React.FC<{
                     // Verificar si el docente está asignado a la clase (MEJORADO: también si id_docente es null)
                     const isClassTeacher = clase?.id_docente_asignado === selectedTeacherId;
                     
-                    // Verificar si es una clase consolidada de inglés (5to-6to) y el docente está asignado a algún nivel
+                    // Verificar si es una clase consolidada de inglés (SOLO 5to-6to) y el docente está asignado a algún nivel
                     let isEnglishLevelTeacher = false;
-                    if (clase?.es_ingles_primaria && clase?.nivel_ingles === null && clase?.skill_rutina) {
-                        // Es una clase consolidada de inglés, verificar asignaciones de nivel de inglés
+                    const isConsolidatedEnglish = clase?.es_ingles_primaria && 
+                                                 clase?.nivel_ingles === null && 
+                                                 clase?.skill_rutina &&
+                                                 (clase?.grado_asignado === '5to Grado' || clase?.grado_asignado === '6to Grado');
+                    if (isConsolidatedEnglish) {
+                        // Es una clase consolidada de inglés (5to-6to), verificar asignaciones de nivel de inglés
                         isEnglishLevelTeacher = englishLevelAssignments.some(
                             assignment => assignment.id_docente === selectedTeacherId
                         );
