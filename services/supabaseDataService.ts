@@ -194,6 +194,18 @@ export interface LogReunionCoordinacion {
   updated_at?: string;
 }
 
+export interface TareaCoordinador {
+  id_tarea: string;
+  id_usuario?: string | null;
+  descripcion: string;
+  completada: boolean;
+  fecha_creacion?: string;
+  fecha_completada?: string | null;
+  prioridad?: 'Baja' | 'Normal' | 'Alta' | 'Urgente';
+  created_at?: string;
+  updated_at?: string;
+}
+
 // ============================================
 // SCHEDULE OPTIMIZER TYPES
 // ============================================
@@ -1447,6 +1459,78 @@ export const logReunionesService = {
       .from('log_reuniones_coordinacion')
       .delete()
       .eq('id_log', id);
+    
+    if (error) throw error;
+  }
+};
+
+// ============================================
+// TAREAS COORDINADOR SERVICE
+// ============================================
+export const tareasCoordinadorService = {
+  async getAll(): Promise<TareaCoordinador[]> {
+    const { data, error } = await supabase
+      .from('tareas_coordinador')
+      .select('*')
+      .order('completada', { ascending: true })
+      .order('fecha_creacion', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByUsuario(idUsuario: string): Promise<TareaCoordinador[]> {
+    const { data, error } = await supabase
+      .from('tareas_coordinador')
+      .select('*')
+      .eq('id_usuario', idUsuario)
+      .order('completada', { ascending: true })
+      .order('fecha_creacion', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getPendientes(idUsuario: string): Promise<TareaCoordinador[]> {
+    const { data, error } = await supabase
+      .from('tareas_coordinador')
+      .select('*')
+      .eq('id_usuario', idUsuario)
+      .eq('completada', false)
+      .order('fecha_creacion', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(tarea: Omit<TareaCoordinador, 'id_tarea' | 'created_at' | 'updated_at'>): Promise<TareaCoordinador> {
+    const { data, error } = await supabase
+      .from('tareas_coordinador')
+      .insert([tarea])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, updates: Partial<TareaCoordinador>): Promise<TareaCoordinador> {
+    const { data, error } = await supabase
+      .from('tareas_coordinador')
+      .update(updates)
+      .eq('id_tarea', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('tareas_coordinador')
+      .delete()
+      .eq('id_tarea', id);
     
     if (error) throw error;
   }

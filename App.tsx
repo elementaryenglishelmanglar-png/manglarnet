@@ -16,9 +16,11 @@ import {
   guardiasService,
   logReunionesService,
   eventosCalendarioService,
+  tareasCoordinadorService,
   type Guardia,
   type LogReunionCoordinacion,
   type EventoCalendario,
+  type TareaCoordinador,
   clasesService,
   planificacionesService,
   horariosService,
@@ -1020,78 +1022,76 @@ const Sidebar: React.FC<{
 // COORDINATOR DASHBOARD WIDGETS
 // ============================================
 
-// Widget 1: Mi Agenda del Día
+// Widget 1: Mi Agenda del Día (Lista de Tareas)
 const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser }) => {
-    const [guardias, setGuardias] = useState<Guardia[]>([]);
-    const [eventos, setEventos] = useState<EventoCalendario[]>([]);
+    const [tareas, setTareas] = useState<TareaCoordinador[]>([]);
+    const [nuevaTarea, setNuevaTarea] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [isAdding, setIsAdding] = useState(false);
 
     useEffect(() => {
-        const loadAgenda = async () => {
+        const loadTareas = async () => {
             if (!currentUser.userId) return;
             
             try {
                 setIsLoading(true);
-                const today = new Date().toISOString().split('T')[0];
-                
-                // Cargar guardias del día
-                const guardiasHoy = await guardiasService.getByDate(today);
-                const guardiasUsuario = guardiasHoy.filter(g => g.id_usuario === currentUser.userId);
-                
-                // Cargar eventos del día (usando eventos_calendario)
-                const eventosHoy = await eventosCalendarioService.getByDateRange(
-                    `${today}T00:00:00Z`,
-                    `${today}T23:59:59Z`
-                );
-                
-                setGuardias(guardiasUsuario);
-                setEventos(eventosHoy);
+                const tareasData = await tareasCoordinadorService.getByUsuario(currentUser.userId);
+                setTareas(tareasData);
             } catch (error) {
-                console.error('Error loading agenda:', error);
+                console.error('Error loading tareas:', error);
             } finally {
                 setIsLoading(false);
             }
         };
         
-        loadAgenda();
+        loadTareas();
     }, [currentUser.userId]);
 
-    const formatTime = (time: string) => {
-        if (!time) return '';
-        const [hours, minutes] = time.split(':');
-        const hour = parseInt(hours);
-        const ampm = hour >= 12 ? 'pm' : 'am';
-        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-        return `${displayHour}:${minutes}${ampm}`;
+    const handleAddTarea = async () => {
+        if (!nuevaTarea.trim() || !currentUser.userId) return;
+        
+        try {
+            setIsAdding(true);
+            const nueva = await tareasCoordinadorService.create({
+                id_usuario: currentUser.userId,
+                descripcion: nuevaTarea.trim(),
+                completada: false,
+                prioridad: 'Normal'
+            });
+            setTareas(prev => [nueva, ...prev]);
+            setNuevaTarea('');
+        } catch (error) {
+            console.error('Error adding tarea:', error);
+            alert('Error al agregar la tarea. Por favor, inténtalo de nuevo.');
+        } finally {
+            setIsAdding(false);
+        }
     };
 
-    const items = useMemo(() => {
-        const agendaItems: Array<{ hora: string; descripcion: string; tipo: 'guardia' | 'evento' }> = [];
+    const handleToggleCompletada = async (id: string, completada: boolean) => {
+        try {
+            const updated = await tareasCoordinadorService.update(id, { completada: !completada });
+            setTareas(prev => prev.map(t => t.id_tarea === id ? updated : t));
+        } catch (error) {
+            console.error('Error updating tarea:', error);
+            alert('Error al actualizar la tarea. Por favor, inténtalo de nuevo.');
+        }
+    };
+
+    const handleDeleteTarea = async (id: string) => {
+        if (!window.confirm('¿Estás seguro de que deseas eliminar esta tarea?')) return;
         
-        guardias.forEach(g => {
-            agendaItems.push({
-                hora: formatTime(g.hora_inicio),
-                descripcion: `${g.descripcion}${g.ubicacion ? ` (${g.ubicacion})` : ''}`,
-                tipo: 'guardia'
-            });
-        });
-        
-        eventos.forEach(e => {
-            const fechaInicio = new Date(e.fecha_inicio);
-            const hora = fechaInicio.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true });
-            agendaItems.push({
-                hora: hora,
-                descripcion: e.titulo,
-                tipo: 'evento'
-            });
-        });
-        
-        return agendaItems.sort((a, b) => {
-            const timeA = a.hora.replace(/[^\d:]/g, '');
-            const timeB = b.hora.replace(/[^\d:]/g, '');
-            return timeA.localeCompare(timeB);
-        });
-    }, [guardias, eventos]);
+        try {
+            await tareasCoordinadorService.delete(id);
+            setTareas(prev => prev.filter(t => t.id_tarea !== id));
+        } catch (error) {
+            console.error('Error deleting tarea:', error);
+            alert('Error al eliminar la tarea. Por favor, inténtalo de nuevo.');
+        }
+    };
+
+    const tareasPendientes = tareas.filter(t => !t.completada);
+    const tareasCompletadas = tareas.filter(t => t.completada);
 
     if (isLoading) {
         return (
@@ -1105,26 +1105,91 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
     return (
         <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-lg font-bold text-text-main mb-4">Mi Agenda del Día</h3>
-            {items.length === 0 ? (
-                <p className="text-gray-500 text-sm">No hay actividades programadas para hoy</p>
-            ) : (
-                <div className="space-y-3">
-                    {items.map((item, idx) => (
-                        <div key={idx} className="flex items-start gap-3 border-l-2 border-brand-primary pl-3">
-                            <span className="text-sm font-semibold text-brand-primary min-w-[60px]">
-                                {item.hora}
-                            </span>
-                            <span className="text-sm text-gray-700 flex-1">
-                                {item.descripcion}
-                            </span>
-                            {item.tipo === 'guardia' && (
-                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                    Guardia
-                                </span>
-                            )}
-                        </div>
-                    ))}
+            
+            {/* Formulario para agregar nueva tarea */}
+            <div className="mb-4 flex gap-2">
+                <input
+                    type="text"
+                    value={nuevaTarea}
+                    onChange={(e) => setNuevaTarea(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddTarea()}
+                    placeholder="Agregar nueva tarea..."
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    disabled={isAdding}
+                />
+                <button
+                    onClick={handleAddTarea}
+                    disabled={isAdding || !nuevaTarea.trim()}
+                    className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                    <PlusIcon className="h-4 w-4" />
+                    Agregar
+                </button>
+            </div>
+
+            {/* Lista de tareas pendientes */}
+            {tareasPendientes.length > 0 && (
+                <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Pendientes ({tareasPendientes.length})</h4>
+                    <div className="space-y-2">
+                        {tareasPendientes.map((tarea) => (
+                            <div key={tarea.id_tarea} className="flex items-start gap-3 p-2 rounded-md hover:bg-gray-50">
+                                <input
+                                    type="checkbox"
+                                    checked={tarea.completada}
+                                    onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
+                                    className="mt-1 h-4 w-4 text-brand-primary focus:ring-brand-primary border-gray-300 rounded"
+                                />
+                                <span className="flex-1 text-sm text-gray-700">{tarea.descripcion}</span>
+                                <button
+                                    onClick={() => handleDeleteTarea(tarea.id_tarea)}
+                                    className="text-red-500 hover:text-red-700 p-1"
+                                    title="Eliminar tarea"
+                                >
+                                    <DeleteIcon className="h-4 w-4" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
+            )}
+
+            {/* Lista de tareas completadas (colapsable) */}
+            {tareasCompletadas.length > 0 && (
+                <div>
+                    <details className="group">
+                        <summary className="text-sm font-semibold text-gray-500 cursor-pointer list-none">
+                            <span className="flex items-center gap-2">
+                                <span>Completadas ({tareasCompletadas.length})</span>
+                                <ChevronDownIcon className="h-4 w-4 transform group-open:rotate-180 transition-transform" />
+                            </span>
+                        </summary>
+                        <div className="mt-2 space-y-2">
+                            {tareasCompletadas.map((tarea) => (
+                                <div key={tarea.id_tarea} className="flex items-start gap-3 p-2 rounded-md opacity-60">
+                                    <input
+                                        type="checkbox"
+                                        checked={tarea.completada}
+                                        onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
+                                        className="mt-1 h-4 w-4 text-brand-primary focus:ring-brand-primary border-gray-300 rounded"
+                                    />
+                                    <span className="flex-1 text-sm text-gray-500 line-through">{tarea.descripcion}</span>
+                                    <button
+                                        onClick={() => handleDeleteTarea(tarea.id_tarea)}
+                                        className="text-red-500 hover:text-red-700 p-1"
+                                        title="Eliminar tarea"
+                                    >
+                                        <DeleteIcon className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </details>
+                </div>
+            )}
+
+            {tareas.length === 0 && (
+                <p className="text-gray-500 text-sm text-center py-4">No hay tareas. Agrega una nueva tarea arriba.</p>
             )}
         </div>
     );
@@ -1292,8 +1357,8 @@ const EstadoMiEquipoWidget: React.FC<{ docentes: Docente[]; planificaciones: Pla
     );
 };
 
-// Widget 4: Alertas de Helios (IA Proactiva)
-const AlertasHeliosWidget: React.FC = () => {
+// Widget 4: Alertas de Coco (IA Proactiva)
+const AlertasCocoWidget: React.FC = () => {
     const [alertas, setAlertas] = useState<LogReunionCoordinacion[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -1326,7 +1391,7 @@ const AlertasHeliosWidget: React.FC = () => {
     if (isLoading) {
         return (
             <div className="bg-white p-6 rounded-lg shadow-md">
-                <h3 className="text-lg font-bold text-text-main mb-4">Alertas de Helios</h3>
+                <h3 className="text-lg font-bold text-text-main mb-4">Alertas de Coco</h3>
                 <p className="text-gray-500">Cargando...</p>
             </div>
         );
@@ -1336,7 +1401,7 @@ const AlertasHeliosWidget: React.FC = () => {
         <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="flex items-center gap-2 mb-4">
                 <SparklesIcon className="h-5 w-5 text-brand-primary" />
-                <h3 className="text-lg font-bold text-text-main">Alertas de Helios</h3>
+                <h3 className="text-lg font-bold text-text-main">Alertas de Coco</h3>
             </div>
             {alertas.length === 0 ? (
                 <p className="text-gray-500 text-sm">No hay alertas pendientes</p>
@@ -1459,7 +1524,7 @@ const DashboardView: React.FC<{
                     <MiAgendaDelDiaWidget currentUser={currentUser} />
                     <EventosSemanaWidget />
                     <EstadoMiEquipoWidget docentes={docentes} planificaciones={planificaciones} />
-                    <AlertasHeliosWidget />
+                    <AlertasCocoWidget />
                 </div>
             )}
         </div>
@@ -4361,7 +4426,7 @@ const PlanningView: React.FC<{
                                 </div>
                                 <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
                                     <button onClick={() => handleGetAiSuggestions(plan)} className="flex items-center gap-1 text-xs px-3 py-1 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200">
-                                        <SparklesIcon className="h-4 w-4" /> Asistente IA
+                                        <SparklesIcon className="h-4 w-4" /> Coco
                                     </button>
                                     <button onClick={() => handleOpenModal(plan, true)} className="text-xs px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300">Ver</button>
                                     { (currentUser.role === 'coordinador' || currentUser.role === 'directivo') &&
@@ -4403,7 +4468,7 @@ const PlanningView: React.FC<{
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
                     <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-3xl">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-2xl font-bold flex items-center gap-2"><SparklesIcon className="h-6 w-6 text-purple-500" />Sugerencias del Asistente IA</h2>
+                            <h2 className="text-2xl font-bold flex items-center gap-2"><SparklesIcon className="h-6 w-6 text-purple-500" />Sugerencias de Coco</h2>
                             <button onClick={() => setAiModalOpen(false)}><CloseIcon /></button>
                         </div>
                         {isLoadingAi ? (
@@ -7488,7 +7553,7 @@ const EvaluationView: React.FC<{
                 categoria: "Sistema", 
                 frecuencia: 0, 
                 estudiantes: "N/A", 
-                accionesSugeridas: "La respuesta del asistente de IA no pudo ser procesada. Inténtelo de nuevo."
+                accionesSugeridas: "La respuesta de Coco no pudo ser procesada. Inténtelo de nuevo."
             }]);
         }
         setIsLoading(false);

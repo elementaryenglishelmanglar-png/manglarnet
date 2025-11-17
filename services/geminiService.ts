@@ -47,10 +47,10 @@ export async function getAIPlanSuggestions(plan: PlanificacionData): Promise<str
     }
 
     const result = await response.json();
-    return result.result || "Lo sentimos, ha ocurrido un error al contactar al asistente de IA. Por favor, verifica tu conexión o inténtalo de nuevo más tarde.";
+    return result.result || "Lo sentimos, ha ocurrido un error al contactar con Coco. Por favor, verifica tu conexión o inténtalo de nuevo más tarde.";
   } catch (error) {
     console.error("Error fetching AI suggestions:", error);
-    return "Lo sentimos, ha ocurrido un error al contactar al asistente de IA. Por favor, verifica tu conexión o inténtalo de nuevo más tarde.";
+    return "Lo sentimos, ha ocurrido un error al contactar con Coco. Por favor, verifica tu conexión o inténtalo de nuevo más tarde.";
   }
 }
 
@@ -95,7 +95,7 @@ export async function getAIEvaluationAnalysis(evaluaciones: EvaluacionAlumnoData
         categoria: "Sistema", 
         frecuencia: 0, 
         estudiantes: "N/A", 
-        accionesSugeridas: "No se pudo conectar con el asistente de IA. Por favor, verifique la conexión a internet y vuelva a intentarlo."
+        accionesSugeridas: "No se pudo conectar con Coco. Por favor, verifique la conexión a internet y vuelva a intentarlo."
     }]);
   } catch (error) {
     console.error("Error fetching AI evaluation analysis:", error);
@@ -105,7 +105,7 @@ export async function getAIEvaluationAnalysis(evaluaciones: EvaluacionAlumnoData
         categoria: "Sistema", 
         frecuencia: 0, 
         estudiantes: "N/A", 
-        accionesSugeridas: "No se pudo conectar con el asistente de IA. Por favor, verifique la conexión a internet y vuelva a intentarlo."
+        accionesSugeridas: "No se pudo conectar con Coco. Por favor, verifique la conexión a internet y vuelva a intentarlo."
     }]);
   }
 }
