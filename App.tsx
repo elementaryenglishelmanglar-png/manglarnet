@@ -380,7 +380,7 @@ const mockPlanificaciones: Planificacion[] = [
         id_clase: 'clase-01',
         semana: 1,
         lapso: 'I Lapso',
-        ano_escolar: '2024-2025',
+        ano_escolar: '2025-2026',
         fecha_creacion: new Date().toISOString(),
         competencia_indicadores: 'Resolver problemas de multiplicación con números decimales.',
         inicio: 'Repaso de las tablas de multiplicar y concepto de decimales.',
@@ -396,7 +396,7 @@ const mockPlanificaciones: Planificacion[] = [
         id_clase: 'clase-02',
         semana: 1,
         lapso: 'I Lapso',
-        ano_escolar: '2024-2025',
+        ano_escolar: '2025-2026',
         fecha_creacion: new Date().toISOString(),
         competencia_indicadores: 'Identificar las partes de una célula animal y vegetal.',
         inicio: 'Lluvia de ideas: ¿De qué estamos hechos los seres vivos?',
@@ -411,7 +411,7 @@ const mockPlanificaciones: Planificacion[] = [
         id_clase: 'clase-03',
         semana: 2,
         lapso: 'I Lapso',
-        ano_escolar: '2024-2025',
+        ano_escolar: '2025-2026',
         fecha_creacion: new Date().toISOString(),
         competencia_indicadores: 'Conocer los eventos principales de la independencia.',
         inicio: 'Discusión sobre héroes nacionales.',
@@ -459,6 +459,17 @@ const GRADOS = [
     "1er Grado", "2do Grado", "3er Grado", "4to Grado", "5to Grado", "6to Grado",
     "1er Año", "2do Año", "3er Año", "4to Año", "5to Año"
 ];
+
+// Función helper para generar años escolares desde 2025-2026 hasta 2040-2041
+const generateAnosEscolares = (): string[] => {
+    const anos: string[] = [];
+    for (let inicio = 2025; inicio <= 2040; inicio++) {
+        anos.push(`${inicio}-${inicio + 1}`);
+    }
+    return anos;
+};
+
+const ANOS_ESCOLARES = generateAnosEscolares();
 
 
 // Función helper para obtener el color de una materia
@@ -4299,13 +4310,14 @@ const PlanningFormModal: React.FC<{
     onClose: () => void;
     onSave: (plan: Planificacion) => void;
     isReadOnly?: boolean;
-}> = ({ plan, userRole, userId, assignedClasses, onClose, onSave, isReadOnly = false }) => {
+    currentUserEmail?: string; // Email del usuario actual para buscar docente si userId está vacío
+}> = ({ plan, userRole, userId, assignedClasses, onClose, onSave, isReadOnly = false, currentUserEmail }) => {
     const [formData, setFormData] = useState<Omit<Planificacion, 'id_planificacion' | 'fecha_creacion'>>({
         id_docente: plan?.id_docente || userId,
         id_clase: plan?.id_clase || (assignedClasses.length > 0 ? assignedClasses[0].id_clase : ''),
         semana: plan?.semana || getWeekNumber(new Date('2024-09-01')),
         lapso: plan?.lapso || 'I Lapso',
-        ano_escolar: plan?.ano_escolar || '2024-2025',
+        ano_escolar: plan?.ano_escolar || '2025-2026',
         competencia_indicadores: plan?.competencia_indicadores || '',
         inicio: plan?.inicio || '',
         desarrollo: plan?.desarrollo || '',
@@ -4318,6 +4330,29 @@ const PlanningFormModal: React.FC<{
     });
 
     const [validationError, setValidationError] = useState<string>('');
+
+    // Si userId está vacío y es un docente, intentar buscar el docente por email
+    useEffect(() => {
+        const fetchDocenteId = async () => {
+            if (userRole === 'docente' && (!userId || userId.trim() === '') && currentUserEmail) {
+                try {
+                    const { data: docente } = await supabase
+                        .from('docentes')
+                        .select('id_docente')
+                        .eq('email', currentUserEmail.toLowerCase())
+                        .maybeSingle();
+                    
+                    if (docente && docente.id_docente) {
+                        setFormData(prev => ({ ...prev, id_docente: docente.id_docente }));
+                    }
+                } catch (error) {
+                    console.error('Error fetching docente:', error);
+                }
+            }
+        };
+        
+        fetchDocenteId();
+    }, [userRole, userId, currentUserEmail]);
 
     const isReviewMode = userRole !== 'docente' && plan !== null;
     
@@ -4421,9 +4456,9 @@ const PlanningFormModal: React.FC<{
                                 disabled={!canEditTeacherFields} 
                                 className="mt-1 block w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
                             >
-                                <option>2024-2025</option>
-                                <option>2025-2026</option>
-                                <option>2026-2027</option>
+                                {ANOS_ESCOLARES.map(ano => (
+                                    <option key={ano} value={ano}>{ano}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
@@ -4512,7 +4547,6 @@ const PlanningView: React.FC<{
     const [boardFilters, setBoardFilters] = useState({
         ano_escolar: 'all',
         lapso: 'all',
-        id_clase: 'all',
         id_docente: 'all',
     });
 
@@ -4632,7 +4666,7 @@ const PlanningView: React.FC<{
             let filtered = [...planificaciones];
             
             // Apply filters
-            const { ano_escolar, lapso, id_clase, id_docente } = boardFilters;
+            const { ano_escolar, lapso, id_docente } = boardFilters;
             
             if (ano_escolar && ano_escolar !== 'all') {
                 filtered = filtered.filter(p => p.ano_escolar === ano_escolar);
@@ -4640,10 +4674,6 @@ const PlanningView: React.FC<{
             
             if (lapso && lapso !== 'all') {
                 filtered = filtered.filter(p => p.lapso === lapso);
-            }
-            
-            if (id_clase && id_clase !== 'all') {
-                filtered = filtered.filter(p => p.id_clase === id_clase);
             }
             
             if (id_docente && id_docente !== 'all') {
@@ -4666,23 +4696,18 @@ const PlanningView: React.FC<{
                 </div>
                 
                 {/* Filters */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg border">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg border">
                     <InputField as="select" label="Año Escolar" name="ano_escolar" value={boardFilters.ano_escolar} onChange={handleFilterChange}>
                         <option value="all">Todos</option>
-                        <option value="2024-2025">2024-2025</option>
-                        <option value="2025-2026">2025-2026</option>
+                        {ANOS_ESCOLARES.map(ano => (
+                            <option key={ano} value={ano}>{ano}</option>
+                        ))}
                     </InputField>
                     <InputField as="select" label="Lapso" name="lapso" value={boardFilters.lapso} onChange={handleFilterChange}>
                         <option value="all">Todos</option>
                         <option value="I Lapso">I Lapso</option>
                         <option value="II Lapso">II Lapso</option>
                         <option value="III Lapso">III Lapso</option>
-                    </InputField>
-                    <InputField as="select" label="Materia" name="id_clase" value={boardFilters.id_clase} onChange={handleFilterChange}>
-                        <option value="all">Todas</option>
-                        {clases && clases.length > 0 ? clases.map(c => (
-                            <option key={c.id_clase} value={c.id_clase}>{c.nombre_materia} ({c.grado_asignado})</option>
-                        )) : null}
                     </InputField>
                     <InputField as="select" label="Docente" name="id_docente" value={boardFilters.id_docente} onChange={handleFilterChange}>
                         <option value="all">Todos</option>
@@ -4764,7 +4789,8 @@ const PlanningView: React.FC<{
                     assignedClasses={teacherClasses} 
                     onClose={handleCloseModal} 
                     onSave={handleSavePlan} 
-                    isReadOnly={isReadOnlyModal} 
+                    isReadOnly={isReadOnlyModal}
+                    currentUserEmail={currentUser.email}
                 />
             )}
             {isAiModalOpen && selectedPlan && (
@@ -6231,7 +6257,7 @@ const TeamScheduleView: React.FC<{
 const ScheduleGeneratorView: React.FC<{
     currentUser: Usuario;
 }> = ({ currentUser }) => {
-    const [anoEscolar, setAnoEscolar] = useState('2024-2025');
+    const [anoEscolar, setAnoEscolar] = useState('2025-2026');
     const [semana, setSemana] = useState<number>(1);
     const [grado, setGrado] = useState<string>('');
     const [configuracion, setConfiguracion] = useState<ConfiguracionHorario | null>(null);
@@ -6377,8 +6403,9 @@ const ScheduleGeneratorView: React.FC<{
                             onChange={(e) => setAnoEscolar(e.target.value)}
                             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-transparent text-base"
                         >
-                            <option value="2024-2025">2024-2025</option>
-                            <option value="2025-2026">2025-2026</option>
+                            {ANOS_ESCOLARES.map(ano => (
+                                <option key={ano} value={ano}>{ano}</option>
+                            ))}
                         </select>
                     </div>
 
@@ -7938,7 +7965,7 @@ const EvaluationView: React.FC<{
     const [selectedMinuta, setSelectedMinuta] = useState<MinutaEvaluacion | null>(null);
 
     const [filters, setFilters] = useState({
-        ano_escolar: '2024-2025',
+        ano_escolar: '2025-2026',
         lapso: 'I Lapso',
         evaluacion: 'I Mensual',
         grado: '',
@@ -8081,7 +8108,7 @@ const EvaluationView: React.FC<{
             setMinutas(allMinutas);
             
             alert('Minuta de la reunión guardada con éxito.');
-            setFilters({ ano_escolar: '2024-2025', lapso: 'I Lapso', evaluacion: 'I Mensual', grado: '', materia: '' });
+            setFilters({ ano_escolar: '2025-2026', lapso: 'I Lapso', evaluacion: 'I Mensual', grado: '', materia: '' });
             setStudentEvals(new Map());
             setAiAnalysis([]);
         } catch (error: any) {
@@ -8103,7 +8130,9 @@ const EvaluationView: React.FC<{
                     <h2 className="text-xl font-bold text-text-main mb-4">1. Contexto de la Reunión</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         <InputField as="select" label="Año Escolar" name="ano_escolar" value={filters.ano_escolar} onChange={handleFilterChange}>
-                            <option>2024-2025</option><option>2025-2026</option>
+                            {ANOS_ESCOLARES.map(ano => (
+                                <option key={ano} value={ano}>{ano}</option>
+                            ))}
                         </InputField>
                          <InputField as="select" label="Lapso" name="lapso" value={filters.lapso} onChange={handleFilterChange}>
                             <option>I Lapso</option><option>II Lapso</option><option>III Lapso</option>
