@@ -7139,46 +7139,133 @@ const CalendarView: React.FC<{
             </div>
 
             {/* Filtros */}
-            <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-gray-50 rounded-lg">
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-white rounded-xl shadow-md border border-gray-100">
                 {/* Filtros por tipo de evento */}
                 <div>
-                    <h3 className="font-semibold text-gray-700 mb-3">Ver Calendarios:</h3>
-                    <div className="space-y-2">
-                        {Object.keys(filtrosTipo).map(tipo => (
-                            <label key={tipo} className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={filtrosTipo[tipo]}
-                                    onChange={(e) => setFiltrosTipo(prev => ({ ...prev, [tipo]: e.target.checked }))}
-                                    className="rounded"
-                                />
-                                <span className="flex items-center gap-2">
-                                    <span
-                                        className="w-4 h-4 rounded"
-                                        style={{ backgroundColor: coloresEventos[tipo] }}
-                                    />
-                                    {tipo}
-                                </span>
-                            </label>
-                        ))}
+                    <h3 className="font-semibold text-gray-800 mb-4 text-base">Ver Calendarios:</h3>
+                    <div className="space-y-2.5">
+                        {Object.keys(filtrosTipo).map(tipo => {
+                            const isActive = filtrosTipo[tipo];
+                            const color = coloresEventos[tipo];
+                            return (
+                                <button
+                                    key={tipo}
+                                    type="button"
+                                    onClick={() => setFiltrosTipo(prev => ({ ...prev, [tipo]: !prev[tipo] }))}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-smooth hover-scale ${
+                                        isActive 
+                                            ? 'bg-opacity-10 border-2 shadow-sm' 
+                                            : 'bg-gray-50 border-2 border-gray-200 opacity-60'
+                                    }`}
+                                    style={isActive ? {
+                                        backgroundColor: `${color}15`,
+                                        borderColor: color
+                                    } : {}}
+                                >
+                                    <div className="relative flex-shrink-0">
+                                        <input
+                                            type="checkbox"
+                                            checked={isActive}
+                                            onChange={() => {}}
+                                            className="sr-only"
+                                            readOnly
+                                        />
+                                        <div 
+                                            className={`w-5 h-5 rounded-md border-2 transition-smooth flex items-center justify-center ${
+                                                isActive ? 'border-current' : 'border-gray-300'
+                                            }`}
+                                            style={isActive ? { 
+                                                backgroundColor: color,
+                                                borderColor: color
+                                            } : {}}
+                                        >
+                                            {isActive && (
+                                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <span 
+                                        className={`flex items-center gap-2 font-medium text-sm ${
+                                            isActive ? 'text-gray-800' : 'text-gray-500'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`w-3 h-3 rounded transition-smooth ${
+                                                isActive ? 'shadow-sm' : 'opacity-50'
+                                            }`}
+                                            style={{ backgroundColor: color }}
+                                        />
+                                        {tipo}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
                 {/* Filtros por nivel educativo */}
                 <div>
-                    <h3 className="font-semibold text-gray-700 mb-3">Ver Niveles:</h3>
-                    <div className="space-y-2">
-                        {Object.keys(filtrosNivel).map(nivel => (
-                            <label key={nivel} className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={filtrosNivel[nivel]}
-                                    onChange={(e) => setFiltrosNivel(prev => ({ ...prev, [nivel]: e.target.checked }))}
-                                    className="rounded"
-                                />
-                                <span>Mostrar solo {nivel}</span>
-                            </label>
-                        ))}
+                    <h3 className="font-semibold text-gray-800 mb-4 text-base">Ver Niveles:</h3>
+                    <div className="space-y-2.5">
+                        {Object.keys(filtrosNivel).map(nivel => {
+                            const isActive = filtrosNivel[nivel];
+                            const nivelColors: { [key: string]: string } = {
+                                'Preescolar': '#EC4899', // Rosa
+                                'Primaria': '#3B82F6', // Azul
+                                'Bachillerato': '#10B981' // Verde
+                            };
+                            const color = nivelColors[nivel] || '#6B7280';
+                            return (
+                                <button
+                                    key={nivel}
+                                    type="button"
+                                    onClick={() => setFiltrosNivel(prev => ({ ...prev, [nivel]: !prev[nivel] }))}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-smooth hover-scale ${
+                                        isActive 
+                                            ? 'bg-opacity-10 border-2 shadow-sm' 
+                                            : 'bg-gray-50 border-2 border-gray-200 opacity-60'
+                                    }`}
+                                    style={isActive ? {
+                                        backgroundColor: `${color}15`,
+                                        borderColor: color
+                                    } : {}}
+                                >
+                                    <div className="relative flex-shrink-0">
+                                        <input
+                                            type="checkbox"
+                                            checked={isActive}
+                                            onChange={() => {}}
+                                            className="sr-only"
+                                            readOnly
+                                        />
+                                        <div 
+                                            className={`w-5 h-5 rounded-md border-2 transition-smooth flex items-center justify-center ${
+                                                isActive ? 'border-current' : 'border-gray-300'
+                                            }`}
+                                            style={isActive ? { 
+                                                backgroundColor: color,
+                                                borderColor: color
+                                            } : {}}
+                                        >
+                                            {isActive && (
+                                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <span 
+                                        className={`font-medium text-sm ${
+                                            isActive ? 'text-gray-800' : 'text-gray-500'
+                                        }`}
+                                    >
+                                        Mostrar solo {nivel}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
