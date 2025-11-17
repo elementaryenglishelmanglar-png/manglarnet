@@ -4215,13 +4215,15 @@ const InputField: React.FC<{
         onChange: onChange,
         required: required,
         disabled: disabled,
-        className: "mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary disabled:bg-gray-100",
+        className: "mt-1 block w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base placeholder:text-gray-400 disabled:bg-gray-100 disabled:cursor-not-allowed",
     };
     return (
         <div>
-            <label htmlFor={name} className="block text-sm font-medium text-gray-700">{label}</label>
+            <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">
+                {label} {required && <span className="text-red-500">*</span>}
+            </label>
             {as === 'textarea'
-                ? <textarea {...commonProps} rows={rows}></textarea>
+                ? <textarea {...commonProps} rows={rows} className={`${commonProps.className} resize-y`}></textarea>
                 : as === 'select'
                 ? <select {...commonProps}>{children}</select>
                 : <input type={type} {...commonProps} />
@@ -4256,6 +4258,8 @@ const PlanningFormModal: React.FC<{
         apellidos_docente: plan?.apellidos_docente,
     });
 
+    const [validationError, setValidationError] = useState<string>('');
+
     const isReviewMode = userRole !== 'docente' && plan !== null;
     
     const canEditTeacherFields = !isReadOnly && (plan === null || (userRole === 'docente' && (plan.status === 'Borrador' || plan.status === 'Revisado')));
@@ -4264,9 +4268,27 @@ const PlanningFormModal: React.FC<{
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value as any }));
+        // Limpiar error de validación cuando el usuario cambia el campo
+        if (name === 'id_clase' && validationError) {
+            setValidationError('');
+        }
     };
     
     const handleSubmit = (newStatus: Planificacion['status']) => {
+        // Validar que id_clase no esté vacío
+        if (!formData.id_clase || formData.id_clase.trim() === '') {
+            setValidationError('Debe seleccionar una asignatura para crear la planificación.');
+            return;
+        }
+        
+        // Validar que id_docente no esté vacío
+        if (!formData.id_docente || formData.id_docente.trim() === '') {
+            setValidationError('Error: No se pudo identificar al docente. Por favor, contacte al administrador.');
+            return;
+        }
+        
+        setValidationError('');
+        
         const finalPlan: Planificacion = {
             ...formData,
             id_planificacion: plan?.id_planificacion || `plan-${Date.now()}`,
@@ -4277,8 +4299,8 @@ const PlanningFormModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-4xl max-h-[95vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-4xl max-h-[95vh] overflow-y-auto glass animate-fade-in">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold">
                         {isReadOnly ? 'Detalle de Planificación' : 
@@ -4288,16 +4310,55 @@ const PlanningFormModal: React.FC<{
                     <button onClick={onClose}><CloseIcon /></button>
                 </div>
                 <div className="space-y-6">
+                    {/* Mensaje si no hay clases asignadas */}
+                    {assignedClasses.length === 0 && canEditTeacherFields && (
+                        <div className="p-4 bg-yellow-50 border-2 border-yellow-200 rounded-xl">
+                            <p className="text-sm text-yellow-800 font-medium">
+                                <strong>⚠️ No tiene clases asignadas.</strong> Por favor, contacte al coordinador para que le asigne clases antes de crear planificaciones.
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Error de validación */}
+                    {validationError && (
+                        <div className="p-4 bg-red-50 border-2 border-red-200 rounded-xl">
+                            <p className="text-sm text-red-800 font-medium">{validationError}</p>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Asignatura</label>
-                            <select name="id_clase" value={formData.id_clase} onChange={handleChange} disabled={!canEditTeacherFields} className="mt-1 block w-full p-2 border border-gray-300 rounded-md bg-gray-50 disabled:bg-gray-200">
-                                {assignedClasses.map(c => <option key={c.id_clase} value={c.id_clase}>{c.nombre_materia} ({c.grado_asignado})</option>)}
+                            <label className="block text-sm font-medium text-gray-700">Asignatura <span className="text-red-500">*</span></label>
+                            <select 
+                                name="id_clase" 
+                                value={formData.id_clase} 
+                                onChange={handleChange} 
+                                disabled={!canEditTeacherFields || assignedClasses.length === 0} 
+                                className={`mt-1 block w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary transition-smooth text-base ${
+                                    assignedClasses.length === 0 
+                                        ? 'border-red-300 bg-red-50' 
+                                        : formData.id_clase 
+                                            ? 'border-gray-200 focus:border-brand-primary' 
+                                            : 'border-red-300 bg-red-50'
+                                } disabled:bg-gray-100 disabled:cursor-not-allowed`}
+                            >
+                                <option value="">{assignedClasses.length === 0 ? 'No hay clases asignadas' : 'Seleccione una asignatura'}</option>
+                                {assignedClasses.map(c => (
+                                    <option key={c.id_clase} value={c.id_clase}>
+                                        {c.nombre_materia} ({c.grado_asignado})
+                                    </option>
+                                ))}
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Lapso</label>
-                             <select name="lapso" value={formData.lapso} onChange={handleChange} disabled={!canEditTeacherFields} className="mt-1 block w-full p-2 border border-gray-300 rounded-md bg-gray-50 disabled:bg-gray-200">
+                             <select 
+                                name="lapso" 
+                                value={formData.lapso} 
+                                onChange={handleChange} 
+                                disabled={!canEditTeacherFields} 
+                                className="mt-1 block w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            >
                                 <option>I Lapso</option>
                                 <option>II Lapso</option>
                                 <option>III Lapso</option>
@@ -4305,7 +4366,13 @@ const PlanningFormModal: React.FC<{
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Año Escolar</label>
-                            <select name="ano_escolar" value={formData.ano_escolar} onChange={handleChange} disabled={!canEditTeacherFields} className="mt-1 block w-full p-2 border border-gray-300 rounded-md bg-gray-50 disabled:bg-gray-200">
+                            <select 
+                                name="ano_escolar" 
+                                value={formData.ano_escolar} 
+                                onChange={handleChange} 
+                                disabled={!canEditTeacherFields} 
+                                className="mt-1 block w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            >
                                 <option>2024-2025</option>
                                 <option>2025-2026</option>
                                 <option>2026-2027</option>
@@ -4325,13 +4392,29 @@ const PlanningFormModal: React.FC<{
                     )}
 
                     <div className="flex justify-end gap-4 pt-4 border-t">
-                        <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded-md">
+                        <button 
+                            type="button" 
+                            onClick={onClose} 
+                            className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-300 transition-smooth"
+                        >
                            {isReadOnly ? 'Cerrar' : 'Cancelar'}
                         </button>
                         {!isReadOnly && canEditTeacherFields && (
                             <>
-                                <button type="button" onClick={() => handleSubmit('Borrador')} className="px-4 py-2 bg-gray-500 text-white rounded-md">Guardar Borrador</button>
-                                <button type="button" onClick={() => handleSubmit('Enviado')} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md">
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleSubmit('Borrador')} 
+                                    disabled={assignedClasses.length === 0 || !formData.id_clase || formData.id_clase.trim() === ''}
+                                    className="px-6 py-3 bg-gray-500 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                                >
+                                    Guardar Borrador
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleSubmit('Enviado')} 
+                                    disabled={assignedClasses.length === 0 || !formData.id_clase || formData.id_clase.trim() === ''}
+                                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                                >
                                     <SendIcon className="h-4 w-4" />
                                     Enviar Planificación
                                 </button>
@@ -4339,8 +4422,18 @@ const PlanningFormModal: React.FC<{
                         )}
                         {!isReadOnly && canEditCoordinatorFields && (
                             <>
-                                <button type="button" onClick={() => handleSubmit('Revisado')} className="px-4 py-2 bg-yellow-500 text-white rounded-md">Marcar como Corregido</button>
-                                <button type="button" onClick={() => handleSubmit('Aprobado')} className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-md">
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleSubmit('Revisado')} 
+                                    className="px-6 py-3 bg-yellow-500 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale"
+                                >
+                                    Marcar como Corregido
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleSubmit('Aprobado')} 
+                                    className="flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale"
+                                >
                                     <ClipboardCheckIcon className="h-4 w-4" />
                                     Aprobar
                                 </button>
@@ -4397,6 +4490,25 @@ const PlanningView: React.FC<{
 
     const handleSavePlan = async (planData: Planificacion) => {
         try {
+            // Validar UUIDs antes de guardar
+            if (!planData.id_clase || planData.id_clase.trim() === '') {
+                throw new Error('Debe seleccionar una asignatura para crear la planificación.');
+            }
+            
+            if (!planData.id_docente || planData.id_docente.trim() === '') {
+                throw new Error('Error: No se pudo identificar al docente. Por favor, contacte al administrador.');
+            }
+
+            // Validar formato UUID básico
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(planData.id_clase)) {
+                throw new Error('Error: El ID de la clase no es válido. Por favor, seleccione una asignatura válida.');
+            }
+            
+            if (!uuidRegex.test(planData.id_docente)) {
+                throw new Error('Error: El ID del docente no es válido. Por favor, contacte al administrador.');
+            }
+            
             const planExists = planificaciones.some(p => p.id_planificacion === planData.id_planificacion);
             if (planExists) {
                 // Update existing plan
@@ -4412,7 +4524,14 @@ const PlanningView: React.FC<{
             handleCloseModal();
         } catch (error: any) {
             console.error('Error saving plan:', error);
-            alert('Error al guardar la planificación: ' + (error.message || 'Error desconocido'));
+            const errorMessage = error.message || 'Error desconocido';
+            
+            // Mensaje más amigable para errores de UUID
+            if (errorMessage.includes('invalid input syntax for type uuid') || errorMessage.includes('UUID')) {
+                alert('Error al guardar la planificación: Debe seleccionar una asignatura válida. Si el problema persiste, contacte al coordinador.');
+            } else {
+                alert('Error al guardar la planificación: ' + errorMessage);
+            }
         }
     };
     
