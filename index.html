@@ -11,61 +11,7 @@
     <title>ManglarNet - Conexión Pedagógica</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Poppins', 'sans-serif'],
-            },
-            colors: {
-              // Colores funcionales (mantener para grados y asignaturas)
-              'brand-primary': '#78AC40',
-              'brand-secondary': '#FADB16',
-              
-              // Paleta monocromática Apple
-              'apple-white': '#FFFFFF',
-              'apple-gray-light': '#F5F5F7',
-              'apple-gray': '#86868B',
-              'apple-gray-dark': '#1D1D1F',
-              'apple-blue': '#007AFF',
-              'apple-red': '#FF3B30',
-              'apple-green': '#34C759',
-              
-              // Compatibilidad con código existente
-              'background-dark': '#1D1D1F',
-              'background-light': '#F5F5F7',
-              'text-main': '#1D1D1F',
-              'text-secondary': '#86868B',
-              'brand-gray': '#B0B4B7',
-            },
-            borderRadius: {
-              'xs': '4px',
-              'sm': '8px',
-              'md': '12px',
-              'lg': '16px',
-              'xl': '20px',
-            },
-            boxShadow: {
-              'soft': '0 2px 8px rgba(0, 0, 0, 0.04)',
-              'medium': '0 4px 12px rgba(0, 0, 0, 0.08)',
-              'large': '0 8px 24px rgba(0, 0, 0, 0.12)',
-              'brand': '0 4px 6px -1px rgba(120, 172, 64, 0.1), 0 2px 4px -1px rgba(120, 172, 64, 0.06)',
-              'brand-lg': '0 10px 15px -3px rgba(120, 172, 64, 0.1), 0 4px 6px -2px rgba(120, 172, 64, 0.05)',
-            },
-            transitionDuration: {
-              '200': '200ms',
-              '300': '300ms',
-            },
-            transitionTimingFunction: {
-              'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
-            }
-          }
-        }
-      }
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
   <script type="importmap">
 {
   "imports": {
@@ -81,7 +27,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-background-light font-sans text-text-main">
+  <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

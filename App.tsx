@@ -1,6 +1,20 @@
 
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { DashboardIcon, StudentsIcon, TeachersIcon, ClassesIcon, PlusIcon, CloseIcon, EditIcon, DeleteIcon, ChevronDownIcon, LogoutIcon, PlanningIcon, GradesIcon, FilterIcon, CalendarIcon, SearchIcon, SpecialSubjectIcon, SparklesIcon, ArrowLeftIcon, UserCircleIcon, AcademicCapIcon, UsersIcon, IdentificationIcon, CakeIcon, LocationMarkerIcon, MailIcon, PhoneIcon, ClipboardCheckIcon, SendIcon, BellIcon, TagIcon, DownloadIcon, EvaluationIcon, SaveIcon, MenuIcon, MagicWandIcon } from './components/Icons';
+import { Button } from './components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from './components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover';
+import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './components/ui/dialog';
+import { InputField } from './components/ui/InputField';
+import { Separator } from './components/ui/separator';
+import { Skeleton } from './components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from './components/ui/alert';
+import { Badge } from './components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
+import { Label } from './components/ui/label';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 
 // Icono de check para tareas completadas
 const CheckIcon = () => (
@@ -10,8 +24,9 @@ const CheckIcon = () => (
 );
 import { getAIPlanSuggestions, getAIEvaluationAnalysis } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
-import { LoginScreen } from './components/LoginScreen';
-import { AuthorizedUsersView } from './components/AuthorizedUsersView';
+// Lazy loading para componentes pesados
+const LoginScreen = lazy(() => import('./components/LoginScreen').then(module => ({ default: module.LoginScreen })));
+const AuthorizedUsersView = lazy(() => import('./components/AuthorizedUsersView').then(module => ({ default: module.AuthorizedUsersView })));
 import { marked } from 'marked';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -33,7 +48,6 @@ import {
   horariosService,
   minutasService,
   notificacionesService,
-  eventosCalendarioService,
   aulasService,
   configuracionHorariosService,
   generacionesHorariosService,
@@ -41,6 +55,7 @@ import {
   type Docente as DocenteDB,
   type Clase as ClaseDB,
   type Planificacion as PlanificacionDB,
+  type MinutaEvaluacion,
   type Horario as HorarioDB,
   type MinutaEvaluacion as MinutaEvaluacionDB,
   type Notification as NotificationDB,
@@ -848,7 +863,10 @@ const Header: React.FC<{
 }> = ({ title, currentUser, onLogout, notifications, onNotificationClick, onMenuToggle }) => {
     const [isMenuOpen, setMenuOpen] = useState(false);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
-    const unreadCount = notifications.filter(n => !n.isRead && n.recipientId === currentUser.docenteId).length;
+    const unreadCount = useMemo(() => 
+        notifications.filter(n => !n.isRead && n.recipientId === currentUser.docenteId).length,
+        [notifications, currentUser.docenteId]
+    );
 
     const timeSince = (date: string) => {
         const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
@@ -865,80 +883,93 @@ const Header: React.FC<{
         return Math.floor(seconds) + " segundos";
     }
 
+    const filteredNotifications = useMemo(() => {
+        return notifications
+            .filter(n => n.recipientId === currentUser.docenteId)
+            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    }, [notifications, currentUser.docenteId]);
+
     return (
-        <header className="bg-white p-4 flex justify-between items-center sticky top-0 z-30 border-b border-apple-gray-light">
+        <header className="bg-card p-4 flex justify-between items-center sticky top-0 z-30 border-b">
             <div className="flex items-center gap-3">
                 {onMenuToggle && (
-                    <button
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={onMenuToggle}
-                        className="lg:hidden p-2 text-apple-gray hover:text-apple-gray-dark hover:bg-apple-gray-light rounded-lg transition-apple"
+                        className="lg:hidden"
                         aria-label="Toggle menu"
                     >
                         <MenuIcon className="h-6 w-6" />
-                    </button>
+                    </Button>
                 )}
-                <h1 className="text-2xl sm:text-3xl font-bold text-apple-gray-dark truncate tracking-tight">{title}</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold text-foreground truncate tracking-tight">{title}</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-                 {currentUser.role === 'docente' && (
-                    <div className="relative">
-                        <button onClick={() => setNotificationsOpen(!isNotificationsOpen)} className="relative text-apple-gray hover:text-apple-gray-dark transition-apple">
-                            <BellIcon className="h-6 w-6" />
-                            {unreadCount > 0 && (
-                                <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
-                            )}
-                        </button>
-                        {isNotificationsOpen && (
-                            <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-xl shadow-lg z-20 border border-apple-gray-light bg-white animate-fade-in">
-                                <div className="p-2 border-b">
-                                    <h3 className="font-semibold text-apple-gray-dark">Notificaciones</h3>
-                                </div>
-                                <div className="py-1 max-h-96 overflow-y-auto">
-                                    {notifications.filter(n => n.recipientId === currentUser.docenteId).length > 0 ? (
-                                        notifications.filter(n => n.recipientId === currentUser.docenteId)
-                                            .sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                                            .map(n => (
-                                                <a
+                {currentUser.role === 'docente' && (
+                    <Popover open={isNotificationsOpen} onOpenChange={setNotificationsOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="relative">
+                                <BellIcon className="h-6 w-6" />
+                                {unreadCount > 0 && (
+                                    <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
+                                )}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 p-0" align="end">
+                            <Card className="border-0 shadow-none">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base">Notificaciones</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                    <div className="max-h-96 overflow-y-auto">
+                                        {filteredNotifications.length > 0 ? (
+                                            filteredNotifications.map(n => (
+                                                <button
                                                     key={n.id}
-                                                    href="#"
-                                                    onClick={(e) => { e.preventDefault(); onNotificationClick(n); setNotificationsOpen(false); }}
-                                                    className={`block px-4 py-3 text-sm text-apple-gray-dark hover:bg-apple-gray-light transition-apple ${!n.isRead ? 'bg-blue-50' : ''}`}
+                                                    onClick={() => { onNotificationClick(n); setNotificationsOpen(false); }}
+                                                    className={`w-full text-left px-4 py-3 text-sm hover:bg-accent transition-colors border-b last:border-0 ${
+                                                        !n.isRead ? 'bg-primary/5' : ''
+                                                    }`}
                                                 >
-                                                    <p className="font-bold">{n.title}</p>
-                                                    <p className="text-apple-gray text-xs font-light">{n.message}</p>
-                                                    <p className="text-right text-xs text-apple-gray font-light mt-1">{timeSince(n.timestamp)} ago</p>
-                                                </a>
+                                                    <p className="font-semibold text-foreground">{n.title}</p>
+                                                    <p className="text-muted-foreground text-xs font-light mt-1">{n.message}</p>
+                                                    <p className="text-right text-xs text-muted-foreground font-light mt-1">
+                                                        {timeSince(n.timestamp)} ago
+                                                    </p>
+                                                </button>
                                             ))
-                                    ) : (
-                                        <p className="text-center text-apple-gray py-4 font-light">No hay notificaciones.</p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                                        ) : (
+                                            <p className="text-center text-muted-foreground py-8 font-light text-sm">
+                                                No hay notificaciones.
+                                            </p>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </PopoverContent>
+                    </Popover>
                 )}
-                <div className="relative">
-                    <button onClick={() => setMenuOpen(!isMenuOpen)} className="flex items-center gap-2 text-left">
-                        <div className="hidden sm:block">
-                            <p className="font-semibold text-apple-gray-dark text-sm sm:text-base">{currentUser.fullName}</p>
-                            <p className="text-xs sm:text-sm text-apple-gray font-light capitalize">{currentUser.role}</p>
-                        </div>
-                        <div className="sm:hidden">
-                            <UserCircleIcon className="h-8 w-8 text-apple-gray" />
-                        </div>
-                        <ChevronDownIcon className="hidden sm:block" />
-                    </button>
-                    {isMenuOpen && (
-                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-xl shadow-lg z-10 border border-apple-gray-light bg-white animate-fade-in">
-                            <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                                <a href="#" onClick={onLogout} className="flex items-center gap-2 px-4 py-2 text-sm text-apple-gray-dark hover:bg-apple-gray-light transition-apple" role="menuitem">
-                                    <LogoutIcon />
-                                    Cerrar Sesión
-                                </a>
+                <DropdownMenu open={isMenuOpen} onOpenChange={setMenuOpen}>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="flex items-center gap-2 text-left h-auto p-2">
+                            <div className="hidden sm:block text-left">
+                                <p className="font-semibold text-foreground text-sm sm:text-base">{currentUser.fullName}</p>
+                                <p className="text-xs sm:text-sm text-muted-foreground font-light capitalize">{currentUser.role}</p>
                             </div>
-                        </div>
-                    )}
-                </div>
+                            <div className="sm:hidden">
+                                <UserCircleIcon className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                            <ChevronDownIcon className="hidden sm:block h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={onLogout} className="cursor-pointer">
+                            <LogoutIcon className="h-4 w-4 mr-2" />
+                            Cerrar Sesión
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </header>
     );
@@ -995,29 +1026,31 @@ const Sidebar: React.FC<{
                         <h2 className="text-xl lg:text-2xl font-bold text-brand-secondary">ManglarNet</h2>
                         <p className="text-xs lg:text-sm text-apple-gray font-light">Conexión Pedagógica</p>
                     </div>
-                    <button
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={onClose}
-                        className="lg:hidden p-2 text-apple-gray hover:text-white hover:bg-apple-gray-dark rounded-lg transition-apple"
+                        className="lg:hidden text-apple-gray hover:text-white hover:bg-white/10"
                         aria-label="Close menu"
                     >
                         <CloseIcon />
-                    </button>
+                    </Button>
                 </div>
                 <nav className="flex-1 px-2 lg:px-4 overflow-y-auto">
                     {navLinksToRender.map(({ id, label, icon: Icon }) => (
-                        <a
+                        <Button
                             key={id}
-                            href="#"
-                            onClick={(e) => { e.preventDefault(); handleNavigate(id); }}
-                            className={`flex items-center gap-3 px-4 lg:px-5 py-3.5 my-1 rounded-lg text-sm font-medium transition-apple ${
+                            variant="ghost"
+                            onClick={() => handleNavigate(id)}
+                            className={`w-full justify-start gap-3 px-4 lg:px-5 py-3.5 my-1 h-auto text-sm font-medium transition-apple ${
                                 activeView === id
-                                    ? 'bg-apple-blue text-white'
+                                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                                     : 'text-apple-gray hover:bg-white/10 hover:text-white'
                             }`}
                         >
                             <Icon className="h-5 w-5 flex-shrink-0" />
                             <span>{label}</span>
-                        </a>
+                        </Button>
                     ))}
                 </nav>
             </aside>
@@ -1030,7 +1063,7 @@ const Sidebar: React.FC<{
 // ============================================
 
 // Widget 1: Mi Agenda del Día (Lista de Tareas)
-const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser }) => {
+const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = React.memo(({ currentUser }) => {
     const [tareas, setTareas] = useState<TareaCoordinador[]>([]);
     const [nuevaTarea, setNuevaTarea] = useState('');
     const [isLoading, setIsLoading] = useState(true);
@@ -1117,115 +1150,131 @@ const MiAgendaDelDiaWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser 
 
     if (isLoading) {
         return (
-            <div className="mb-16">
-                <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Mi Agenda del Día</h3>
-                <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-apple-blue"></div>
-                </div>
-            </div>
+            <Card className="mb-16">
+                <CardHeader>
+                    <CardTitle>Mi Agenda del Día</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        <Skeleton className="h-10 w-full" />
+                        <div className="space-y-2">
+                            {[1, 2, 3].map((i) => (
+                                <Skeleton key={i} className="h-20 w-full" />
+                            ))}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         );
     }
 
     return (
-        <div className="mb-16">
-            <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Mi Agenda del Día</h3>
-            <p className="text-apple-gray text-sm font-light mb-10">Gestiona tus tareas diarias</p>
-            
-            <div className="mb-10 flex gap-3">
-                <input
-                    type="text"
-                    value={nuevaTarea}
-                    onChange={(e) => setNuevaTarea(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddTarea()}
-                    placeholder="Agregar nueva tarea..."
-                    className="flex-1 px-5 py-3.5 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple text-base placeholder:text-apple-gray"
-                    disabled={isAdding}
-                />
-                <button
-                    onClick={handleAddTarea}
-                    disabled={isAdding || !nuevaTarea.trim()}
-                    className="px-6 py-3.5 bg-apple-blue text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium transition-apple hover:opacity-90 min-h-[48px]"
-                >
-                    <PlusIcon className="h-5 w-5" />
-                    Agregar
-                </button>
-            </div>
-
-            {tareasPendientes.length > 0 && (
-                <div className="mb-8">
-                    <div className="flex items-center gap-3 mb-5">
-                        <div className="w-2.5 h-2.5 bg-apple-red rounded-full"></div>
-                        <h4 className="text-base font-semibold text-apple-gray-dark">Pendientes ({tareasPendientes.length})</h4>
-                    </div>
-                    <div className="space-y-2">
-                        {tareasPendientes.map((tarea) => (
-                            <div key={tarea.id_tarea} className="flex items-center gap-4 py-4 px-2 border-b border-apple-gray-light transition-apple hover:bg-apple-gray-light/50 group rounded-lg">
-                                <input
-                                    type="checkbox"
-                                    checked={tarea.completada}
-                                    onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
-                                    className="h-5 w-5 text-apple-blue focus:ring-apple-blue border-apple-gray rounded cursor-pointer transition-apple flex-shrink-0"
-                                />
-                                <span className="flex-1 text-base font-normal text-apple-gray-dark leading-relaxed">{tarea.descripcion}</span>
-                                <button
-                                    onClick={() => handleDeleteTarea(tarea.id_tarea)}
-                                    className="opacity-0 group-hover:opacity-100 text-apple-red hover:text-apple-red p-2 rounded-lg transition-apple hover:bg-apple-red/10"
-                                    title="Eliminar tarea"
-                                >
-                                    <DeleteIcon className="h-4 w-4" />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
+        <Card className="mb-16">
+            <CardHeader>
+                <CardTitle>Mi Agenda del Día</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Gestiona tus tareas diarias</p>
+            </CardHeader>
+            <CardContent>
+                <div className="mb-10 flex gap-3">
+                    <Input
+                        type="text"
+                        value={nuevaTarea}
+                        onChange={(e) => setNuevaTarea(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleAddTarea()}
+                        placeholder="Agregar nueva tarea..."
+                        disabled={isAdding}
+                        className="flex-1"
+                    />
+                    <Button
+                        onClick={handleAddTarea}
+                        disabled={isAdding || !nuevaTarea.trim()}
+                    >
+                        <PlusIcon className="h-4 w-4 mr-2" />
+                        Agregar
+                    </Button>
                 </div>
-            )}
 
-            {tareasCompletadas.length > 0 && (
-                <div>
-                    <details className="group">
-                        <summary className="text-sm font-medium text-apple-gray cursor-pointer list-none hover:text-apple-gray-dark transition-apple mb-4 py-2">
-                            <span className="flex items-center gap-2">
-                                <CheckIcon className="h-4 w-4 text-apple-green" />
-                                <span>Completadas ({tareasCompletadas.length})</span>
-                                <ChevronDownIcon className="h-4 w-4 transform group-open:rotate-180 transition-apple" />
-                            </span>
-                        </summary>
-                        <div className="mt-2 space-y-2">
-                            {tareasCompletadas.map((tarea) => (
-                                <div key={tarea.id_tarea} className="flex items-center gap-4 py-4 px-2 border-b border-apple-gray-light opacity-70">
+                {tareasPendientes.length > 0 && (
+                    <div className="mb-8">
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="w-2.5 h-2.5 bg-destructive rounded-full"></div>
+                            <h4 className="text-base font-semibold text-foreground">Pendientes ({tareasPendientes.length})</h4>
+                        </div>
+                        <div className="space-y-2">
+                            {tareasPendientes.map((tarea) => (
+                                <div key={tarea.id_tarea} className="flex items-center gap-4 py-4 px-2 border-b hover:bg-accent/50 group rounded-lg transition-colors">
                                     <input
                                         type="checkbox"
                                         checked={tarea.completada}
                                         onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
-                                        className="h-5 w-5 text-apple-green focus:ring-apple-green border-apple-gray rounded cursor-pointer transition-apple flex-shrink-0"
+                                        className="h-5 w-5 text-primary focus:ring-primary border-input rounded cursor-pointer transition-colors flex-shrink-0"
                                     />
-                                    <span className="flex-1 text-base text-apple-gray line-through font-light leading-relaxed">{tarea.descripcion}</span>
-                                    <button
+                                    <span className="flex-1 text-base font-normal text-foreground leading-relaxed">{tarea.descripcion}</span>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={() => handleDeleteTarea(tarea.id_tarea)}
-                                        className="text-apple-red hover:text-apple-red p-2 rounded-lg transition-apple hover:bg-apple-red/10"
+                                        className="opacity-0 group-hover:opacity-100 h-8 w-8 text-destructive hover:text-destructive"
                                         title="Eliminar tarea"
                                     >
                                         <DeleteIcon className="h-4 w-4" />
-                                    </button>
+                                    </Button>
                                 </div>
                             ))}
                         </div>
-                    </details>
-                </div>
-            )}
+                    </div>
+                )}
 
-            {tareas.length === 0 && (
-                <div className="text-center py-16">
-                    <p className="text-apple-gray-dark text-base font-light mb-2">No hay tareas pendientes</p>
-                    <p className="text-apple-gray text-sm font-light">Agrega una nueva tarea para comenzar</p>
-                </div>
-            )}
-        </div>
+                {tareasCompletadas.length > 0 && (
+                    <div>
+                        <details className="group">
+                            <summary className="text-sm font-medium text-muted-foreground cursor-pointer list-none hover:text-foreground transition-colors mb-4 py-2">
+                                <span className="flex items-center gap-2">
+                                    <CheckIcon className="h-4 w-4 text-primary" />
+                                    <span>Completadas ({tareasCompletadas.length})</span>
+                                    <ChevronDownIcon className="h-4 w-4 transform group-open:rotate-180 transition-transform" />
+                                </span>
+                            </summary>
+                            <div className="mt-2 space-y-2">
+                                {tareasCompletadas.map((tarea) => (
+                                    <div key={tarea.id_tarea} className="flex items-center gap-4 py-4 px-2 border-b opacity-70">
+                                        <input
+                                            type="checkbox"
+                                            checked={tarea.completada}
+                                            onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
+                                            className="h-5 w-5 text-primary focus:ring-primary border-input rounded cursor-pointer transition-colors flex-shrink-0"
+                                        />
+                                        <span className="flex-1 text-base text-muted-foreground line-through font-light leading-relaxed">{tarea.descripcion}</span>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => handleDeleteTarea(tarea.id_tarea)}
+                                            className="h-8 w-8 text-destructive hover:text-destructive"
+                                            title="Eliminar tarea"
+                                        >
+                                            <DeleteIcon className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </details>
+                    </div>
+                )}
+
+                {tareas.length === 0 && (
+                    <div className="text-center py-16">
+                        <p className="text-foreground text-base font-light mb-2">No hay tareas pendientes</p>
+                        <p className="text-muted-foreground text-sm font-light">Agrega una nueva tarea para comenzar</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
-};
+});
+MiAgendaDelDiaWidget.displayName = 'MiAgendaDelDiaWidget';
 
 // Widget 2: Eventos de la Semana
-const EventosSemanaWidget: React.FC = () => {
+const EventosSemanaWidget: React.FC = React.memo(() => {
     const [eventos, setEventos] = useState<EventoCalendario[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -1276,57 +1325,71 @@ const EventosSemanaWidget: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="mb-16">
-                <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Eventos de la Semana</h3>
-                <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-apple-blue"></div>
-                </div>
-            </div>
+            <Card className="mb-16">
+                <CardHeader>
+                    <CardTitle>Eventos de la Semana</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-3">
+                        {[1, 2, 3, 4].map((i) => (
+                            <Skeleton key={i} className="h-24 w-full" />
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
         );
     }
 
     return (
-        <div className="mb-16">
-            <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Eventos de la Semana</h3>
-            <p className="text-apple-gray text-sm font-light mb-10">Próximos 7 días</p>
-            
-            {eventos.length === 0 ? (
-                <div className="text-center py-16">
-                    <p className="text-apple-gray-dark text-base font-light mb-2">No hay eventos programados</p>
-                    <p className="text-apple-gray text-sm font-light">Esta semana está libre de eventos</p>
-                </div>
-            ) : (
-                <div className="space-y-3">
-                    {eventos.map((evento) => {
-                        const color = evento.color || getEventColor(evento.tipo_evento);
-                        return (
-                            <div key={evento.id_evento} className="flex items-start gap-4 py-5 px-4 border-b border-apple-gray-light transition-apple hover:bg-apple-gray-light/50 rounded-lg group">
-                                <div 
-                                    className="w-3.5 h-3.5 rounded-full flex-shrink-0 mt-1"
-                                    style={{ backgroundColor: color }}
-                                ></div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-baseline gap-3 mb-2">
-                                        <span className="font-semibold text-base text-apple-gray-dark min-w-[110px] flex-shrink-0">
-                                            {formatDate(evento.fecha_inicio)}
-                                        </span>
-                                        <span className="text-base text-apple-gray-dark font-medium leading-relaxed">{evento.titulo}</span>
-                                    </div>
-                                    {evento.descripcion && (
-                                        <p className="text-sm text-apple-gray font-light mt-2 ml-[122px] leading-relaxed">{evento.descripcion}</p>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
+        <Card className="mb-16">
+            <CardHeader>
+                <CardTitle>Eventos de la Semana</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Próximos 7 días</p>
+            </CardHeader>
+            <CardContent>
+                {eventos.length === 0 ? (
+                    <div className="text-center py-16">
+                        <p className="text-foreground text-base font-light mb-2">No hay eventos programados</p>
+                        <p className="text-muted-foreground text-sm font-light">Esta semana está libre de eventos</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {eventos.map((evento) => {
+                            const color = evento.color || getEventColor(evento.tipo_evento);
+                            return (
+                                <Card key={evento.id_evento} className="hover:bg-accent/50 transition-colors">
+                                    <CardContent className="py-5 px-4">
+                                        <div className="flex items-start gap-4">
+                                            <div 
+                                                className="w-3.5 h-3.5 rounded-full flex-shrink-0 mt-1"
+                                                style={{ backgroundColor: color }}
+                                            ></div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-baseline gap-3 mb-2">
+                                                    <span className="font-semibold text-base text-foreground min-w-[110px] flex-shrink-0">
+                                                        {formatDate(evento.fecha_inicio)}
+                                                    </span>
+                                                    <span className="text-base text-foreground font-medium leading-relaxed">{evento.titulo}</span>
+                                                </div>
+                                                {evento.descripcion && (
+                                                    <p className="text-sm text-muted-foreground font-light mt-2 ml-[122px] leading-relaxed">{evento.descripcion}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
-};
+});
+EventosSemanaWidget.displayName = 'EventosSemanaWidget';
 
 // Widget 3: Estado de Mi Equipo
-const EstadoMiEquipoWidget: React.FC<{ docentes: Docente[]; planificaciones: Planificacion[] }> = ({ docentes, planificaciones }) => {
+const EstadoMiEquipoWidget: React.FC<{ docentes: Docente[]; planificaciones: Planificacion[] }> = React.memo(({ docentes, planificaciones }) => {
     const anoEscolar = '2025-2026'; // TODO: Obtener del contexto
     const lapsoActual = 'I Lapso'; // TODO: Obtener del contexto
     
@@ -1355,62 +1418,66 @@ const EstadoMiEquipoWidget: React.FC<{ docentes: Docente[]; planificaciones: Pla
     const progressColor = stats.porcentaje >= 80 ? '#10b981' : stats.porcentaje >= 50 ? '#f59e0b' : '#ef4444';
 
     return (
-        <div className="mb-16">
-            <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Estado de Mi Equipo</h3>
-            <p className="text-apple-gray text-sm font-light mb-10">Planificaciones del lapso</p>
-            
-            <div className="flex items-start gap-8">
-                <div className="relative flex-shrink-0">
-                    <svg width="140" height="140" className="transform -rotate-90">
-                        <circle
-                            cx="70"
-                            cy="70"
-                            r={radius}
-                            stroke="#e5e7eb"
-                            strokeWidth="12"
-                            fill="none"
-                        />
-                        <circle
-                            cx="70"
-                            cy="70"
-                            r={radius}
-                            stroke={progressColor}
-                            strokeWidth="12"
-                            fill="none"
-                            strokeDasharray={strokeDasharray}
-                            strokeDashoffset={strokeDashoffset}
-                            strokeLinecap="round"
-                            className="transition-all duration-700 ease-out"
-                        />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-4xl font-bold text-apple-gray-dark">{stats.porcentaje}%</span>
-                        <span className="text-sm text-apple-gray font-medium mt-1">Completado</span>
+        <Card className="mb-16">
+            <CardHeader>
+                <CardTitle>Estado de Mi Equipo</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Planificaciones del lapso</p>
+            </CardHeader>
+            <CardContent>
+                <div className="flex items-start gap-8">
+                    <div className="relative flex-shrink-0">
+                        <svg width="140" height="140" className="transform -rotate-90">
+                            <circle
+                                cx="70"
+                                cy="70"
+                                r={radius}
+                                stroke="hsl(var(--muted))"
+                                strokeWidth="12"
+                                fill="none"
+                            />
+                            <circle
+                                cx="70"
+                                cy="70"
+                                r={radius}
+                                stroke={progressColor}
+                                strokeWidth="12"
+                                fill="none"
+                                strokeDasharray={strokeDasharray}
+                                strokeDashoffset={strokeDashoffset}
+                                strokeLinecap="round"
+                                className="transition-all duration-700 ease-out"
+                            />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <span className="text-4xl font-bold text-foreground">{stats.porcentaje}%</span>
+                            <span className="text-sm text-muted-foreground font-medium mt-1">Completado</span>
+                        </div>
+                    </div>
+                    <div className="flex-1 space-y-4 pt-2">
+                        <div className="py-5 border-b">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-base font-semibold text-foreground">Entregadas</span>
+                                <span className="text-2xl font-bold text-primary">{stats.entregadas}</span>
+                            </div>
+                            <div className="text-sm text-muted-foreground font-light">de {stats.total} docentes</div>
+                        </div>
+                        <div className="py-5 border-b">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-base font-semibold text-foreground">Pendientes</span>
+                                <span className="text-2xl font-bold text-destructive">{stats.pendientes}</span>
+                            </div>
+                            <div className="text-sm text-muted-foreground font-light">por entregar</div>
+                        </div>
                     </div>
                 </div>
-                <div className="flex-1 space-y-4 pt-2">
-                    <div className="py-5 border-b border-apple-gray-light">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-base font-semibold text-apple-gray-dark">Entregadas</span>
-                            <span className="text-2xl font-bold text-apple-green">{stats.entregadas}</span>
-                        </div>
-                        <div className="text-sm text-apple-gray font-light">de {stats.total} docentes</div>
-                    </div>
-                    <div className="py-5 border-b border-apple-gray-light">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-base font-semibold text-apple-gray-dark">Pendientes</span>
-                            <span className="text-2xl font-bold text-apple-red">{stats.pendientes}</span>
-                        </div>
-                        <div className="text-sm text-apple-gray font-light">por entregar</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+            </CardContent>
+        </Card>
     );
-};
+});
+EstadoMiEquipoWidget.displayName = 'EstadoMiEquipoWidget';
 
 // Widget 4: Alertas de Coco (IA Proactiva)
-const AlertasCocoWidget: React.FC = () => {
+const AlertasCocoWidget: React.FC = React.memo(() => {
     const [alertas, setAlertas] = useState<LogReunionCoordinacion[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -1442,67 +1509,79 @@ const AlertasCocoWidget: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="mb-16">
-                <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Alertas de Coco</h3>
-                <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-apple-blue"></div>
-                </div>
-            </div>
+            <Card className="mb-16">
+                <CardHeader>
+                    <CardTitle>Alertas de Coco</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-3">
+                        {[1, 2, 3].map((i) => (
+                            <Skeleton key={i} className="h-20 w-full" />
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
         );
     }
 
     return (
-        <div className="mb-16">
-            <h3 className="text-2xl font-semibold mb-2 tracking-tight text-apple-gray-dark">Alertas de Coco</h3>
-            <p className="text-apple-gray text-sm font-light mb-10">IA Proactiva</p>
-            
-            {alertas.length === 0 ? (
-                <div className="text-center py-16">
-                    <p className="text-apple-gray-dark text-base font-light mb-2">No hay alertas pendientes</p>
-                    <p className="text-apple-gray text-sm font-light">Coco está monitoreando activamente</p>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {alertas.map((alerta) => {
-                        const color = getAlertaColor(alerta.tipo_alerta);
-                        return (
-                            <div 
-                                key={alerta.id_log} 
-                                className="py-5 px-4 border-b border-apple-gray-light transition-apple hover:bg-apple-gray-light/50 rounded-lg"
-                            >
-                                <div className="flex items-start justify-between gap-4">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <span 
-                                                className="text-xs font-semibold px-3.5 py-1.5 rounded-full text-white"
-                                                style={{ backgroundColor: color }}
-                                            >
-                                                {alerta.tipo_alerta || 'Otro'}
-                                            </span>
-                                            <span className="text-xs font-medium text-apple-gray-dark bg-apple-gray-light px-3 py-1.5 rounded-lg">
-                                                {alerta.grado}
-                                            </span>
+        <Card className="mb-16">
+            <CardHeader>
+                <CardTitle>Alertas de Coco</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">IA Proactiva</p>
+            </CardHeader>
+            <CardContent>
+                {alertas.length === 0 ? (
+                    <div className="text-center py-16">
+                        <p className="text-foreground text-base font-light mb-2">No hay alertas pendientes</p>
+                        <p className="text-muted-foreground text-sm font-light">Coco está monitoreando activamente</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {alertas.map((alerta) => {
+                            const color = getAlertaColor(alerta.tipo_alerta);
+                            return (
+                                <Card 
+                                    key={alerta.id_log} 
+                                    className="hover:bg-accent/50 transition-colors"
+                                >
+                                    <CardContent className="py-5 px-4">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3 mb-4">
+                                                    <span 
+                                                        className="text-xs font-semibold px-3.5 py-1.5 rounded-full text-white"
+                                                        style={{ backgroundColor: color }}
+                                                    >
+                                                        {alerta.tipo_alerta || 'Otro'}
+                                                    </span>
+                                                    <span className="text-xs font-medium text-foreground bg-muted px-3 py-1.5 rounded-lg">
+                                                        {alerta.grado}
+                                                    </span>
+                                                </div>
+                                                <p className="text-base font-semibold text-foreground mb-3 leading-relaxed">{alerta.categoria}</p>
+                                                {alerta.descripcion && (
+                                                    <p className="text-sm text-muted-foreground font-light mb-4 leading-relaxed">{alerta.descripcion}</p>
+                                                )}
+                                                <div className="flex items-center gap-2">
+                                                    <BellIcon className="h-4 w-4 text-muted-foreground" />
+                                                    <p className="text-sm text-muted-foreground font-light">
+                                                        Aparece en <span className="font-semibold text-foreground">{alerta.frecuencia}</span> reunión{alerta.frecuencia > 1 ? 'es' : ''}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <p className="text-base font-semibold text-apple-gray-dark mb-3 leading-relaxed">{alerta.categoria}</p>
-                                        {alerta.descripcion && (
-                                            <p className="text-sm text-apple-gray font-light mb-4 leading-relaxed">{alerta.descripcion}</p>
-                                        )}
-                                        <div className="flex items-center gap-2">
-                                            <BellIcon className="h-4 w-4 text-apple-gray" />
-                                            <p className="text-sm text-apple-gray font-light">
-                                                Aparece en <span className="font-semibold text-apple-gray-dark">{alerta.frecuencia}</span> reunión{alerta.frecuencia > 1 ? 'es' : ''}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
-};
+});
+AlertasCocoWidget.displayName = 'AlertasCocoWidget';
 
 const DashboardView: React.FC<{ 
     stats: { totalStudents: number, totalTeachers: number, classesToday: number };
@@ -1568,32 +1647,647 @@ const DashboardView: React.FC<{
                     })}
                 </div>
                 <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="py-6 border-b border-apple-gray-light flex justify-between items-center">
-                        <div>
-                            <p className="text-4xl font-bold text-apple-gray-dark mb-2">{stats.totalTeachers}</p>
-                            <p className="text-lg text-apple-gray font-light">Docentes Activos</p>
-                        </div>
-                        <AcademicCapIcon className="h-12 w-12 text-apple-blue opacity-60" />
-                    </div>
-                    <div className="py-6 border-b border-apple-gray-light flex justify-between items-center">
-                        <div>
-                            <p className="text-4xl font-bold text-apple-gray-dark mb-2">{stats.classesToday}</p>
-                            <p className="text-lg text-apple-gray font-light">Clases Hoy</p>
-                        </div>
-                        <CalendarIcon className="h-12 w-12 text-apple-blue opacity-60" />
-                    </div>
+                    <Card>
+                        <CardContent className="py-6 flex justify-between items-center">
+                            <div>
+                                <p className="text-4xl font-bold text-foreground mb-2">{stats.totalTeachers}</p>
+                                <p className="text-lg text-muted-foreground font-light">Docentes Activos</p>
+                            </div>
+                            <AcademicCapIcon className="h-12 w-12 text-primary opacity-60" />
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="py-6 flex justify-between items-center">
+                            <div>
+                                <p className="text-4xl font-bold text-foreground mb-2">{stats.classesToday}</p>
+                                <p className="text-lg text-muted-foreground font-light">Clases Hoy</p>
+                            </div>
+                            <CalendarIcon className="h-12 w-12 text-primary opacity-60" />
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
 
-            {/* Widgets adicionales solo para coordinadores */}
+            {/* Dashboard Analítico para coordinadores */}
             {isCoordinator && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                    <MiAgendaDelDiaWidget currentUser={currentUser} />
-                    <EventosSemanaWidget />
-                    <EstadoMiEquipoWidget docentes={docentes} planificaciones={planificaciones} />
-                    <AlertasCocoWidget />
-                </div>
+                <CoordinatorAnalyticsDashboard 
+                    currentUser={currentUser}
+                    alumnos={alumnos}
+                    clases={clases}
+                    docentes={docentes}
+                    planificaciones={planificaciones}
+                />
             )}
+        </div>
+    );
+};
+
+// ============================================
+// COORDINATOR ANALYTICS DASHBOARD (Power BI Style)
+// ============================================
+
+interface CoordinatorAnalyticsDashboardProps {
+    currentUser: Usuario;
+    alumnos: Alumno[];
+    clases: Clase[];
+    docentes: Docente[];
+    planificaciones: Planificacion[];
+}
+
+const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps> = ({ 
+    currentUser, 
+    alumnos, 
+    clases, 
+    docentes, 
+    planificaciones 
+}) => {
+    // Estados de filtros globales
+    const [filters, setFilters] = useState({
+        lapso: 'I Lapso',
+        anoEscolar: '2025-2026',
+        evaluacion: 'Todas',
+        grado: 'Todos',
+        materia: 'Todas',
+        docente: 'Todos'
+    });
+
+    // Estados de datos
+    const [minutas, setMinutas] = useState<MinutaEvaluacion[]>([]);
+    const [reuniones, setReuniones] = useState<LogReunionCoordinacion[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [selectedNoteFilter, setSelectedNoteFilter] = useState<string | null>(null);
+    const [selectedDifficultyFilter, setSelectedDifficultyFilter] = useState<string | null>(null);
+
+    // Cargar datos
+    useEffect(() => {
+        const loadData = async () => {
+            setIsLoading(true);
+            try {
+                const [minutasData, reunionesData] = await Promise.all([
+                    minutasService.getAll(),
+                    logReunionesService.getAll()
+                ]);
+                setMinutas(minutasData);
+                setReuniones(reunionesData);
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        loadData();
+    }, []);
+
+    // Filtrar minutas según filtros globales
+    const filteredMinutas = useMemo(() => {
+        return minutas.filter(m => {
+            if (filters.lapso !== 'Todos' && m.lapso !== filters.lapso) return false;
+            if (filters.anoEscolar !== 'Todos' && m.ano_escolar !== filters.anoEscolar) return false;
+            if (filters.evaluacion !== 'Todas' && m.evaluacion !== filters.evaluacion) return false;
+            if (filters.grado !== 'Todos' && m.grado !== filters.grado) return false;
+            if (filters.materia !== 'Todas' && m.materia !== filters.materia) return false;
+            return true;
+        });
+    }, [minutas, filters]);
+
+    // Extraer todos los datos de alumnos de las minutas filtradas
+    const allStudentData = useMemo(() => {
+        const students: Array<{
+            nombre: string;
+            nota: string;
+            grado: string;
+            materia: string;
+            docente?: string;
+            id_alumno?: string;
+        }> = [];
+        
+        filteredMinutas.forEach(minuta => {
+            if (Array.isArray(minuta.datos_alumnos)) {
+                minuta.datos_alumnos.forEach((alumno: any) => {
+                    const clase = clases.find(c => c.nombre_materia === minuta.materia);
+                    const docente = clase ? docentes.find(d => d.id_docente === clase.id_docente) : undefined;
+                    students.push({
+                        nombre: alumno.nombre_alumno || alumno.nombre || '',
+                        nota: alumno.nota || '',
+                        grado: minuta.grado,
+                        materia: minuta.materia,
+                        docente: docente ? `${docente.nombres} ${docente.apellidos}` : undefined,
+                        id_alumno: alumno.id_alumno
+                    });
+                });
+            }
+        });
+        return students;
+    }, [filteredMinutas, docentes, clases]);
+
+    // Calcular KPIs
+    const kpis = useMemo(() => {
+        // Promedio General (convertir notas a números)
+        const notasNumericas = allStudentData
+            .map(s => {
+                const nota = s.nota?.toUpperCase() || '';
+                if (nota === 'A' || nota === 'A+') return 5;
+                if (nota === 'B+' || nota === 'B') return 4;
+                if (nota === 'C+' || nota === 'C') return 3;
+                if (nota === 'D' || nota === 'D+') return 2;
+                if (nota === 'E') return 1;
+                return null;
+            })
+            .filter((n): n is number => n !== null);
+        
+        const promedio = notasNumericas.length > 0 
+            ? notasNumericas.reduce((a, b) => a + b, 0) / notasNumericas.length 
+            : 0;
+        
+        const promedioLetra = promedio >= 4.5 ? 'A' : promedio >= 3.5 ? 'B+' : promedio >= 2.5 ? 'C' : promedio >= 1.5 ? 'D' : 'E';
+
+        // Alumnos en Riesgo (C, D, E)
+        const alumnosRiesgo = allStudentData.filter(s => {
+            const nota = s.nota?.toUpperCase() || '';
+            return nota === 'C' || nota === 'C+' || nota === 'D' || nota === 'D+' || nota === 'E';
+        }).length;
+
+        // Reuniones Completadas
+        const reunionesFiltradas = reuniones.filter(r => {
+            if (filters.grado !== 'Todos' && r.grado !== filters.grado) return false;
+            return true;
+        });
+        const completadas = reunionesFiltradas.filter(r => r.estado === 'Resuelto' || r.estado === 'Archivado').length;
+        const totalReuniones = reunionesFiltradas.length;
+
+        // Dificultad Principal (de analisis_ia)
+        const dificultades: { [key: string]: number } = {};
+        filteredMinutas.forEach(minuta => {
+            if (Array.isArray(minuta.analisis_ia)) {
+                minuta.analisis_ia.forEach((dificultad: any) => {
+                    const nombre = dificultad.dificultad || dificultad.nombre || '';
+                    if (nombre) {
+                        dificultades[nombre] = (dificultades[nombre] || 0) + (dificultad.frecuencia || 1);
+                    }
+                });
+            }
+        });
+        
+        const dificultadPrincipal = Object.entries(dificultades)
+            .sort(([, a], [, b]) => b - a)[0]?.[0] || 'N/A';
+
+        return {
+            promedioGeneral: promedioLetra,
+            alumnosRiesgo,
+            reunionesCompletadas: `${completadas} / ${totalReuniones}`,
+            dificultadPrincipal
+        };
+    }, [allStudentData, reuniones, filteredMinutas, filters.grado]);
+
+    // Distribución de Notas
+    const notaDistribution = useMemo(() => {
+        const distribution: { [key: string]: number } = {};
+        allStudentData.forEach(s => {
+            const nota = s.nota?.toUpperCase() || 'Sin Nota';
+            distribution[nota] = (distribution[nota] || 0) + 1;
+        });
+        return Object.entries(distribution)
+            .map(([nota, count]) => ({ nota, count }))
+            .sort((a, b) => {
+                const order: { [key: string]: number } = { 'A': 5, 'A+': 6, 'B+': 4, 'B': 3, 'C+': 2, 'C': 1, 'D': 0, 'E': -1 };
+                return (order[b.nota] || -2) - (order[a.nota] || -2);
+            });
+    }, [allStudentData]);
+
+    // Top 5 Dificultades
+    const topDifficulties = useMemo(() => {
+        const dificultades: { [key: string]: number } = {};
+        filteredMinutas.forEach(minuta => {
+            if (Array.isArray(minuta.analisis_ia)) {
+                minuta.analisis_ia.forEach((dificultad: any) => {
+                    const nombre = dificultad.dificultad || dificultad.nombre || '';
+                    if (nombre) {
+                        dificultades[nombre] = (dificultades[nombre] || 0) + (dificultad.frecuencia || 1);
+                    }
+                });
+            }
+        });
+        return Object.entries(dificultades)
+            .map(([nombre, frecuencia]) => ({ nombre, frecuencia }))
+            .sort((a, b) => b.frecuencia - a.frecuencia)
+            .slice(0, 5);
+    }, [filteredMinutas]);
+
+    // Lista de Alumnos en Foco (con drill-down)
+    const alumnosEnFoco = useMemo(() => {
+        let filtered = allStudentData;
+        
+        // Aplicar filtro de nota si está seleccionado
+        if (selectedNoteFilter) {
+            filtered = filtered.filter(s => s.nota?.toUpperCase() === selectedNoteFilter.toUpperCase());
+        }
+        
+        // Aplicar filtro de dificultad si está seleccionado
+        if (selectedDifficultyFilter) {
+            const alumnosConDificultad = new Set<string>();
+            filteredMinutas.forEach(minuta => {
+                if (Array.isArray(minuta.analisis_ia)) {
+                    minuta.analisis_ia.forEach((dificultad: any) => {
+                        if ((dificultad.dificultad || dificultad.nombre) === selectedDifficultyFilter) {
+                            const estudiantes = dificultad.estudiantes || dificultad.estudiantes_afectados || [];
+                            if (Array.isArray(estudiantes)) {
+                                estudiantes.forEach((nombre: string) => alumnosConDificultad.add(nombre));
+                            }
+                        }
+                    });
+                }
+            });
+            filtered = filtered.filter(s => alumnosConDificultad.has(s.nombre));
+        }
+        
+        // Por defecto, mostrar alumnos en riesgo
+        if (!selectedNoteFilter && !selectedDifficultyFilter) {
+            filtered = filtered.filter(s => {
+                const nota = s.nota?.toUpperCase() || '';
+                return nota === 'C' || nota === 'C+' || nota === 'D' || nota === 'D+' || nota === 'E';
+            });
+        }
+        
+        return filtered;
+    }, [allStudentData, selectedNoteFilter, selectedDifficultyFilter, filteredMinutas]);
+
+    // Estatus de Reuniones
+    const estatusReuniones = useMemo(() => {
+        return reuniones
+            .filter(r => filters.grado === 'Todos' || r.grado === filters.grado)
+            .map(r => {
+                const docente = docentes.find(d => d.id_docente === r.creado_por || false);
+                return {
+                    docente: docente ? `${docente.nombres} ${docente.apellidos}` : 'N/A',
+                    materiaGrado: r.materia ? `${r.materia} / ${r.grado}` : r.grado,
+                    estado: r.estado || 'Pendiente',
+                    fecha: r.fecha_reunion
+                };
+            })
+            .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+    }, [reuniones, filters.grado, docentes]);
+
+    // Obtener opciones únicas para filtros
+    const uniqueLapsos = useMemo(() => ['I Lapso', 'II Lapso', 'III Lapso'], []);
+    const uniqueAnosEscolares = useMemo(() => {
+        const anos = new Set(minutas.map(m => m.ano_escolar));
+        return Array.from(anos).sort();
+    }, [minutas]);
+    const uniqueEvaluaciones = useMemo(() => {
+        const evaluaciones = new Set(minutas.map(m => m.evaluacion));
+        return ['Todas', ...Array.from(evaluaciones).sort()];
+    }, [minutas]);
+    const uniqueGrados = useMemo(() => {
+        const grados = new Set([...minutas.map(m => m.grado), ...alumnos.map(a => a.salon)]);
+        return ['Todos', ...Array.from(grados).sort()];
+    }, [minutas, alumnos]);
+    const uniqueMaterias = useMemo(() => {
+        const materias = new Set([...minutas.map(m => m.materia), ...clases.map(c => c.nombre_materia)]);
+        return ['Todas', ...Array.from(materias).sort()];
+    }, [minutas, clases]);
+    const uniqueDocentes = useMemo(() => {
+        return ['Todos', ...docentes.map(d => `${d.nombres} ${d.apellidos}`).sort()];
+    }, [docentes]);
+
+    if (isLoading) {
+        return (
+            <div className="space-y-4">
+                <Skeleton className="h-20 w-full" />
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 w-full" />)}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-8">
+            {/* Filtros Globales */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Filtros Globales</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <div className="space-y-2">
+                            <Label>Lapso</Label>
+                            <Select value={filters.lapso} onValueChange={(value) => setFilters(prev => ({ ...prev, lapso: value }))}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {uniqueLapsos.map(lapso => (
+                                        <SelectItem key={lapso} value={lapso}>{lapso}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Año Escolar</Label>
+                            <Select value={filters.anoEscolar} onValueChange={(value) => setFilters(prev => ({ ...prev, anoEscolar: value }))}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Todos">Todos</SelectItem>
+                                    {uniqueAnosEscolares.map(ano => (
+                                        <SelectItem key={ano} value={ano}>{ano}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Evaluación</Label>
+                            <Select value={filters.evaluacion} onValueChange={(value) => setFilters(prev => ({ ...prev, evaluacion: value }))}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {uniqueEvaluaciones.map(evaluacion => (
+                                        <SelectItem key={evaluacion} value={evaluacion}>{evaluacion}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Grado</Label>
+                            <Select value={filters.grado} onValueChange={(value) => setFilters(prev => ({ ...prev, grado: value }))}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {uniqueGrados.map(grado => (
+                                        <SelectItem key={grado} value={grado}>{grado}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Materia</Label>
+                            <Select value={filters.materia} onValueChange={(value) => setFilters(prev => ({ ...prev, materia: value }))}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {uniqueMaterias.map(materia => (
+                                        <SelectItem key={materia} value={materia}>{materia}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Docente</Label>
+                            <Select value={filters.docente} onValueChange={(value) => setFilters(prev => ({ ...prev, docente: value }))}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {uniqueDocentes.map(docente => (
+                                        <SelectItem key={docente} value={docente}>{docente}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Fila de KPIs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card>
+                    <CardContent className="p-6">
+                        <p className="text-4xl font-bold text-foreground mb-2">{kpis.promedioGeneral}</p>
+                        <p className="text-sm text-muted-foreground font-light">Promedio General</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-6">
+                        <p className="text-4xl font-bold text-destructive mb-2">{kpis.alumnosRiesgo}</p>
+                        <p className="text-sm text-muted-foreground font-light">Estudiantes con Nota 'C' o inferior</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-6">
+                        <p className="text-4xl font-bold text-foreground mb-2">{kpis.reunionesCompletadas}</p>
+                        <p className="text-sm text-muted-foreground font-light">Reuniones de Seguimiento Realizadas</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-6">
+                        <p className="text-lg font-semibold text-foreground mb-2 truncate">{kpis.dificultadPrincipal}</p>
+                        <p className="text-sm text-muted-foreground font-light">Dificultad Académica #1</p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Fila de Visualizaciones */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Widget 5: Distribución de Notas */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Distribución de Notas</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={notaDistribution} layout="vertical">
+                                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                                <XAxis type="number" stroke="hsl(var(--muted-foreground))" />
+                                <YAxis dataKey="nota" type="category" stroke="hsl(var(--muted-foreground))" width={60} />
+                                <RechartsTooltip 
+                                    contentStyle={{ 
+                                        backgroundColor: 'hsl(var(--card))', 
+                                        border: '1px solid hsl(var(--border))',
+                                        borderRadius: '8px'
+                                    }}
+                                />
+                                <Bar 
+                                    dataKey="count" 
+                                    fill="hsl(var(--primary))"
+                                    onClick={(data) => {
+                                        if (data && data.nota) {
+                                            setSelectedNoteFilter(data.nota);
+                                            setSelectedDifficultyFilter(null);
+                                        }
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    {notaDistribution.map((entry, index) => (
+                                        <Cell 
+                                            key={`cell-${index}`} 
+                                            fill={selectedNoteFilter === entry.nota 
+                                                ? 'hsl(var(--primary))' 
+                                                : 'hsl(var(--primary))'
+                                            }
+                                            opacity={selectedNoteFilter === entry.nota ? 1 : 0.7}
+                                        />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                        {selectedNoteFilter && (
+                            <div className="mt-4">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => {
+                                        setSelectedNoteFilter(null);
+                                        setSelectedDifficultyFilter(null);
+                                    }}
+                                >
+                                    Limpiar Filtro
+                                </Button>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Widget 6: Top 5 Dificultades */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Top 5 Dificultades Detectadas</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={topDifficulties}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                                <XAxis 
+                                    dataKey="nombre" 
+                                    stroke="hsl(var(--muted-foreground))"
+                                    angle={-45}
+                                    textAnchor="end"
+                                    height={100}
+                                />
+                                <YAxis stroke="hsl(var(--muted-foreground))" />
+                                <RechartsTooltip 
+                                    contentStyle={{ 
+                                        backgroundColor: 'hsl(var(--card))', 
+                                        border: '1px solid hsl(var(--border))',
+                                        borderRadius: '8px'
+                                    }}
+                                />
+                                <Bar 
+                                    dataKey="frecuencia" 
+                                    fill="hsl(var(--primary))"
+                                    onClick={(data) => {
+                                        if (data && data.nombre) {
+                                            setSelectedDifficultyFilter(data.nombre);
+                                            setSelectedNoteFilter(null);
+                                        }
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    {topDifficulties.map((entry, index) => (
+                                        <Cell 
+                                            key={`cell-${index}`} 
+                                            fill={selectedDifficultyFilter === entry.nombre 
+                                                ? 'hsl(var(--primary))' 
+                                                : 'hsl(var(--primary))'
+                                            }
+                                            opacity={selectedDifficultyFilter === entry.nombre ? 1 : 0.7}
+                                        />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                        {selectedDifficultyFilter && (
+                            <div className="mt-4">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => {
+                                        setSelectedNoteFilter(null);
+                                        setSelectedDifficultyFilter(null);
+                                    }}
+                                >
+                                    Limpiar Filtro
+                                </Button>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Fila de Listas de Acción */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Widget 7: Lista de Alumnos en Foco */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Lista de Alumnos en Foco</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                            {alumnosEnFoco.length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-8">No hay alumnos que coincidan con los filtros</p>
+                            ) : (
+                                <div className="divide-y divide-border">
+                                    {alumnosEnFoco.map((alumno, index) => (
+                                        <div key={index} className="py-3 px-2 hover:bg-accent/50 transition-colors">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex-1">
+                                                    <p className="font-medium text-foreground">{alumno.nombre}</p>
+                                                    <div className="flex gap-4 mt-1 text-sm text-muted-foreground">
+                                                        <span>{alumno.grado}</span>
+                                                        <span>{alumno.materia}</span>
+                                                        {alumno.docente && <span>{alumno.docente}</span>}
+                                                    </div>
+                                                </div>
+                                                <Badge variant={alumno.nota === 'C' || alumno.nota === 'D' || alumno.nota === 'E' ? 'destructive' : 'secondary'}>
+                                                    {alumno.nota}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Widget 8: Estatus de Reuniones */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Estatus de Reuniones</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                            {estatusReuniones.length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-8">No hay reuniones registradas</p>
+                            ) : (
+                                <div className="divide-y divide-border">
+                                    {estatusReuniones.map((reunion, index) => (
+                                        <div key={index} className="py-3 px-2 hover:bg-accent/50 transition-colors">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex-1">
+                                                    <p className="font-medium text-foreground">{reunion.docente}</p>
+                                                    <p className="text-sm text-muted-foreground mt-1">{reunion.materiaGrado}</p>
+                                                    <p className="text-xs text-muted-foreground mt-1">{new Date(reunion.fecha).toLocaleDateString()}</p>
+                                                </div>
+                                                <Badge 
+                                                    variant={
+                                                        reunion.estado === 'Resuelto' || reunion.estado === 'Archivado' 
+                                                            ? 'default' 
+                                                            : reunion.estado === 'En Proceso' 
+                                                            ? 'secondary' 
+                                                            : 'outline'
+                                                    }
+                                                >
+                                                    {reunion.estado}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Widgets Personales */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <MiAgendaDelDiaWidget currentUser={currentUser} />
+                <EventosSemanaWidget />
+            </div>
         </div>
     );
 };
@@ -1632,35 +2326,39 @@ const ResumenAlumnosDocenteWidget: React.FC<{
     }, [studentsByGrade]);
 
     return (
-        <div className="mb-16">
-            <h2 className="text-2xl font-bold mb-8 tracking-tight">Mis Alumnos por Grado</h2>
-            {sortedGrades.length === 0 ? (
-                <div className="text-center py-12">
-                    <p className="text-apple-gray text-sm font-light">No tienes alumnos asignados aún</p>
-                </div>
-            ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
-                {sortedGrades.map((grade) => {
-                    const gradeColor = getGradeColor(grade);
-                    return (
-                        <div 
-                            key={grade} 
-                            className="p-8 rounded-2xl text-white transition-apple hover:scale-[1.02]"
-                            style={{ backgroundColor: gradeColor }}
-                        >
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-5xl font-bold mb-2">{studentsByGrade[grade]}</p>
-                                    <p className="text-lg font-semibold">{grade}</p>
+        <Card className="mb-16">
+            <CardHeader>
+                <CardTitle className="text-2xl">Mis Alumnos por Grado</CardTitle>
+            </CardHeader>
+            <CardContent>
+                {sortedGrades.length === 0 ? (
+                    <div className="text-center py-12">
+                        <p className="text-muted-foreground text-sm font-light">No tienes alumnos asignados aún</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
+                        {sortedGrades.map((grade) => {
+                            const gradeColor = getGradeColor(grade);
+                            return (
+                                <div 
+                                    key={grade} 
+                                    className="p-8 rounded-2xl text-white transition-transform hover:scale-[1.02] shadow-md"
+                                    style={{ backgroundColor: gradeColor }}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="text-5xl font-bold mb-2">{studentsByGrade[grade]}</p>
+                                            <p className="text-lg font-semibold">{grade}</p>
+                                        </div>
+                                        <UsersIcon className="h-10 w-10 opacity-80" />
+                                    </div>
                                 </div>
-                                <UsersIcon className="h-10 w-10 opacity-80" />
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-            )}
-        </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 };
 
@@ -1756,30 +2454,33 @@ const MisClasesHoyWidget: React.FC<{
     }, [schedules, clases, currentUser.docenteId, aulas]);
 
     return (
-        <div className="mb-12">
-            <h3 className="text-xl font-semibold mb-2 tracking-tight">Mis Clases de Hoy</h3>
-            <p className="text-apple-gray text-sm font-light mb-8">{new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-            
-            {classesToday.length === 0 ? (
-                <div className="text-center py-12">
-                    <p className="text-apple-gray text-sm font-light">No hay clases programadas para hoy</p>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {classesToday.map((clase, index) => (
-                        <div key={`${clase.id_clase}-${index}`} className="flex items-center gap-6 py-4 border-b border-apple-gray-light transition-apple hover:opacity-70">
-                            <div className="flex-shrink-0 w-20 text-left">
-                                <p className="text-base font-semibold text-apple-gray-dark">{clase.hora}</p>
+        <Card className="mb-12">
+            <CardHeader>
+                <CardTitle className="text-xl">Mis Clases de Hoy</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">{new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+            </CardHeader>
+            <CardContent>
+                {classesToday.length === 0 ? (
+                    <div className="text-center py-12">
+                        <p className="text-muted-foreground text-sm font-light">No hay clases programadas para hoy</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {classesToday.map((clase, index) => (
+                            <div key={`${clase.id_clase}-${index}`} className="flex items-center gap-6 py-4 border-b hover:bg-accent/50 transition-colors rounded-lg px-2">
+                                <div className="flex-shrink-0 w-20 text-left">
+                                    <p className="text-base font-semibold text-foreground">{clase.hora}</p>
+                                </div>
+                                <div className="flex-1">
+                                    <p className="font-medium text-foreground mb-1">{clase.materia}</p>
+                                    <p className="text-sm text-muted-foreground font-light">{clase.grado} {clase.aula && `• ${clase.aula}`}</p>
+                                </div>
                             </div>
-                            <div className="flex-1">
-                                <p className="font-medium text-apple-gray-dark mb-1">{clase.materia}</p>
-                                <p className="text-sm text-apple-gray font-light">{clase.grado} {clase.aula && `• ${clase.aula}`}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
+                        ))}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 };
 
@@ -1806,34 +2507,37 @@ const PlanificacionesPendientesWidget: React.FC<{
     };
 
     return (
-        <div className="mb-12">
-            <h3 className="text-xl font-semibold mb-2 tracking-tight">Planificaciones Pendientes</h3>
-            <p className="text-apple-gray text-sm font-light mb-8">{pendientes.length} pendiente{pendientes.length !== 1 ? 's' : ''}</p>
-            
-            {pendientes.length === 0 ? (
-                <div className="text-center py-12">
-                    <p className="text-apple-gray text-sm font-light">¡Todo al día!</p>
-                    <p className="text-apple-gray text-xs font-light mt-2">No tienes planificaciones pendientes</p>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {pendientes.map((plan) => {
-                        const clase = clases.find(c => c.id_clase === plan.id_clase);
-                        return (
-                            <div key={plan.id_planificacion} className="flex items-center justify-between py-4 border-b border-apple-gray-light transition-apple hover:opacity-70">
-                                <div className="flex-1">
-                                    <p className="font-medium text-apple-gray-dark mb-1">{clase?.nombre_materia || 'Sin asignatura'}</p>
-                                    <p className="text-sm text-apple-gray font-light">Semana {plan.semana} • {plan.lapso} • {clase?.grado_asignado}</p>
+        <Card className="mb-12">
+            <CardHeader>
+                <CardTitle className="text-xl">Planificaciones Pendientes</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">{pendientes.length} pendiente{pendientes.length !== 1 ? 's' : ''}</p>
+            </CardHeader>
+            <CardContent>
+                {pendientes.length === 0 ? (
+                    <div className="text-center py-12">
+                        <p className="text-muted-foreground text-sm font-light">¡Todo al día!</p>
+                        <p className="text-muted-foreground text-xs font-light mt-2">No tienes planificaciones pendientes</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {pendientes.map((plan) => {
+                            const clase = clases.find(c => c.id_clase === plan.id_clase);
+                            return (
+                                <div key={plan.id_planificacion} className="flex items-center justify-between py-4 border-b hover:bg-accent/50 transition-colors rounded-lg px-2">
+                                    <div className="flex-1">
+                                        <p className="font-medium text-foreground mb-1">{clase?.nombre_materia || 'Sin asignatura'}</p>
+                                        <p className="text-sm text-muted-foreground font-light">Semana {plan.semana} • {plan.lapso} • {clase?.grado_asignado}</p>
+                                    </div>
+                                    <span className={`px-4 py-1.5 rounded-full text-xs font-medium ${getStatusColor(plan.status)}`}>
+                                        {plan.status}
+                                    </span>
                                 </div>
-                                <span className={`px-4 py-1.5 rounded-full text-xs font-medium ${getStatusColor(plan.status)}`}>
-                                    {plan.status}
-                                </span>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 };
 
@@ -1873,35 +2577,38 @@ const MisAsignaturasWidget: React.FC<{
     }, [clases, alumnos, currentUser.docenteId]);
 
     return (
-        <div className="mb-12">
-            <h3 className="text-xl font-semibold mb-2 tracking-tight">Mis Asignaturas</h3>
-            <p className="text-apple-gray text-sm font-light mb-8">{misAsignaturas.length} asignatura{misAsignaturas.length !== 1 ? 's' : ''}</p>
-            
-            {misAsignaturas.length === 0 ? (
-                <div className="text-center py-12">
-                    <p className="text-apple-gray text-sm font-light">No tienes asignaturas asignadas</p>
-                    <p className="text-apple-gray text-xs font-light mt-2">Contacta a un coordinador para asignarte clases</p>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {misAsignaturas.map((asignatura, index) => (
-                        <div key={index} className="py-4 border-b border-apple-gray-light transition-apple hover:opacity-70">
-                            <p className="font-medium text-apple-gray-dark mb-3">{asignatura.materia}</p>
-                            <div className="flex items-center gap-6 text-sm text-apple-gray font-light">
-                                <span className="flex items-center gap-2">
-                                    <UsersIcon className="h-4 w-4" />
-                                    {Array.from(asignatura.grados).join(', ')}
-                                </span>
-                                <span className="flex items-center gap-2">
-                                    <UserCircleIcon className="h-4 w-4" />
-                                    {asignatura.totalAlumnos} alumno{asignatura.totalAlumnos !== 1 ? 's' : ''}
-                                </span>
+        <Card className="mb-12">
+            <CardHeader>
+                <CardTitle className="text-xl">Mis Asignaturas</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">{misAsignaturas.length} asignatura{misAsignaturas.length !== 1 ? 's' : ''}</p>
+            </CardHeader>
+            <CardContent>
+                {misAsignaturas.length === 0 ? (
+                    <div className="text-center py-12">
+                        <p className="text-muted-foreground text-sm font-light">No tienes asignaturas asignadas</p>
+                        <p className="text-muted-foreground text-xs font-light mt-2">Contacta a un coordinador para asignarte clases</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {misAsignaturas.map((asignatura, index) => (
+                            <div key={index} className="py-4 border-b hover:bg-accent/50 transition-colors rounded-lg px-2">
+                                <p className="font-medium text-foreground mb-3">{asignatura.materia}</p>
+                                <div className="flex items-center gap-6 text-sm text-muted-foreground font-light">
+                                    <span className="flex items-center gap-2">
+                                        <UsersIcon className="h-4 w-4" />
+                                        {Array.from(asignatura.grados).join(', ')}
+                                    </span>
+                                    <span className="flex items-center gap-2">
+                                        <UserCircleIcon className="h-4 w-4" />
+                                        {asignatura.totalAlumnos} alumno{asignatura.totalAlumnos !== 1 ? 's' : ''}
+                                    </span>
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
+                        ))}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 };
 
@@ -1956,56 +2663,60 @@ const EventosDocenteWidget: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-xl shadow-lg border border-yellow-100">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-yellow-500 rounded-lg">
-                        <CalendarIcon className="h-6 w-6 text-white" />
+            <Card className="mb-12">
+                <CardHeader>
+                    <CardTitle className="text-xl">Próximos Eventos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-3">
+                        {[1, 2, 3].map((i) => (
+                            <Skeleton key={i} className="h-20 w-full" />
+                        ))}
                     </div>
-                    <h3 className="text-xl font-semibold text-apple-gray-dark tracking-tight">Próximos Eventos</h3>
-                </div>
-                <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500"></div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
         );
     }
 
     return (
-        <div className="mb-12">
-            <h3 className="text-xl font-semibold mb-2 tracking-tight">Próximos Eventos</h3>
-            <p className="text-apple-gray text-sm font-light mb-8">Próximos 7 días</p>
-            
-            {eventos.length === 0 ? (
-                <div className="text-center py-12">
-                    <p className="text-apple-gray text-sm font-light">No hay eventos programados</p>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {eventos.map((evento) => {
-                        const color = evento.color || getEventColor(evento.tipo_evento);
-                        return (
-                            <div key={evento.id_evento} className="flex items-center gap-4 py-4 border-b border-apple-gray-light transition-apple hover:opacity-70">
-                                <div 
-                                    className="w-3 h-3 rounded-full flex-shrink-0"
-                                    style={{ backgroundColor: color }}
-                                ></div>
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-3">
-                                        <span className="font-medium text-sm text-apple-gray-dark min-w-[100px]">
-                                            {formatDate(evento.fecha_inicio)}:
-                                        </span>
-                                        <span className="text-sm text-apple-gray-dark font-light">{evento.nombre_evento}</span>
+        <Card className="mb-12">
+            <CardHeader>
+                <CardTitle className="text-xl">Próximos Eventos</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Próximos 7 días</p>
+            </CardHeader>
+            <CardContent>
+                {eventos.length === 0 ? (
+                    <div className="text-center py-12">
+                        <p className="text-muted-foreground text-sm font-light">No hay eventos programados</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {eventos.map((evento) => {
+                            const color = evento.color || getEventColor(evento.tipo_evento);
+                            return (
+                                <div key={evento.id_evento} className="flex items-center gap-4 py-4 border-b hover:bg-accent/50 transition-colors rounded-lg px-2">
+                                    <div 
+                                        className="w-3 h-3 rounded-full flex-shrink-0"
+                                        style={{ backgroundColor: color }}
+                                    ></div>
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-medium text-sm text-foreground min-w-[100px]">
+                                                {formatDate(evento.fecha_inicio)}:
+                                            </span>
+                                            <span className="text-sm text-foreground font-light">{evento.nombre_evento}</span>
+                                        </div>
+                                        {evento.responsable && (
+                                            <p className="text-xs text-muted-foreground font-light mt-1 ml-[108px]">Resp: {evento.responsable}</p>
+                                        )}
                                     </div>
-                                    {evento.responsable && (
-                                        <p className="text-xs text-apple-gray font-light mt-1 ml-[108px]">Resp: {evento.responsable}</p>
-                                    )}
                                 </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 };
 
@@ -2095,110 +2806,125 @@ const MiAgendaDocenteWidget: React.FC<{ currentUser: Usuario }> = ({ currentUser
 
     if (isLoading) {
         return (
-            <div className="mb-12">
-                <h3 className="text-xl font-semibold mb-2 tracking-tight">Mi Agenda del Día</h3>
-                <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-apple-blue"></div>
-                </div>
-            </div>
+            <Card className="mb-12">
+                <CardHeader>
+                    <CardTitle className="text-xl">Mi Agenda del Día</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        <Skeleton className="h-10 w-full" />
+                        <div className="space-y-2">
+                            {[1, 2, 3].map((i) => (
+                                <Skeleton key={i} className="h-20 w-full" />
+                            ))}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         );
     }
 
     return (
-        <div className="mb-12">
-            <h3 className="text-xl font-semibold mb-2 tracking-tight">Mi Agenda del Día</h3>
-            <p className="text-apple-gray text-sm font-light mb-8">Gestiona tus tareas diarias</p>
-            
-            <div className="mb-8 flex gap-3">
-                <input
-                    type="text"
-                    value={nuevaTarea}
-                    onChange={(e) => setNuevaTarea(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddTarea()}
-                    placeholder="Agregar nueva tarea..."
-                    className="flex-1 px-4 py-3 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple"
-                    disabled={isAdding}
-                />
-                <button
-                    onClick={handleAddTarea}
-                    disabled={isAdding || !nuevaTarea.trim()}
-                    className="px-6 py-3 bg-apple-blue text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium transition-apple hover:opacity-90"
-                >
-                    <PlusIcon className="h-5 w-5" />
-                    Agregar
-                </button>
-            </div>
-
-            {tareasPendientes.length > 0 && (
-                <div className="mb-6">
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="w-2 h-2 bg-apple-red rounded-full"></div>
-                        <h4 className="text-sm font-medium text-apple-gray-dark">Pendientes ({tareasPendientes.length})</h4>
-                    </div>
-                    <div className="space-y-3">
-                        {tareasPendientes.map((tarea) => (
-                            <div key={tarea.id_tarea} className="flex items-center gap-4 py-3 border-b border-apple-gray-light transition-apple hover:opacity-70 group">
-                                <input
-                                    type="checkbox"
-                                    checked={tarea.completada}
-                                    onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
-                                    className="h-5 w-5 text-apple-blue focus:ring-apple-blue border-apple-gray rounded cursor-pointer transition-apple"
-                                />
-                                <span className="flex-1 text-sm font-light text-apple-gray-dark">{tarea.descripcion}</span>
-                                <button
-                                    onClick={() => handleDeleteTarea(tarea.id_tarea)}
-                                    className="opacity-0 group-hover:opacity-100 text-apple-red hover:text-apple-red p-1.5 rounded transition-apple"
-                                    title="Eliminar tarea"
-                                >
-                                    <DeleteIcon className="h-4 w-4" />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
+        <Card className="mb-12">
+            <CardHeader>
+                <CardTitle className="text-xl">Mi Agenda del Día</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Gestiona tus tareas diarias</p>
+            </CardHeader>
+            <CardContent>
+                <div className="mb-8 flex gap-3">
+                    <Input
+                        type="text"
+                        value={nuevaTarea}
+                        onChange={(e) => setNuevaTarea(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleAddTarea()}
+                        placeholder="Agregar nueva tarea..."
+                        disabled={isAdding}
+                        className="flex-1"
+                    />
+                    <Button
+                        onClick={handleAddTarea}
+                        disabled={isAdding || !nuevaTarea.trim()}
+                    >
+                        <PlusIcon className="h-4 w-4 mr-2" />
+                        Agregar
+                    </Button>
                 </div>
-            )}
 
-            {tareasCompletadas.length > 0 && (
-                <div>
-                    <details className="group">
-                        <summary className="text-sm font-light text-apple-gray cursor-pointer list-none hover:text-apple-gray-dark transition-apple mb-3">
-                            <span className="flex items-center gap-2">
-                                <CheckIcon className="h-4 w-4 text-apple-green" />
-                                <span>Completadas ({tareasCompletadas.length})</span>
-                                <ChevronDownIcon className="h-4 w-4 transform group-open:rotate-180 transition-apple" />
-                            </span>
-                        </summary>
-                        <div className="mt-2 space-y-3">
-                            {tareasCompletadas.map((tarea) => (
-                                <div key={tarea.id_tarea} className="flex items-center gap-4 py-3 border-b border-apple-gray-light opacity-60">
+                {tareasPendientes.length > 0 && (
+                    <div className="mb-6">
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="w-2 h-2 bg-destructive rounded-full"></div>
+                            <h4 className="text-sm font-medium text-foreground">Pendientes ({tareasPendientes.length})</h4>
+                        </div>
+                        <div className="space-y-3">
+                            {tareasPendientes.map((tarea) => (
+                                <div key={tarea.id_tarea} className="flex items-center gap-4 py-3 border-b hover:bg-accent/50 transition-colors group rounded-lg px-2">
                                     <input
                                         type="checkbox"
                                         checked={tarea.completada}
                                         onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
-                                        className="h-5 w-5 text-apple-green focus:ring-apple-green border-apple-gray rounded cursor-pointer transition-apple"
+                                        className="h-5 w-5 text-primary focus:ring-primary border-input rounded cursor-pointer transition-colors"
                                     />
-                                    <span className="flex-1 text-sm text-apple-gray line-through font-light">{tarea.descripcion}</span>
-                                    <button
+                                    <span className="flex-1 text-sm font-light text-foreground">{tarea.descripcion}</span>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={() => handleDeleteTarea(tarea.id_tarea)}
-                                        className="text-apple-red hover:text-apple-red p-1.5 rounded transition-apple"
+                                        className="opacity-0 group-hover:opacity-100 h-8 w-8 text-destructive hover:text-destructive"
                                         title="Eliminar tarea"
                                     >
                                         <DeleteIcon className="h-4 w-4" />
-                                    </button>
+                                    </Button>
                                 </div>
                             ))}
                         </div>
-                    </details>
-                </div>
-            )}
+                    </div>
+                )}
 
-            {tareas.length === 0 && (
-                <div className="text-center py-12">
-                    <p className="text-apple-gray text-sm font-light">No hay tareas pendientes</p>
-                    <p className="text-apple-gray text-xs font-light mt-2">Agrega una nueva tarea para comenzar</p>
-                </div>
-            )}
-        </div>
+                {tareasCompletadas.length > 0 && (
+                    <div>
+                        <details className="group">
+                            <summary className="text-sm font-light text-muted-foreground cursor-pointer list-none hover:text-foreground transition-colors mb-3">
+                                <span className="flex items-center gap-2">
+                                    <CheckIcon className="h-4 w-4 text-primary" />
+                                    <span>Completadas ({tareasCompletadas.length})</span>
+                                    <ChevronDownIcon className="h-4 w-4 transform group-open:rotate-180 transition-transform" />
+                                </span>
+                            </summary>
+                            <div className="mt-2 space-y-3">
+                                {tareasCompletadas.map((tarea) => (
+                                    <div key={tarea.id_tarea} className="flex items-center gap-4 py-3 border-b opacity-60">
+                                        <input
+                                            type="checkbox"
+                                            checked={tarea.completada}
+                                            onChange={() => handleToggleCompletada(tarea.id_tarea, tarea.completada)}
+                                            className="h-5 w-5 text-primary focus:ring-primary border-input rounded cursor-pointer transition-colors"
+                                        />
+                                        <span className="flex-1 text-sm text-muted-foreground line-through font-light">{tarea.descripcion}</span>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => handleDeleteTarea(tarea.id_tarea)}
+                                            className="h-8 w-8 text-destructive hover:text-destructive"
+                                            title="Eliminar tarea"
+                                        >
+                                            <DeleteIcon className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </details>
+                    </div>
+                )}
+
+                {tareas.length === 0 && (
+                    <div className="text-center py-12">
+                        <p className="text-foreground text-sm font-light">No hay tareas pendientes</p>
+                        <p className="text-muted-foreground text-xs font-light mt-2">Agrega una nueva tarea para comenzar</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 };
 
@@ -2726,16 +3452,15 @@ const StudentFormModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-0 sm:p-4">
-            <div className="bg-white rounded-2xl p-6 sm:p-8 lg:p-10 w-full h-full sm:h-auto sm:max-w-4xl sm:max-h-[90vh] overflow-y-auto flex flex-col">
-                <div className="flex justify-between items-center mb-8 flex-shrink-0">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-apple-gray-dark tracking-tight">{student ? 'Editar Alumno' : 'Añadir Alumno'}</h2>
-                    <button onClick={onClose} className="p-2 text-apple-gray hover:text-apple-gray-dark transition-apple rounded-lg hover:bg-apple-gray-light"><CloseIcon /></button>
-                </div>
-                <form onSubmit={handleSubmit} className="space-y-8">
+        <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 sm:p-6 lg:p-10">
+                <DialogHeader className="px-6 pt-6 sm:px-0 sm:pt-0">
+                    <DialogTitle className="text-2xl sm:text-3xl">{student ? 'Editar Alumno' : 'Añadir Alumno'}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-8 px-6 pb-6 sm:px-0 sm:pb-0">
                     {/* Personal Info */}
-                    <div className="border-b border-apple-gray-light pb-8">
-                        <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight">Datos Personales</h3>
+                    <div className="pb-8">
+                        <h3 className="text-xl font-semibold mb-6 text-foreground tracking-tight">Datos Personales</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <InputField label="Nombres" name="nombres" value={formData.nombres} onChange={handleChange} required />
                             <InputField label="Apellidos" name="apellidos" value={formData.apellidos} onChange={handleChange} required />
@@ -2749,9 +3474,10 @@ const StudentFormModal: React.FC<{
                              <InputField label="Estado" name="estado" value={formData.estado} onChange={handleChange} />
                         </div>
                     </div>
+                    <Separator />
                     {/* Academic Info */}
-                    <div className="border-b border-apple-gray-light pb-8">
-                        <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight">Datos Académicos</h3>
+                    <div className="pb-8">
+                        <h3 className="text-xl font-semibold mb-6 text-foreground tracking-tight">Datos Académicos</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                              <InputField label="Cédula Escolar" name="cedula_escolar" value={formData.cedula_escolar} onChange={handleChange} />
                             <InputField as="select" label="Salón/Grado" name="salon" value={formData.salon} onChange={handleChange}>
@@ -2775,18 +3501,19 @@ const StudentFormModal: React.FC<{
                             <InputField label="Hermanos (separados por coma)" name="hermanos" value={hermanosStr} onChange={(e) => setHermanosStr(e.target.value)} />
                         </div>
                     </div>
+                    <Separator />
                     {/* Parent Info */}
                     <div>
-                        <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight">Datos de Representantes</h3>
+                        <h3 className="text-xl font-semibold mb-6 text-foreground tracking-tight">Datos de Representantes</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="py-6 border-b border-apple-gray-light space-y-4">
-                                <h4 className="font-semibold text-apple-gray-dark">Madre</h4>
+                            <div className="py-6 space-y-4">
+                                <h4 className="font-semibold text-foreground">Madre</h4>
                                 <InputField label="Nombre Completo" name="info_madre.nombre" value={formData.info_madre.nombre} onChange={handleChange} required />
                                 <InputField label="Email" name="info_madre.email" type="email" value={formData.info_madre.email} onChange={handleChange} required />
                                 <InputField label="Teléfono" name="info_madre.telefono" value={formData.info_madre.telefono} onChange={handleChange} required />
                             </div>
-                            <div className="py-6 border-b border-apple-gray-light space-y-4">
-                                <h4 className="font-semibold text-apple-gray-dark">Padre</h4>
+                            <div className="py-6 space-y-4">
+                                <h4 className="font-semibold text-foreground">Padre</h4>
                                 <InputField label="Nombre Completo" name="info_padre.nombre" value={formData.info_padre.nombre} onChange={handleChange} />
                                 <InputField label="Email" name="info_padre.email" type="email" value={formData.info_padre.email} onChange={handleChange} />
                                 <InputField label="Teléfono" name="info_padre.telefono" value={formData.info_padre.telefono} onChange={handleChange} />
@@ -2794,13 +3521,13 @@ const StudentFormModal: React.FC<{
                         </div>
                     </div>
                     {/* Actions */}
-                    <div className="flex flex-col sm:flex-row justify-end gap-4 mt-8 pt-6 border-t border-apple-gray-light flex-shrink-0">
-                        <button type="button" onClick={onClose} className="w-full sm:w-auto px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg text-base font-medium transition-apple hover:bg-apple-gray-light">Cancelar</button>
-                        <button type="submit" className="w-full sm:w-auto px-6 py-3 bg-apple-blue text-white rounded-lg text-base font-medium transition-apple hover:opacity-90">Guardar Alumno</button>
-                    </div>
+                    <DialogFooter className="px-6 pb-6 sm:px-0 sm:pb-0 mt-8">
+                        <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+                        <Button type="submit">Guardar Alumno</Button>
+                    </DialogFooter>
                 </form>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 };
 
@@ -3335,22 +4062,15 @@ const TeacherFormModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-0 sm:p-4" onClick={onClose}>
-            <div className="bg-white rounded-2xl p-6 sm:p-8 lg:p-10 w-full h-full sm:h-auto sm:max-w-3xl sm:max-h-[90vh] overflow-y-auto flex flex-col" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-4 sm:mb-6 flex-shrink-0">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-apple-gray-dark tracking-tight">{teacher ? 'Editar Docente' : 'Añadir Docente'}</h2>
-                    <button 
-                        onClick={onClose} 
-                        className="text-apple-gray hover:text-apple-gray-dark transition-apple p-2 rounded-lg hover:bg-apple-gray-light"
-                        disabled={isSubmitting}
-                    >
-                        <CloseIcon />
-                    </button>
-                </div>
-                <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 flex-1 overflow-y-auto">
+        <Dialog open={true} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 sm:p-6 lg:p-10">
+                <DialogHeader className="px-6 pt-6 sm:px-0 sm:pt-0">
+                    <DialogTitle className="text-2xl sm:text-3xl">{teacher ? 'Editar Docente' : 'Añadir Docente'}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 px-6 pb-6 sm:px-0 sm:pb-0">
                     {/* Información Personal */}
                     <div>
-                        <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight border-b border-apple-gray-light pb-4">Información Personal</h3>
+                        <h3 className="text-xl font-semibold mb-6 text-foreground tracking-tight pb-4">Información Personal</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <InputField 
@@ -3361,7 +4081,7 @@ const TeacherFormModal: React.FC<{
                                     required 
                                 />
                                 {errors.nombres && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.nombres}</p>
+                                    <p className="mt-1 text-sm text-destructive">{errors.nombres}</p>
                                 )}
                             </div>
                             <div>
@@ -3373,7 +4093,7 @@ const TeacherFormModal: React.FC<{
                                     required 
                                 />
                                 {errors.apellidos && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.apellidos}</p>
+                                    <p className="mt-1 text-sm text-destructive">{errors.apellidos}</p>
                                 )}
                             </div>
                             <div>
@@ -3386,7 +4106,7 @@ const TeacherFormModal: React.FC<{
                                     required 
                                 />
                                 {errors.email && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                                    <p className="mt-1 text-sm text-destructive">{errors.email}</p>
                                 )}
                             </div>
                             <div>
@@ -3415,13 +4135,16 @@ const TeacherFormModal: React.FC<{
                         </div>
                     </div>
                     
+                    <Separator />
                     {/* Asignaturas y Grados */}
-                    <div className="border-t pt-6">
-                        <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight">Asignaturas y Grados</h3>
+                    <div className="pt-6">
+                        <h3 className="text-xl font-semibold mb-6 text-foreground tracking-tight">Asignaturas y Grados</h3>
                         {isLoadingAssignments && teacher && (
-                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                <p className="text-sm text-blue-800">Cargando asignaciones existentes...</p>
-                            </div>
+                            <Card className="mb-4 bg-primary/5 border-primary/20">
+                                <CardContent className="p-3">
+                                    <p className="text-sm text-primary">Cargando asignaciones existentes...</p>
+                                </CardContent>
+                            </Card>
                         )}
                         <div className="bg-apple-gray-light p-4 rounded-lg border border-apple-gray-light">
                             <div className="flex flex-wrap items-end gap-4 mb-4">
@@ -3572,17 +4295,16 @@ const TeacherFormModal: React.FC<{
                                         </select>
                                     </div>
                                 )}
-                                <button 
+                                <Button 
                                     type="button" 
                                     onClick={handleAddAssignment} 
-                                    className="bg-apple-blue text-white px-6 py-3 rounded-lg hover:opacity-90 transition-apple disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                                     disabled={isSubmitting}
                                 >
                                     Añadir
-                                </button>
+                                </Button>
                             </div>
                             {errors.assignment && (
-                                <p className="mb-3 text-sm text-red-600 bg-red-50 p-2 rounded">{errors.assignment}</p>
+                                <p className="mb-3 text-sm text-destructive bg-destructive/10 p-2 rounded">{errors.assignment}</p>
                             )}
                             {assignments.length > 0 ? (
                                 <div className="flex flex-wrap gap-2">
@@ -3611,19 +4333,21 @@ const TeacherFormModal: React.FC<{
                                                         <span className="text-purple-600"> - {aulas.find(aula => aula.id_aula === a.id_aula)?.nombre || 'Aula'}</span>
                                                     )}
                                                     <span className="text-purple-600">)</span>
-                                                    <button 
+                                                    <Button
                                                         type="button" 
+                                                        variant="ghost"
+                                                        size="icon"
                                                         onClick={() => {
                                                             // Eliminar ambos (5to y 6to)
                                                             const indicesAEliminar = [index, index + 1];
                                                             setAssignments(prev => prev.filter((_, i) => !indicesAEliminar.includes(i)));
                                                         }} 
-                                                        className="text-purple-600 hover:text-purple-800 hover:bg-purple-200 rounded-full p-0.5 transition-colors"
+                                                        className="h-6 w-6 text-purple-600 hover:text-purple-800 hover:bg-purple-200"
                                                         disabled={isSubmitting}
                                                         title="Eliminar ambos grados"
                                                     >
-                                                        <CloseIcon />
-                                                    </button>
+                                                        <CloseIcon className="h-4 w-4" />
+                                                    </Button>
                                                 </span>
                                             );
                                         }
@@ -3652,53 +4376,54 @@ const TeacherFormModal: React.FC<{
                                                     <span className="text-blue-600"> - {aulas.find(aula => aula.id_aula === a.id_aula)?.nombre || 'Aula'}</span>
                                                 )}
                                                 <span className="text-blue-600">)</span>
-                                                <button 
+                                                <Button
                                                     type="button" 
+                                                    variant="ghost"
+                                                    size="icon"
                                                     onClick={() => handleRemoveAssignment(index)} 
-                                                    className="text-blue-600 hover:text-blue-800 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                                                    className="h-6 w-6 text-blue-600 hover:text-blue-800 hover:bg-blue-200"
                                                     disabled={isSubmitting}
                                                     title="Eliminar"
                                                 >
-                                                    <CloseIcon />
-                                                </button>
+                                                    <CloseIcon className="h-4 w-4" />
+                                                </Button>
                                             </span>
                                         );
                                     })}
                                 </div>
                             ) : (
-                                <p className="text-sm text-apple-gray font-light italic">No hay asignaturas agregadas. Agregue al menos una asignatura y grado.</p>
+                                <p className="text-sm text-muted-foreground font-light italic">No hay asignaturas agregadas. Agregue al menos una asignatura y grado.</p>
                             )}
                         </div>
                     </div>
 
-                    {/* Botones de acción */}
-                    <div className="flex flex-col sm:flex-row justify-end gap-4 mt-8 pt-6 border-t border-apple-gray-light flex-shrink-0">
-                        <button 
-                            type="button" 
-                            onClick={onClose} 
-                            className="w-full sm:w-auto px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg hover:bg-apple-gray-light transition-apple disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
-                            disabled={isSubmitting}
-                        >
-                            Cancelar
-                        </button>
-                        <button 
-                            type="submit" 
-                            className="w-full sm:w-auto px-6 py-3 bg-apple-blue text-white rounded-lg hover:opacity-90 transition-apple disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base font-medium"
-                            disabled={isSubmitting}
-                        >
-                            {isSubmitting ? (
-                                <>
-                                    <span className="animate-spin">⏳</span>
-                                    Guardando...
-                                </>
-                            ) : (
-                                'Guardar Cambios'
-                            )}
-                        </button>
-                    </div>
                 </form>
-            </div>
-        </div>
+                <DialogFooter className="px-6 pb-6 sm:px-0 sm:pb-0 mt-8">
+                    <Button 
+                        type="button" 
+                        variant="outline"
+                        onClick={onClose} 
+                        disabled={isSubmitting}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button 
+                        type="submit" 
+                        onClick={handleSubmit}
+                        disabled={isSubmitting}
+                    >
+                        {isSubmitting ? (
+                            <>
+                                <span className="animate-spin">⏳</span>
+                                Guardando...
+                            </>
+                        ) : (
+                            'Guardar Cambios'
+                        )}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 };
 
@@ -4628,9 +5353,12 @@ const LapsosAdminView: React.FC<{
 
     if (isLoading) {
         return (
-            <div className="mb-8">
-                <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
+            <div className="mb-8 space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[1, 2, 3, 4].map((i) => (
+                        <Skeleton key={i} className="h-32 w-full" />
+                    ))}
                 </div>
             </div>
         );
@@ -4912,42 +5640,6 @@ const LapsosAdminView: React.FC<{
                     </div>
                 </div>
             )}
-        </div>
-    );
-};
-
-const InputField: React.FC<{
-    label: string;
-    name: string;
-    value: string;
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
-    type?: string;
-    required?: boolean;
-    as?: 'textarea' | 'select';
-    rows?: number;
-    disabled?: boolean;
-    children?: React.ReactNode;
-}> = ({ label, name, value, onChange, type = 'text', required = false, as, rows, disabled, children }) => {
-    const commonProps = {
-        id: name,
-        name: name,
-        value: value,
-        onChange: onChange,
-        required: required,
-        disabled: disabled,
-        className: "mt-1 block w-full px-4 py-3 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple text-base placeholder:text-apple-gray disabled:bg-apple-gray-light disabled:cursor-not-allowed",
-    };
-    return (
-        <div>
-            <label htmlFor={name} className="block text-sm font-medium text-apple-gray-dark mb-2">
-                {label} {required && <span className="text-apple-red">*</span>}
-            </label>
-            {as === 'textarea'
-                ? <textarea {...commonProps} rows={rows} className={`${commonProps.className} resize-y`}></textarea>
-                : as === 'select'
-                ? <select {...commonProps}>{children}</select>
-                : <input type={type} {...commonProps} />
-            }
         </div>
     );
 };
@@ -9335,12 +10027,18 @@ const App: React.FC = () => {
 
           // Si hay un error de RLS, red o rate limiting, no hacer signOut
           if (authError) {
-            // Si es un error 429 (Too Many Requests), esperar y reintentar más tarde
+            // Si es un error 429 (Too Many Requests), esperar y no hacer signOut
             if (authError.code === 'PGRST301' || 
                 authError.message?.includes('429') || 
+                authError.message?.includes('rate limit') ||
                 authError.message?.includes('Too Many Requests')) {
-              console.warn('Rate limit reached (429). Will retry later. Maintaining session.');
-              // Mantener la sesión actual si existe
+              console.warn('Rate limit alcanzado (429). Manteniendo sesión, se reintentará más tarde.');
+              return; // No hacer signOut, solo esperar
+            }
+            
+            // Si es un error 500 o de servidor, no hacer signOut
+            if (authError.message?.includes('500') || authError.code === 'PGRST301') {
+              console.warn('Error del servidor, no se hará signOut');
               return;
             }
             
@@ -9349,14 +10047,14 @@ const App: React.FC = () => {
                 authError.message?.includes('406') ||
                 authError.message?.includes('permission') ||
                 authError.message?.includes('row-level security')) {
-              console.warn('Temporary error checking authorization, will not sign out user');
+              console.warn('Error temporal verificando autorización, no se hará signOut');
               return;
             }
             
             // Para otros errores desconocidos, también no hacer signOut automáticamente
             // Solo registrar el error (sin console.error para evitar spam)
             if (!authError.message?.includes('JWT') && !authError.message?.includes('token')) {
-              console.warn('Error checking authorization:', authError.message || authError.code);
+              console.warn('Error verificando autorización:', authError.message || authError.code);
             }
             return;
           }
@@ -9433,10 +10131,48 @@ const App: React.FC = () => {
 
     checkSession();
 
-    // Listen for auth state changes
+    // Listen for auth state changes (con throttling para evitar loops)
+    let lastAuthCheck = 0;
+    const AUTH_CHECK_THROTTLE = 2000; // 2 segundos entre verificaciones
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
+      } else if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+        // Throttle: solo verificar si pasaron al menos 2 segundos desde la última verificación
+        const now = Date.now();
+        if (now - lastAuthCheck < AUTH_CHECK_THROTTLE) {
+          return; // Saltar esta verificación
+        }
+        lastAuthCheck = now;
+        
+        // Verificar autorización solo si hay sesión
+        if (session?.user?.email) {
+          try {
+            const { data: authorizedUser } = await supabase
+              .from('authorized_users')
+              .select('*')
+              .eq('email', session.user.email.toLowerCase())
+              .maybeSingle();
+            
+            if (authorizedUser) {
+              const { data: userData } = await supabase.auth.getUser();
+              const fullName = userData.user?.user_metadata?.full_name || 
+                             userData.user?.user_metadata?.name || 
+                             session.user.email?.split('@')[0] || '';
+              
+              setCurrentUser({
+                id: session.user.id,
+                email: session.user.email,
+                role: authorizedUser.role as UserRole,
+                fullName: fullName,
+              });
+            }
+          } catch (error) {
+            console.error('Error en onAuthStateChange:', error);
+            // No hacer signOut por errores
+          }
+        }
       }
     });
 
@@ -9613,7 +10349,16 @@ const App: React.FC = () => {
       case 'evaluation':
         return <EvaluationView alumnos={alumnos} clases={clases} minutas={minutas} setMinutas={setMinutas} />;
       case 'authorized-users':
-        return <AuthorizedUsersView currentUser={currentUser!} />;
+        return (
+          <Suspense fallback={
+            <div className="space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-64 w-full" />
+            </div>
+          }>
+            <AuthorizedUsersView currentUser={currentUser!} />
+          </Suspense>
+        );
       case 'lapsos-admin':
         return <LapsosAdminView currentUser={currentUser!} />;
       default:
@@ -9636,15 +10381,27 @@ const App: React.FC = () => {
   };
 
   if (!currentUser) {
-    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+    return (
+      <Suspense fallback={
+        <div className="flex h-screen bg-background items-center justify-center">
+          <div className="text-center space-y-4 w-full max-w-md px-4">
+            <Skeleton className="h-12 w-12 mx-auto rounded-full" />
+            <Skeleton className="h-4 w-32 mx-auto" />
+          </div>
+        </div>
+      }>
+        <LoginScreen onLoginSuccess={handleLoginSuccess} />
+      </Suspense>
+    );
   }
 
   if (isLoadingData) {
     return (
-      <div className="flex h-screen bg-background-light items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando datos...</p>
+      <div className="flex h-screen bg-background items-center justify-center">
+        <div className="text-center space-y-4 w-full max-w-md px-4">
+          <Skeleton className="h-12 w-12 mx-auto rounded-full" />
+          <Skeleton className="h-4 w-32 mx-auto" />
+          <Skeleton className="h-4 w-48 mx-auto" />
         </div>
       </div>
     );
@@ -9652,17 +10409,18 @@ const App: React.FC = () => {
 
   if (dataError) {
     return (
-      <div className="flex h-screen bg-background-light items-center justify-center">
-        <div className="bg-white p-6 rounded-lg shadow-md max-w-md">
-          <h2 className="text-xl font-bold text-red-600 mb-2">Error al cargar datos</h2>
-          <p className="text-gray-600 mb-4">{dataError}</p>
-          <button
-            onClick={() => loadAllData()}
-            className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-green-600"
-          >
-            Reintentar
-          </button>
-        </div>
+      <div className="flex h-screen bg-background items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-6">
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Error al cargar datos</AlertTitle>
+              <AlertDescription>{dataError}</AlertDescription>
+            </Alert>
+            <Button onClick={() => loadAllData()} className="w-full">
+              Reintentar
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

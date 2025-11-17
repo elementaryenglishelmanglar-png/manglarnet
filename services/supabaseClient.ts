@@ -18,13 +18,23 @@ const getEnvVar = (viteKey: string, nextKey: string): string => {
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL');
 const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY');
 
+// Log environment variables status (solo en desarrollo)
+if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+  console.log('🔧 Supabase Config Check:');
+  console.log('  VITE_SUPABASE_URL:', supabaseUrl ? '✅ Configurado' : '❌ No configurado');
+  console.log('  VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '✅ Configurado' : '❌ No configurado');
+  if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
+    console.log('  URL:', supabaseUrl);
+  }
+}
+
 // Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
   const errorMsg = '❌ ERROR: Variables de entorno de Supabase no configuradas.\n\n' +
-    'Por favor configura las siguientes variables en Vercel:\n' +
-    '- VITE_SUPABASE_URL\n' +
-    '- VITE_SUPABASE_ANON_KEY\n\n' +
-    'Ve a: Settings > Environment Variables en tu proyecto de Vercel';
+    'Por favor crea un archivo .env.local en la raíz del proyecto con:\n' +
+    'VITE_SUPABASE_URL=https://tu-proyecto.supabase.co\n' +
+    'VITE_SUPABASE_ANON_KEY=tu-anon-key\n\n' +
+    'Luego reinicia el servidor de desarrollo (npm run dev)';
   
   console.error(errorMsg);
 }
@@ -41,11 +51,17 @@ export const supabase = createClient(finalUrl, finalKey, {
     persistSession: !!supabaseUrl && !!supabaseAnonKey,
     detectSessionInUrl: !!supabaseUrl && !!supabaseAnonKey,
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-    flowType: 'pkce'
+    flowType: 'pkce',
+    // Asegurar que el apikey se envíe en todas las peticiones de auth
+    debug: false
+  },
+  db: {
+    schema: 'public'
   },
   global: {
     headers: {
-      'apikey': finalKey
+      'apikey': finalKey,
+      'Authorization': `Bearer ${finalKey}`
     }
   }
 });

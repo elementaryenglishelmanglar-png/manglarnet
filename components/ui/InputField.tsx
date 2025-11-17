@@ -1,6 +1,9 @@
-'use client';
-
 import React from 'react';
+import { Input } from './input';
+import { Label } from './label';
+import { Textarea } from './textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
+import { cn } from '@/lib/utils';
 
 interface InputFieldProps {
   label: string;
@@ -13,6 +16,8 @@ interface InputFieldProps {
   rows?: number;
   disabled?: boolean;
   children?: React.ReactNode;
+  placeholder?: string;
+  className?: string;
 }
 
 export const InputField: React.FC<InputFieldProps> = ({ 
@@ -25,30 +30,62 @@ export const InputField: React.FC<InputFieldProps> = ({
   as, 
   rows, 
   disabled, 
-  children 
+  children,
+  placeholder,
+  className
 }) => {
-  const commonProps = {
-    id: name,
-    name: name,
-    value: value,
-    onChange: onChange,
-    required: required,
-    disabled: disabled,
-    className: "mt-1 block w-full px-4 py-3 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple text-base placeholder:text-apple-gray disabled:bg-apple-gray-light disabled:cursor-not-allowed",
-  };
-  
   return (
-    <div>
-      <label htmlFor={name} className="block text-sm font-medium text-apple-gray-dark mb-2">
-        {label} {required && <span className="text-apple-red">*</span>}
-      </label>
-      {as === 'textarea'
-        ? <textarea {...commonProps} rows={rows} className={`${commonProps.className} resize-y`}></textarea>
-        : as === 'select'
-        ? <select {...commonProps}>{children}</select>
-        : <input {...commonProps} type={type} />
-      }
+    <div className={cn("space-y-2", className)}>
+      <Label htmlFor={name} className="text-sm font-medium">
+        {label} {required && <span className="text-destructive">*</span>}
+      </Label>
+      {as === 'textarea' ? (
+        <Textarea
+          id={name}
+          name={name}
+          value={value}
+          onChange={onChange}
+          required={required}
+          disabled={disabled}
+          rows={rows}
+          placeholder={placeholder}
+          className="min-h-[80px]"
+        />
+      ) : as === 'select' ? (
+        <Select value={value} onValueChange={(val) => {
+          const event = {
+            target: { name, value: val }
+          } as React.ChangeEvent<HTMLSelectElement>;
+          onChange(event);
+        }}>
+          <SelectTrigger id={name} disabled={disabled} className="w-full">
+            <SelectValue placeholder={placeholder || `Selecciona ${label.toLowerCase()}`} />
+          </SelectTrigger>
+          <SelectContent>
+            {React.Children.map(children, (child) => {
+              if (React.isValidElement(child) && child.type === 'option') {
+                return (
+                  <SelectItem key={child.props.value} value={child.props.value}>
+                    {child.props.children}
+                  </SelectItem>
+                );
+              }
+              return child;
+            })}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Input
+          id={name}
+          name={name}
+          type={type}
+          value={value}
+          onChange={onChange}
+          required={required}
+          disabled={disabled}
+          placeholder={placeholder}
+        />
+      )}
     </div>
   );
 };
-

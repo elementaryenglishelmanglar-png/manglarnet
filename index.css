@@ -1,67 +1,125 @@
 /* ============================================
    MANGULARNET - FILOSOFÍA DE DISEÑO APPLE
+   CON SHADCN/UI
    ============================================ */
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* 1. Reset de Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 2. Capa base de Apple (Filosofía Apple) */
+@layer base {
+  :root {
+    /* 3. Paleta Monocromática (para shadcn/ui) */
+    --background: 240 5% 96%; /* #f5f5f7 (Gris Apple) */
+    --foreground: 240 6% 12%; /* #1d1d1f (Gris oscuro Apple) */
+    
+    --card: 240 10% 100%; /* Blanco */
+    --card-foreground: 240 6% 12%;
+    
+    --popover: 240 10% 100%;
+    --popover-foreground: 240 6% 12%;
+    
+    --primary: 217 91% 60%; /* #007AFF (Azul Apple para acciones) */
+    --primary-foreground: 210 40% 98%;
+    
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 12%;
+    
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 12%;
+    
+    --destructive: 0 84% 60%; /* Rojo para peligro */
+    --destructive-foreground: 210 40% 98%;
+    
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 217 91% 60%;
+    
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    letter-spacing: -0.01em;
+  }
+
+  /* 4. Jerarquía de Tipografía (Fuente Poppins) */
+  h1 {
+    @apply font-bold text-3xl tracking-tight;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    @apply font-semibold text-xl tracking-tight;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    @apply font-semibold text-lg;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  p {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 400;
+    line-height: 1.6;
+  }
+
+  /* 5. Fuentes Poppins personalizadas */
+  .font-poppins-light {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 300;
+  }
+
+  .font-poppins-regular {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 400;
+  }
+
+  .font-poppins-semibold {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+  }
+
+  .font-poppins-bold {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+  }
 }
 
-body {
-  font-family: 'Poppins', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  background-color: #FFFFFF;
-  color: #1D1D1F;
-  letter-spacing: -0.01em;
-}
+/* ============================================
+   UTILIDADES GLOBALES APPLE
+   ============================================ */
 
 #root {
   width: 100%;
   min-height: 100vh;
 }
 
-/* ============================================
-   JERARQUÍA TIPOGRÁFICA APPLE
-   ============================================ */
-h1 {
-  font-family: 'Poppins', sans-serif;
-  font-weight: 700;
-  font-size: 2.5rem;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  color: #1D1D1F;
-}
-
-h2 {
-  font-family: 'Poppins', sans-serif;
-  font-weight: 600;
-  font-size: 1.5rem;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-  color: #1D1D1F;
-}
-
-h3 {
-  font-family: 'Poppins', sans-serif;
-  font-weight: 600;
-  font-size: 1.25rem;
-  line-height: 1.3;
-  color: #1D1D1F;
-}
-
-p, body {
-  font-family: 'Poppins', sans-serif;
-  font-weight: 400;
-  color: #1D1D1F;
-  line-height: 1.6;
-}
-
 .text-secondary {
-  font-weight: 300;
-  color: #86868B;
+  @apply font-light text-muted-foreground;
 }
 
 /* ============================================
@@ -73,16 +131,16 @@ p, body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #F5F5F7;
+  background: hsl(var(--background));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #86868B;
+  background: hsl(var(--muted-foreground));
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #1D1D1F;
+  background: hsl(var(--foreground));
 }
 
 /* ============================================
@@ -190,7 +248,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid #007AFF;
+  outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
   outline-style: solid;
 }

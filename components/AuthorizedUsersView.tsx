@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, AuthorizedUser } from '../services/supabaseClient';
-import { PlusIcon, EditIcon, DeleteIcon, CloseIcon } from './Icons';
+import { PlusIcon, EditIcon, DeleteIcon } from './Icons';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Card, CardContent } from './ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Badge } from './ui/badge';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Skeleton } from './ui/skeleton';
 
 interface AuthorizedUsersViewProps {
   currentUser: { id: string; email: string; role: string };
@@ -104,6 +113,7 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
     if (!window.confirm(`¿Está seguro de que desea eliminar el acceso de ${userEmail}?`)) {
       return;
     }
+    // TODO: Reemplazar con Dialog de confirmación más adelante
 
     try {
       const { error: deleteError } = await supabase
@@ -130,17 +140,45 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
     administrativo: 'Administrativo',
   };
 
-  const roleColors: Record<AuthorizedUser['role'], string> = {
-    docente: 'bg-blue-100 text-blue-800',
-    coordinador: 'bg-purple-100 text-purple-800',
-    directivo: 'bg-green-100 text-green-800',
-    administrativo: 'bg-gray-100 text-gray-800',
+  const getRoleBadgeVariant = (role: AuthorizedUser['role']): "default" | "secondary" | "destructive" | "outline" => {
+    switch (role) {
+      case 'directivo': return 'default';
+      case 'coordinador': return 'secondary';
+      case 'docente': return 'outline';
+      case 'administrativo': return 'secondary';
+      default: return 'outline';
+    }
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <Skeleton className="h-8 w-48 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <Skeleton className="h-10 w-40" />
+        </div>
+        <Card>
+          <CardContent className="p-4 sm:p-6">
+            <Skeleton className="h-10 w-full mb-4" />
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <Card key={i}>
+                  <CardContent className="p-4">
+                    <Skeleton className="h-6 w-48 mb-2" />
+                    <Skeleton className="h-4 w-32 mb-3" />
+                    <div className="flex gap-2">
+                      <Skeleton className="h-9 flex-1" />
+                      <Skeleton className="h-9 flex-1" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -149,205 +187,197 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Usuarios Autorizados</h2>
-          <p className="text-sm sm:text-base text-gray-600 mt-1">Gestiona quién puede acceder al sistema</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground">Usuarios Autorizados</h2>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">Gestiona quién puede acceder al sistema</p>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl hover:bg-opacity-90 font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale"
-        >
-          <PlusIcon />
+        <Button onClick={() => handleOpenModal()} className="w-full sm:w-auto">
+          <PlusIcon className="h-4 w-4 mr-2" />
           Agregar Usuario
-        </button>
+        </Button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6">
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Buscar por correo electrónico..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base placeholder:text-gray-400"
-          />
-        </div>
+      <Card>
+        <CardContent className="p-4 sm:p-6">
+          <div className="mb-4">
+            <Input
+              type="text"
+              placeholder="Buscar por correo electrónico..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full"
+            />
+          </div>
 
-        {/* Mobile Card View */}
-        <div className="md:hidden space-y-4">
-          {filteredUsers.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              {searchTerm ? 'No se encontraron usuarios' : 'No hay usuarios autorizados'}
-            </div>
-          ) : (
-            filteredUsers.map((user) => (
-              <div key={user.id} className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:shadow-md transition-smooth hover-lift">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-900 text-sm">{user.email}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {new Date(user.created_at).toLocaleDateString('es-VE')}
-                    </p>
-                  </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
-                    {roleLabels[user.role]}
-                  </span>
-                </div>
-                <div className="flex gap-2 pt-3 border-t border-gray-200">
-                  <button
-                    onClick={() => handleOpenModal(user)}
-                    className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 text-sm font-medium transition-colors flex items-center justify-center gap-1"
-                  >
-                    <EditIcon />
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(user.id, user.email)}
-                    className="flex-1 px-3 py-2 bg-red-50 text-red-700 rounded-md hover:bg-red-100 text-sm font-medium transition-colors flex items-center justify-center gap-1"
-                  >
-                    <DeleteIcon />
-                    Eliminar
-                  </button>
-                </div>
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-4">
+            {filteredUsers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {searchTerm ? 'No se encontraron usuarios' : 'No hay usuarios autorizados'}
               </div>
-            ))
-          )}
-        </div>
-
-        {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Correo Electrónico</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Rol</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Fecha de Registro</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-8 text-gray-500">
-                    {searchTerm ? 'No se encontraron usuarios' : 'No hay usuarios autorizados'}
-                  </td>
-                </tr>
-              ) : (
-                filteredUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-smooth">
-                    <td className="py-3 px-4 text-gray-800">{user.email}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
-                        {roleLabels[user.role]}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-gray-600 text-sm">
-                      {new Date(user.created_at).toLocaleDateString('es-VE')}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => handleOpenModal(user)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                          title="Editar"
-                        >
-                          <EditIcon />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(user.id, user.email)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded"
-                          title="Eliminar"
-                        >
-                          <DeleteIcon />
-                        </button>
+            ) : (
+              filteredUsers.map((user) => (
+                <Card key={user.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <p className="font-semibold text-foreground text-sm">{user.email}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(user.created_at).toLocaleDateString('es-VE')}
+                        </p>
                       </div>
+                      <Badge variant={getRoleBadgeVariant(user.role)}>
+                        {roleLabels[user.role]}
+                      </Badge>
+                    </div>
+                    <div className="flex gap-2 pt-3 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenModal(user)}
+                        className="flex-1"
+                      >
+                        <EditIcon className="h-4 w-4 mr-1" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(user.id, user.email)}
+                        className="flex-1"
+                      >
+                        <DeleteIcon className="h-4 w-4 mr-1" />
+                        Eliminar
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 px-4 font-semibold text-foreground">Correo Electrónico</th>
+                  <th className="text-left py-3 px-4 font-semibold text-foreground">Rol</th>
+                  <th className="text-left py-3 px-4 font-semibold text-foreground">Fecha de Registro</th>
+                  <th className="text-right py-3 px-4 font-semibold text-foreground">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-center py-8 text-muted-foreground">
+                      {searchTerm ? 'No se encontraron usuarios' : 'No hay usuarios autorizados'}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  filteredUsers.map((user) => (
+                    <tr key={user.id} className="border-b hover:bg-accent/50 transition-colors">
+                      <td className="py-3 px-4 text-foreground">{user.email}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
+                          {roleLabels[user.role]}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground text-sm">
+                        {new Date(user.created_at).toLocaleDateString('es-VE')}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenModal(user)}
+                            title="Editar"
+                          >
+                            <EditIcon className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(user.id, user.email)}
+                            title="Eliminar"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <DeleteIcon className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-        <div className="mt-4 text-sm text-gray-600">
-          Total: {filteredUsers.length} usuario(s) autorizado(s)
-        </div>
-      </div>
+          <div className="mt-4 text-sm text-muted-foreground">
+            Total: {filteredUsers.length} usuario(s) autorizado(s)
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-0 sm:p-4 animate-fade-in">
-          <div className="bg-white rounded-none sm:rounded-2xl shadow-xl max-w-md w-full h-full sm:h-auto sm:mx-4 flex flex-col glass animate-fade-in">
-            <div className="flex justify-between items-center p-4 sm:p-6 border-b flex-shrink-0">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800">
-                {editingUser ? 'Editar Usuario' : 'Agregar Usuario'}
-              </h3>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 p-1"
-              >
-                <CloseIcon />
-              </button>
-            </div>
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingUser ? 'Editar Usuario' : 'Agregar Usuario'}</DialogTitle>
+          </DialogHeader>
 
-            <div className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm">
-                  {error}
-                </div>
+          <div className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Correo Electrónico</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="usuario@ejemplo.com"
+                disabled={!!editingUser}
+              />
+              {editingUser && (
+                <p className="text-xs text-muted-foreground">El correo no puede ser modificado</p>
               )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Correo Electrónico
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base placeholder:text-gray-400 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  placeholder="usuario@ejemplo.com"
-                  disabled={!!editingUser}
-                />
-                {editingUser && (
-                  <p className="mt-1 text-xs text-gray-500">El correo no puede ser modificado</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Rol
-                </label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as AuthorizedUser['role'] })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-smooth text-base"
-                >
-                  <option value="docente">Docente</option>
-                  <option value="coordinador">Coordinador</option>
-                  <option value="directivo">Directivo</option>
-                  <option value="administrativo">Administrativo</option>
-                </select>
-              </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row justify-end gap-3 p-4 sm:p-6 border-t flex-shrink-0">
-              <button
-                onClick={handleCloseModal}
-                className="w-full sm:w-auto px-6 py-3 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-smooth text-base font-medium"
+            <div className="space-y-2">
+              <Label htmlFor="role">Rol</Label>
+              <Select
+                value={formData.role}
+                onValueChange={(value) => setFormData({ ...formData, role: value as AuthorizedUser['role'] })}
               >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                className="w-full sm:w-auto px-6 py-3 bg-brand-primary text-white rounded-xl hover:bg-opacity-90 font-semibold shadow-md hover:shadow-lg transition-smooth hover-scale text-base"
-              >
-                {editingUser ? 'Guardar Cambios' : 'Agregar Usuario'}
-              </button>
+                <SelectTrigger id="role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="docente">Docente</SelectItem>
+                  <SelectItem value="coordinador">Coordinador</SelectItem>
+                  <SelectItem value="directivo">Directivo</SelectItem>
+                  <SelectItem value="administrativo">Administrativo</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </div>
-      )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseModal}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave}>
+              {editingUser ? 'Guardar Cambios' : 'Agregar Usuario'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
-
