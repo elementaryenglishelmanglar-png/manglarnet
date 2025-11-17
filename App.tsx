@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './components/ui/dialog';
+import { Input } from './components/ui/input';
 import { InputField } from './components/ui/InputField';
 import { Separator } from './components/ui/separator';
 import { Skeleton } from './components/ui/skeleton';
@@ -25,7 +26,8 @@ const CheckIcon = () => (
 import { getAIPlanSuggestions, getAIEvaluationAnalysis } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
 // Lazy loading para componentes pesados
-const LoginScreen = lazy(() => import('./components/LoginScreen').then(module => ({ default: module.LoginScreen })));
+// LoginScreen deshabilitado - plataforma abierta
+// const LoginScreen = lazy(() => import('./components/LoginScreen').then(module => ({ default: module.LoginScreen })));
 const AuthorizedUsersView = lazy(() => import('./components/AuthorizedUsersView').then(module => ({ default: module.AuthorizedUsersView })));
 import { marked } from 'marked';
 import html2canvas from 'html2canvas';
@@ -1930,23 +1932,39 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
     // Obtener opciones únicas para filtros
     const uniqueLapsos = useMemo(() => ['I Lapso', 'II Lapso', 'III Lapso'], []);
     const uniqueAnosEscolares = useMemo(() => {
-        const anos = new Set(minutas.map(m => m.ano_escolar));
+        const anos = new Set(minutas
+            .map(m => m.ano_escolar)
+            .filter(a => a && a.trim() !== '') // Filtrar valores vacíos
+        );
         return Array.from(anos).sort();
     }, [minutas]);
     const uniqueEvaluaciones = useMemo(() => {
-        const evaluaciones = new Set(minutas.map(m => m.evaluacion));
+        const evaluaciones = new Set(minutas
+            .map(m => m.evaluacion)
+            .filter(e => e && e.trim() !== '') // Filtrar valores vacíos
+        );
         return ['Todas', ...Array.from(evaluaciones).sort()];
     }, [minutas]);
     const uniqueGrados = useMemo(() => {
-        const grados = new Set([...minutas.map(m => m.grado), ...alumnos.map(a => a.salon)]);
+        const grados = new Set([
+            ...minutas.map(m => m.grado).filter(g => g && g.trim() !== ''),
+            ...alumnos.map(a => a.salon).filter(s => s && s.trim() !== '')
+        ]);
         return ['Todos', ...Array.from(grados).sort()];
     }, [minutas, alumnos]);
     const uniqueMaterias = useMemo(() => {
-        const materias = new Set([...minutas.map(m => m.materia), ...clases.map(c => c.nombre_materia)]);
+        const materias = new Set([
+            ...minutas.map(m => m.materia).filter(m => m && m.trim() !== ''),
+            ...clases.map(c => c.nombre_materia).filter(m => m && m.trim() !== '')
+        ]);
         return ['Todas', ...Array.from(materias).sort()];
     }, [minutas, clases]);
     const uniqueDocentes = useMemo(() => {
-        return ['Todos', ...docentes.map(d => `${d.nombres} ${d.apellidos}`).sort()];
+        const docentesList = docentes
+            .map(d => `${d.nombres} ${d.apellidos}`.trim())
+            .filter(d => d !== '') // Filtrar valores vacíos
+            .sort();
+        return ['Todos', ...docentesList];
     }, [docentes]);
 
     if (isLoading) {
@@ -1976,9 +1994,11 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {uniqueLapsos.map(lapso => (
-                                        <SelectItem key={lapso} value={lapso}>{lapso}</SelectItem>
-                                    ))}
+                                    {uniqueLapsos
+                                        .filter(lapso => lapso && lapso.trim() !== '') // Filtrar valores vacíos
+                                        .map(lapso => (
+                                            <SelectItem key={lapso} value={lapso}>{lapso}</SelectItem>
+                                        ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -1990,9 +2010,11 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="Todos">Todos</SelectItem>
-                                    {uniqueAnosEscolares.map(ano => (
-                                        <SelectItem key={ano} value={ano}>{ano}</SelectItem>
-                                    ))}
+                                    {uniqueAnosEscolares
+                                        .filter(ano => ano && ano.trim() !== '') // Filtrar valores vacíos
+                                        .map(ano => (
+                                            <SelectItem key={ano} value={ano}>{ano}</SelectItem>
+                                        ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -2003,9 +2025,11 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {uniqueEvaluaciones.map(evaluacion => (
-                                        <SelectItem key={evaluacion} value={evaluacion}>{evaluacion}</SelectItem>
-                                    ))}
+                                    {uniqueEvaluaciones
+                                        .filter(evaluacion => evaluacion && evaluacion.trim() !== '') // Filtrar valores vacíos
+                                        .map(evaluacion => (
+                                            <SelectItem key={evaluacion} value={evaluacion}>{evaluacion}</SelectItem>
+                                        ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -2016,9 +2040,11 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {uniqueGrados.map(grado => (
-                                        <SelectItem key={grado} value={grado}>{grado}</SelectItem>
-                                    ))}
+                                    {uniqueGrados
+                                        .filter(grado => grado && grado.trim() !== '') // Filtrar valores vacíos
+                                        .map(grado => (
+                                            <SelectItem key={grado} value={grado}>{grado}</SelectItem>
+                                        ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -2029,9 +2055,11 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {uniqueMaterias.map(materia => (
-                                        <SelectItem key={materia} value={materia}>{materia}</SelectItem>
-                                    ))}
+                                    {uniqueMaterias
+                                        .filter(materia => materia && materia.trim() !== '') // Filtrar valores vacíos
+                                        .map(materia => (
+                                            <SelectItem key={materia} value={materia}>{materia}</SelectItem>
+                                        ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -2042,9 +2070,11 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {uniqueDocentes.map(docente => (
-                                        <SelectItem key={docente} value={docente}>{docente}</SelectItem>
-                                    ))}
+                                    {uniqueDocentes
+                                        .filter(docente => docente && docente.trim() !== '') // Filtrar valores vacíos
+                                        .map(docente => (
+                                            <SelectItem key={docente} value={docente}>{docente}</SelectItem>
+                                        ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -10393,13 +10423,25 @@ const App: React.FC = () => {
   };
 
   // Login deshabilitado - plataforma abierta
-  // if (!currentUser) {
-  //   return (
-  //     <Suspense fallback={...}>
-  //       <LoginScreen onLoginSuccess={handleLoginSuccess} />
-  //     </Suspense>
-  //   );
-  // }
+  // Asegurar que siempre haya un usuario (nunca mostrar login)
+  if (!currentUser) {
+    // Si por alguna razón currentUser es null, establecer el usuario por defecto
+    setCurrentUser({
+      id: 'default-user-id',
+      email: 'usuario@elmanglar.edu',
+      role: 'coordinador' as UserRole,
+      fullName: 'Usuario del Sistema',
+    });
+    // Retornar loading mientras se establece
+    return (
+      <div className="flex h-screen bg-background items-center justify-center">
+        <div className="text-center space-y-4 w-full max-w-md px-4">
+          <Skeleton className="h-12 w-12 mx-auto rounded-full" />
+          <Skeleton className="h-4 w-32 mx-auto" />
+        </div>
+      </div>
+    );
+  }
 
   if (isLoadingData) {
     return (
