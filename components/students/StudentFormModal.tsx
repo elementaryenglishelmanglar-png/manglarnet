@@ -37,12 +37,12 @@ export default function StudentFormModal({ student, onClose, onSave }: StudentFo
     },
     nivel_ingles: student?.nivel_ingles || 'Basic',
   });
-  
+
   const [hermanosStr, setHermanosStr] = useState(student?.hermanos?.join(', ') || '');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
+
     if (name.includes('.')) {
       const [parent, child] = name.split('.');
       setFormData(prev => ({
@@ -56,7 +56,7 @@ export default function StudentFormModal({ student, onClose, onSave }: StudentFo
       setFormData(prev => ({ ...prev, [name]: value as any }));
     }
   };
-  
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const finalStudentData: Alumno = {
@@ -74,8 +74,8 @@ export default function StudentFormModal({ student, onClose, onSave }: StudentFo
           <h2 className="text-2xl sm:text-3xl font-bold text-apple-gray-dark tracking-tight">
             {student ? 'Editar Alumno' : 'Añadir Alumno'}
           </h2>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="p-2 text-apple-gray hover:text-apple-gray-dark transition-apple rounded-lg hover:bg-apple-gray-light"
           >
             <CloseIcon />
@@ -90,79 +90,79 @@ export default function StudentFormModal({ student, onClose, onSave }: StudentFo
               <InputField label="Apellidos" name="apellidos" value={formData.apellidos} onChange={handleChange} required />
               <InputField label="Email Alumno" name="email_alumno" type="email" value={formData.email_alumno} onChange={handleChange} required />
               <InputField label="Fecha de Nacimiento" name="fecha_nacimiento" type="date" value={formData.fecha_nacimiento} onChange={handleChange} required />
-              <InputField 
-                as="select" 
-                label="Género" 
-                name="genero" 
-                value={formData.genero} 
+              <InputField
+                as="select"
+                label="Género"
+                name="genero"
+                value={formData.genero}
                 onChange={handleChange}
               >
-                <option>Niño</option>
-                <option>Niña</option>
+                <option value="Niño">Niño</option>
+                <option value="Niña">Niña</option>
               </InputField>
               <InputField label="Lugar de Nacimiento" name="lugar_nacimiento" value={formData.lugar_nacimiento} onChange={handleChange} />
               <InputField label="Estado" name="estado" value={formData.estado} onChange={handleChange} />
             </div>
           </div>
-          
+
           {/* Academic Info */}
           <div className="border-b border-apple-gray-light pb-8">
             <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight">Datos Académicos</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <InputField label="Cédula Escolar" name="cedula_escolar" value={formData.cedula_escolar} onChange={handleChange} />
-              <InputField 
-                as="select" 
-                label="Salón/Grado" 
-                name="salon" 
-                value={formData.salon} 
+              <InputField
+                as="select"
+                label="Salón/Grado"
+                name="salon"
+                value={formData.salon}
                 onChange={handleChange}
               >
                 {GRADOS.map(g => (
                   <option key={g} value={g}>{g}</option>
                 ))}
               </InputField>
-              <InputField 
-                as="select" 
-                label="Grupo" 
-                name="grupo" 
-                value={formData.grupo} 
+              <InputField
+                as="select"
+                label="Grupo"
+                name="grupo"
+                value={formData.grupo}
                 onChange={handleChange}
               >
-                <option>Grupo 1</option>
-                <option>Grupo 2</option>
+                <option value="Grupo 1">Grupo 1</option>
+                <option value="Grupo 2">Grupo 2</option>
               </InputField>
-              <InputField 
-                as="select" 
-                label="Condición" 
-                name="condicion" 
-                value={formData.condicion} 
+              <InputField
+                as="select"
+                label="Condición"
+                name="condicion"
+                value={formData.condicion}
                 onChange={handleChange}
               >
-                <option>Regular</option>
-                <option>Nuevo Ingreso</option>
+                <option value="Regular">Regular</option>
+                <option value="Nuevo Ingreso">Nuevo Ingreso</option>
               </InputField>
-              <InputField 
-                as="select" 
-                label="Nivel de Inglés" 
-                name="nivel_ingles" 
-                value={formData.nivel_ingles} 
+              <InputField
+                as="select"
+                label="Nivel de Inglés"
+                name="nivel_ingles"
+                value={formData.nivel_ingles}
                 onChange={handleChange}
               >
-                <option>Basic</option>
-                <option>Lower</option>
-                <option>Upper</option>
-                <option>Advanced</option>
-                <option>IB</option>
+                <option value="Basic">Basic</option>
+                <option value="Lower">Lower</option>
+                <option value="Upper">Upper</option>
+                <option value="Advanced">Advanced</option>
+                <option value="IB">IB</option>
               </InputField>
-              <InputField 
-                label="Hermanos (separados por coma)" 
-                name="hermanos" 
-                value={hermanosStr} 
-                onChange={(e) => setHermanosStr(e.target.value)} 
+              <InputField
+                label="Hermanos (separados por coma)"
+                name="hermanos"
+                value={hermanosStr}
+                onChange={(e) => setHermanosStr(e.target.value)}
               />
             </div>
           </div>
-          
+
           {/* Parent Info */}
           <div>
             <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight">Datos de Representantes</h3>
@@ -181,18 +181,18 @@ export default function StudentFormModal({ student, onClose, onSave }: StudentFo
               </div>
             </div>
           </div>
-          
+
           {/* Actions */}
           <div className="flex flex-col sm:flex-row justify-end gap-4 mt-8 pt-6 border-t border-apple-gray-light flex-shrink-0">
-            <button 
-              type="button" 
-              onClick={onClose} 
+            <button
+              type="button"
+              onClick={onClose}
               className="w-full sm:w-auto px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg text-base font-medium transition-apple hover:bg-apple-gray-light"
             >
               Cancelar
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="w-full sm:w-auto px-6 py-3 bg-apple-blue text-white rounded-lg text-base font-medium transition-apple hover:opacity-90"
             >
               Guardar Alumno

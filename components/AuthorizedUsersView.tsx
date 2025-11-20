@@ -84,8 +84,13 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
       return;
     }
 
-    if (!editingUser && !formData.password.trim()) {
+    if (!formData.password.trim()) {
       setError('La contraseña es requerida para nuevos usuarios');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
 
@@ -120,7 +125,7 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
       } else {
         // Create new user - use signUp to create in Supabase Auth, then in usuarios table
         const authEmail = email || `${username}@manglarnet.local`;
-        
+
         // Create user in Supabase Auth using signUp
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: authEmail,
@@ -157,12 +162,38 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
           if (insertError.code === '23505') {
             throw new Error('Este nombre de usuario ya está registrado');
           }
-          throw insertError;
+          console.error('Error inserting into usuarios table:', insertError);
+          throw new Error(`Error al crear usuario en la base de datos: ${insertError.message}`);
+        }
+
+        // If role is docente, create entry in docentes table
+        if (formData.role === 'docente') {
+          const { error: docenteError } = await supabase
+            .from('docentes')
+            .insert({
+              id_usuario: authData.user.id,
+              nombres: username,
+              apellidos: '',
+              email: email || authEmail,
+              activo: true,
+            });
+
+          if (docenteError) {
+            console.warn('Warning: Could not create docente entry:', docenteError);
+            // Don't fail the entire operation, just log the warning
+          }
         }
       }
 
       await loadUsuarios();
       handleCloseModal();
+
+      // Show success message
+      if (!editingUser) {
+        alert(`✅ Usuario "${username}" creado exitosamente con rol ${formData.role}`);
+      } else {
+        alert(`✅ Usuario "${username}" actualizado exitosamente`);
+      }
     } catch (err: any) {
       console.error('Error saving user:', err);
       setError(err.message || 'Error al guardar usuario');
