@@ -3267,11 +3267,21 @@ const StudentListView: React.FC<{
         <div className="mb-8">
             <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-bold text-apple-gray-dark tracking-tight">Lista de Alumnos</h2>
-                <button onClick={onAddStudent} className="flex items-center gap-2 bg-apple-blue text-white px-6 py-3 rounded-lg hover:opacity-90 text-sm sm:text-base font-medium min-h-[44px] transition-apple">
-                    <PlusIcon />
-                    <span className="hidden sm:inline">Añadir Alumno</span>
-                    <span className="sm:hidden">Añadir</span>
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setIsBulkImportOpen(true)}
+                        className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:opacity-90 text-sm sm:text-base font-medium min-h-[44px] transition-apple"
+                    >
+                        📤
+                        <span className="hidden sm:inline">Importar Excel</span>
+                        <span className="sm:hidden">Importar</span>
+                    </button>
+                    <button onClick={onAddStudent} className="flex items-center gap-2 bg-apple-blue text-white px-6 py-3 rounded-lg hover:opacity-90 text-sm sm:text-base font-medium min-h-[44px] transition-apple">
+                        <PlusIcon />
+                        <span className="hidden sm:inline">Añadir Alumno</span>
+                        <span className="sm:hidden">Añadir</span>
+                    </button>
+                </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 mb-8">
                 <div className="relative flex-grow">
