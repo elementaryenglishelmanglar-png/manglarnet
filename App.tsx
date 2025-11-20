@@ -29,6 +29,7 @@ import { supabase } from './services/supabaseClient';
 // Lazy loading para componentes pesados
 const LoginScreen = lazy(() => import('./components/LoginScreen').then(module => ({ default: module.LoginScreen })));
 const AuthorizedUsersView = lazy(() => import('./components/AuthorizedUsersView').then(module => ({ default: module.AuthorizedUsersView })));
+import BulkImportModal from './components/students/BulkImportModal';
 import { marked } from 'marked';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -9980,6 +9981,7 @@ const App: React.FC = () => {
 
     // Data states - loaded from Supabase
     const [alumnos, setAlumnos] = useState<Alumno[]>([]);
+    const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
     const [docentes, setDocentes] = useState<Docente[]>([]);
     const [clases, setClases] = useState<Clase[]>([]);
     const [planificaciones, setPlanificaciones] = useState<Planificacion[]>([]);
@@ -10687,6 +10689,15 @@ const App: React.FC = () => {
                     student={editingStudent}
                     onClose={handleCloseStudentModal}
                     onSave={handleSaveStudent}
+                />
+            )}
+            {isBulkImportOpen && (
+                <BulkImportModal
+                    isOpen={isBulkImportOpen}
+                    onClose={() => setIsBulkImportOpen(false)}
+                    onSuccess={() => {
+                        loadAlumnos(); // Reload students after successful import
+                    }}
                 />
             )}
         </div>
