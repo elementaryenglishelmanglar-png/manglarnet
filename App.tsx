@@ -10572,9 +10572,9 @@ const App: React.FC = () => {
             case 'students':
                 return <StudentListView
                     students={alumnos}
-                    onSelectStudent={handleSelectStudent}
-                    onAddStudent={handleAddStudent}
-                    onEditStudent={handleEditStudent}
+                    onSelectStudent={setSelectedStudent}
+                    onAddStudent={() => handleOpenStudentModal(null)}
+                    onEditStudent={handleOpenStudentModal}
                     onDeleteStudent={handleDeleteStudent}
                     onOpenBulkImport={() => {
                         console.log('🟢 onOpenBulkImport called, setting isBulkImportOpen to true');
