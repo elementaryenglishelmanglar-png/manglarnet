@@ -256,9 +256,9 @@ export interface ConfiguracionHorario {
 
 export interface RestriccionDura {
   id: string;
-  tipo: 'docente_no_disponible' | 'aula_no_disponible' | 'clase_fija' | 
-        'docente_max_horas_dia' | 'docente_min_horas_dia' | 'grado_no_disponible' |
-        'docente_max_horas_semana' | 'docente_min_horas_semana';
+  tipo: 'docente_no_disponible' | 'aula_no_disponible' | 'clase_fija' |
+  'docente_max_horas_dia' | 'docente_min_horas_dia' | 'grado_no_disponible' |
+  'docente_max_horas_semana' | 'docente_min_horas_semana';
   id_docente?: string;
   id_clase?: string;
   id_aula?: string;
@@ -276,9 +276,9 @@ export interface RestriccionDura {
 
 export interface RestriccionSuave {
   id: string;
-  tipo: 'docente_preferencia_horario' | 'docente_preferencia_dia' | 
-        'materia_preferencia_orden' | 'docente_agrupar_horas' | 
-        'materia_preferencia_horario' | 'docente_evitar_huecos';
+  tipo: 'docente_preferencia_horario' | 'docente_preferencia_dia' |
+  'materia_preferencia_orden' | 'docente_agrupar_horas' |
+  'materia_preferencia_horario' | 'docente_evitar_huecos';
   id_docente?: string;
   id_clase?: string;
   nombre_materia?: string;
@@ -321,7 +321,7 @@ export const alumnosService = {
       .from('alumnos')
       .select('*')
       .order('apellidos', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -332,7 +332,7 @@ export const alumnosService = {
       .select('*')
       .eq('id_alumno', id)
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -343,7 +343,7 @@ export const alumnosService = {
       .insert([alumno])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -355,7 +355,7 @@ export const alumnosService = {
       .eq('id_alumno', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -365,7 +365,7 @@ export const alumnosService = {
       .from('alumnos')
       .delete()
       .eq('id_alumno', id);
-    
+
     if (error) throw error;
   }
 };
@@ -380,7 +380,7 @@ export const docentesService = {
       .from('docentes')
       .select('*')
       .order('apellidos', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -391,7 +391,7 @@ export const docentesService = {
       .select('*')
       .eq('id_docente', id)
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -402,7 +402,7 @@ export const docentesService = {
       .insert([docente])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -414,7 +414,7 @@ export const docentesService = {
       .eq('id_docente', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -424,7 +424,7 @@ export const docentesService = {
       .from('docentes')
       .delete()
       .eq('id_docente', id);
-    
+
     if (error) throw error;
   }
 };
@@ -439,7 +439,7 @@ export const clasesService = {
       .from('clases')
       .select('*')
       .order('grado_asignado', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -450,7 +450,7 @@ export const clasesService = {
       .select('*')
       .eq('id_clase', id)
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -461,7 +461,7 @@ export const clasesService = {
       .insert([clase])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -473,7 +473,7 @@ export const clasesService = {
       .eq('id_clase', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -483,7 +483,7 @@ export const clasesService = {
       .from('clases')
       .delete()
       .eq('id_clase', id);
-    
+
     if (error) throw error;
   }
 };
@@ -498,7 +498,7 @@ export const planificacionesService = {
       .from('planificaciones')
       .select('*')
       .order('fecha_creacion', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -509,7 +509,7 @@ export const planificacionesService = {
       .select('*')
       .eq('id_planificacion', id)
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -520,7 +520,7 @@ export const planificacionesService = {
       .insert([planificacion])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -532,7 +532,7 @@ export const planificacionesService = {
       .eq('id_planificacion', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -542,7 +542,7 @@ export const planificacionesService = {
       .from('planificaciones')
       .delete()
       .eq('id_planificacion', id);
-    
+
     if (error) throw error;
   }
 };
@@ -552,26 +552,62 @@ export const planificacionesService = {
 // ============================================
 
 export const horariosService = {
-  async getByGradeAndWeek(grado: string, semana: number): Promise<Horario[]> {
+  async getByGradeAndWeek(grado: string, semana: number): Promise<any[]> {
     const { data, error } = await supabase
       .from('horarios')
-      .select('*')
+      .select(`
+        *,
+        clases (
+          id_clase,
+          nombre_materia,
+          grado_asignado,
+          id_docente_asignado,
+          es_ingles_primaria,
+          nivel_ingles,
+          skill_rutina,
+          id_aula
+        ),
+        docentes (
+          id_docente,
+          nombres,
+          apellidos,
+          email
+        )
+      `)
       .eq('grado', grado)
       .eq('semana', semana)
       .order('dia_semana', { ascending: true })
       .order('hora_inicio', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
 
-  async getAll(): Promise<Horario[]> {
+  async getAll(): Promise<any[]> {
     const { data, error } = await supabase
       .from('horarios')
-      .select('*')
+      .select(`
+        *,
+        clases (
+          id_clase,
+          nombre_materia,
+          grado_asignado,
+          id_docente_asignado,
+          es_ingles_primaria,
+          nivel_ingles,
+          skill_rutina,
+          id_aula
+        ),
+        docentes (
+          id_docente,
+          nombres,
+          apellidos,
+          email
+        )
+      `)
       .order('grado', { ascending: true })
       .order('semana', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -582,7 +618,7 @@ export const horariosService = {
       .insert([horario])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -594,7 +630,7 @@ export const horariosService = {
       .eq('id_horario', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -604,7 +640,7 @@ export const horariosService = {
       .from('horarios')
       .delete()
       .eq('id_horario', id);
-    
+
     if (error) throw error;
   },
 
@@ -614,21 +650,39 @@ export const horariosService = {
       .delete()
       .eq('grado', grado)
       .eq('semana', semana);
-    
+
     if (error) throw error;
   },
 
-  async getByGradeWeekAndLapso(grado: string, semana: number, lapso: string, anoEscolar: string): Promise<Horario[]> {
+  async getByGradeWeekAndLapso(grado: string, semana: number, lapso: string, anoEscolar: string): Promise<any[]> {
     const { data, error } = await supabase
       .from('horarios')
-      .select('*')
+      .select(`
+        *,
+        clases (
+          id_clase,
+          nombre_materia,
+          grado_asignado,
+          id_docente_asignado,
+          es_ingles_primaria,
+          nivel_ingles,
+          skill_rutina,
+          id_aula
+        ),
+        docentes (
+          id_docente,
+          nombres,
+          apellidos,
+          email
+        )
+      `)
       .eq('grado', grado)
       .eq('semana', semana)
       .eq('lapso', lapso)
       .eq('ano_escolar', anoEscolar)
       .order('dia_semana', { ascending: true })
       .order('hora_inicio', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   }
@@ -645,11 +699,11 @@ export const lapsosService = {
       .select('*')
       .eq('activo', true)
       .order('lapso', { ascending: true });
-    
+
     if (anoEscolar) {
       query = query.eq('ano_escolar', anoEscolar);
     }
-    
+
     const { data, error } = await query;
     if (error) throw error;
     return data || [];
@@ -661,7 +715,7 @@ export const lapsosService = {
       .select('*')
       .eq('id_lapso', id)
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -673,7 +727,7 @@ export const lapsosService = {
       .eq('ano_escolar', anoEscolar)
       .eq('activo', true)
       .order('lapso', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -684,7 +738,7 @@ export const lapsosService = {
       .insert([lapso])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -696,7 +750,7 @@ export const lapsosService = {
       .eq('id_lapso', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -706,7 +760,7 @@ export const lapsosService = {
       .from('lapsos')
       .delete()
       .eq('id_lapso', id);
-    
+
     if (error) throw error;
   }
 };
@@ -722,7 +776,7 @@ export const semanasLapsoService = {
       .select('*')
       .eq('id_lapso', idLapso)
       .order('numero_semana', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -734,7 +788,7 @@ export const semanasLapsoService = {
       .eq('id_lapso', idLapso)
       .eq('numero_semana', numeroSemana)
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -751,7 +805,7 @@ export const semanasLapsoService = {
       .lte('fecha_inicio', dateStr)
       .gte('fecha_fin', dateStr)
       .single();
-    
+
     if (error) {
       // Si no se encuentra, retornar null en lugar de lanzar error
       if (error.code === 'PGRST116') return null;
@@ -769,14 +823,14 @@ export const semanasLapsoService = {
       `)
       .eq('lapsos.activo', true)
       .order('fecha_inicio', { ascending: true });
-    
+
     if (anoEscolar) {
       query = query.eq('lapsos.ano_escolar', anoEscolar);
     }
-    
+
     const { data, error } = await query;
     if (error) throw error;
-    
+
     // Transformar los datos para incluir información del lapso
     return (data || []).map((item: any) => ({
       ...item,
@@ -796,7 +850,7 @@ export const minutasService = {
       .from('minutas_evaluacion')
       .select('*')
       .order('fecha_creacion', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -807,7 +861,7 @@ export const minutasService = {
       .select('*')
       .eq('id_minuta', id)
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -818,7 +872,7 @@ export const minutasService = {
       .insert([minuta])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -830,7 +884,7 @@ export const minutasService = {
       .eq('id_minuta', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -840,7 +894,7 @@ export const minutasService = {
       .from('minutas_evaluacion')
       .delete()
       .eq('id_minuta', id);
-    
+
     if (error) throw error;
   }
 };
@@ -856,7 +910,7 @@ export const notificacionesService = {
       .select('*')
       .eq('recipient_id', recipientId)
       .order('timestamp', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -866,7 +920,7 @@ export const notificacionesService = {
       .from('notificaciones')
       .select('*')
       .order('timestamp', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -874,8 +928,8 @@ export const notificacionesService = {
   async create(notificacion: Omit<Notification, 'id' | 'timestamp' | 'created_at'>): Promise<Notification> {
     const dbData = {
       ...notificacion,
-      link_to: typeof notificacion.link_to === 'string' 
-        ? notificacion.link_to 
+      link_to: typeof notificacion.link_to === 'string'
+        ? notificacion.link_to
         : JSON.stringify(notificacion.link_to)
     };
     const { data, error } = await supabase
@@ -883,7 +937,7 @@ export const notificacionesService = {
       .insert([dbData])
       .select()
       .single();
-    
+
     if (error) throw error;
     return {
       ...data,
@@ -902,7 +956,7 @@ export const aulasService = {
       .from('aulas')
       .select('*')
       .order('nombre', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -913,7 +967,7 @@ export const aulasService = {
       .select('*')
       .eq('id_aula', id)
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -924,7 +978,7 @@ export const aulasService = {
       .insert([aula])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -936,7 +990,7 @@ export const aulasService = {
       .eq('id_aula', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -946,7 +1000,7 @@ export const aulasService = {
       .from('aulas')
       .delete()
       .eq('id_aula', id);
-    
+
     if (error) throw error;
   }
 };
@@ -962,7 +1016,7 @@ export const docenteMateriasService = {
       .select('*')
       .eq('id_docente', idDocente)
       .order('nivel_prioridad', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -973,7 +1027,7 @@ export const docenteMateriasService = {
       .insert([docenteMateria])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -983,7 +1037,7 @@ export const docenteMateriasService = {
       .from('docente_materias')
       .delete()
       .eq('id', id);
-    
+
     if (error) throw error;
   }
 };
@@ -999,7 +1053,7 @@ export const claseRequisitosService = {
       .select('*')
       .eq('id_clase', idClase)
       .single();
-    
+
     if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
     return data || null;
   },
@@ -1007,7 +1061,7 @@ export const claseRequisitosService = {
   async createOrUpdate(requisito: Omit<ClaseRequisito, 'id' | 'created_at'>): Promise<ClaseRequisito> {
     // Check if exists
     const existing = await this.getByClase(requisito.id_clase);
-    
+
     if (existing) {
       const { data, error } = await supabase
         .from('clase_requisitos')
@@ -1015,7 +1069,7 @@ export const claseRequisitosService = {
         .eq('id', existing.id)
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     } else {
@@ -1024,7 +1078,7 @@ export const claseRequisitosService = {
         .insert([requisito])
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     }
@@ -1035,7 +1089,7 @@ export const claseRequisitosService = {
       .from('clase_requisitos')
       .delete()
       .eq('id_clase', idClase);
-    
+
     if (error) throw error;
   }
 };
@@ -1052,7 +1106,7 @@ export const configuracionHorariosService = {
       .eq('ano_escolar', anoEscolar)
       .eq('activa', true)
       .single();
-    
+
     if (error && error.code !== 'PGRST116') throw error;
     return data || null;
   },
@@ -1070,7 +1124,7 @@ export const configuracionHorariosService = {
       .insert([config])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1082,7 +1136,7 @@ export const configuracionHorariosService = {
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   }
@@ -1100,7 +1154,7 @@ export const restriccionesDurasService = {
       .eq('ano_escolar', anoEscolar)
       .eq('activa', true)
       .order('tipo', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1111,7 +1165,7 @@ export const restriccionesDurasService = {
       .insert([restriccion])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1123,7 +1177,7 @@ export const restriccionesDurasService = {
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1133,7 +1187,7 @@ export const restriccionesDurasService = {
       .from('restricciones_duras')
       .delete()
       .eq('id', id);
-    
+
     if (error) throw error;
   }
 };
@@ -1150,7 +1204,7 @@ export const restriccionesSuavesService = {
       .eq('ano_escolar', anoEscolar)
       .eq('activa', true)
       .order('peso', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1161,7 +1215,7 @@ export const restriccionesSuavesService = {
       .insert([restriccion])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1173,7 +1227,7 @@ export const restriccionesSuavesService = {
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1183,7 +1237,7 @@ export const restriccionesSuavesService = {
       .from('restricciones_suaves')
       .delete()
       .eq('id', id);
-    
+
     if (error) throw error;
   }
 };
@@ -1199,7 +1253,7 @@ export const generacionesHorariosService = {
       .select('*')
       .eq('ano_escolar', anoEscolar)
       .order('created_at', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1210,7 +1264,7 @@ export const generacionesHorariosService = {
       .insert([generacion])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1222,7 +1276,7 @@ export const generacionesHorariosService = {
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1233,7 +1287,7 @@ export const generacionesHorariosService = {
       .select('*')
       .eq('id', id)
       .single();
-    
+
     if (error && error.code !== 'PGRST116') throw error;
     return data || null;
   }
@@ -1249,7 +1303,7 @@ export const eventosCalendarioService = {
       .from('eventos_calendario')
       .select('*')
       .order('fecha_inicio', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1261,7 +1315,7 @@ export const eventosCalendarioService = {
       .gte('fecha_inicio', fechaInicio)
       .lte('fecha_fin', fechaFin)
       .order('fecha_inicio', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1272,7 +1326,7 @@ export const eventosCalendarioService = {
       .select('*')
       .eq('id_evento', id)
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1283,7 +1337,7 @@ export const eventosCalendarioService = {
       .insert([evento])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1295,7 +1349,7 @@ export const eventosCalendarioService = {
       .eq('id_evento', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1305,7 +1359,7 @@ export const eventosCalendarioService = {
       .from('eventos_calendario')
       .delete()
       .eq('id_evento', id);
-    
+
     if (error) throw error;
   }
 };
@@ -1320,7 +1374,7 @@ export const guardiasService = {
       .select('*')
       .order('fecha', { ascending: true })
       .order('hora_inicio', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1332,7 +1386,7 @@ export const guardiasService = {
       .eq('id_usuario', idUsuario)
       .order('fecha', { ascending: true })
       .order('hora_inicio', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1343,7 +1397,7 @@ export const guardiasService = {
       .select('*')
       .eq('fecha', fecha)
       .order('hora_inicio', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1354,7 +1408,7 @@ export const guardiasService = {
       .insert([guardia])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1366,7 +1420,7 @@ export const guardiasService = {
       .eq('id_guardia', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1376,7 +1430,7 @@ export const guardiasService = {
       .from('maestra_guardias')
       .delete()
       .eq('id_guardia', id);
-    
+
     if (error) throw error;
   }
 };
@@ -1391,7 +1445,7 @@ export const logReunionesService = {
       .select('*')
       .order('fecha_reunion', { ascending: false })
       .order('created_at', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1402,7 +1456,7 @@ export const logReunionesService = {
       .select('*')
       .eq('grado', grado)
       .order('fecha_reunion', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1413,7 +1467,7 @@ export const logReunionesService = {
       .select('*')
       .eq('tipo_alerta', tipoAlerta)
       .order('fecha_reunion', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1426,7 +1480,7 @@ export const logReunionesService = {
       .order('fecha_reunion', { ascending: false })
       .order('frecuencia', { ascending: false })
       .limit(limit);
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1437,7 +1491,7 @@ export const logReunionesService = {
       .insert([log])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1449,7 +1503,7 @@ export const logReunionesService = {
       .eq('id_log', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1459,7 +1513,7 @@ export const logReunionesService = {
       .from('log_reuniones_coordinacion')
       .delete()
       .eq('id_log', id);
-    
+
     if (error) throw error;
   }
 };
@@ -1474,7 +1528,7 @@ export const tareasCoordinadorService = {
       .select('*')
       .order('completada', { ascending: true })
       .order('fecha_creacion', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1486,7 +1540,7 @@ export const tareasCoordinadorService = {
       .eq('id_usuario', idUsuario)
       .order('completada', { ascending: true })
       .order('fecha_creacion', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1498,7 +1552,7 @@ export const tareasCoordinadorService = {
       .eq('id_usuario', idUsuario)
       .eq('completada', false)
       .order('fecha_creacion', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -1509,7 +1563,7 @@ export const tareasCoordinadorService = {
       .insert([tarea])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1521,7 +1575,7 @@ export const tareasCoordinadorService = {
       .eq('id_tarea', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -1531,7 +1585,7 @@ export const tareasCoordinadorService = {
       .from('tareas_coordinador')
       .delete()
       .eq('id_tarea', id);
-    
+
     if (error) throw error;
   }
 };
