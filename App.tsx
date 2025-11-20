@@ -3250,7 +3250,8 @@ const StudentListView: React.FC<{
     onAddStudent: () => void;
     onEditStudent: (student: Alumno) => void;
     onDeleteStudent: (studentId: string) => void;
-}> = ({ students, onSelectStudent, onAddStudent, onEditStudent, onDeleteStudent }) => {
+    onOpenBulkImport: () => void;
+}> = ({ students, onSelectStudent, onAddStudent, onEditStudent, onDeleteStudent, onOpenBulkImport }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterGrade, setFilterGrade] = useState('all');
 
@@ -3270,7 +3271,7 @@ const StudentListView: React.FC<{
                 <h2 className="text-2xl font-bold text-apple-gray-dark tracking-tight">Lista de Alumnos</h2>
                 <div className="flex gap-3">
                     <button
-                        onClick={() => setIsBulkImportOpen(true)}
+                        onClick={onOpenBulkImport}
                         className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:opacity-90 text-sm sm:text-base font-medium min-h-[44px] transition-apple"
                     >
                         📤
@@ -10568,10 +10569,11 @@ const App: React.FC = () => {
             case 'students':
                 return <StudentListView
                     students={alumnos}
-                    onSelectStudent={setSelectedStudent}
-                    onAddStudent={() => handleOpenStudentModal(null)}
-                    onEditStudent={handleOpenStudentModal}
+                    onSelectStudent={handleSelectStudent}
+                    onAddStudent={handleAddStudent}
+                    onEditStudent={handleEditStudent}
                     onDeleteStudent={handleDeleteStudent}
+                    onOpenBulkImport={() => setIsBulkImportOpen(true)}
                 />;
             case 'teachers':
                 return <TeachersView docentes={docentes} clases={clases} alumnos={alumnos} aulas={aulas} setDocentes={setDocentes} setClases={setClases} currentUser={currentUser!} />;
