@@ -6247,6 +6247,21 @@ const ScheduleView: React.FC<{
         return time.length >= 5 ? time.substring(0, 5) : time;
     };
 
+    // Debug: Log clases data
+    useEffect(() => {
+        console.log('=== SCHEDULE VIEW CLASES DEBUG ===');
+        console.log('Total clases received:', clases.length);
+        console.log('Selected grade:', selectedGrade);
+        if (clases.length > 0) {
+            console.log('Sample clase:', clases[0]);
+            console.log('Unique grades in clases:', [...new Set(clases.map(c => c.grado_asignado))]);
+            console.log('Clases for selected grade:', clases.filter(c => c.grado_asignado === selectedGrade).map(c => c.nombre_materia));
+        } else {
+            console.warn('⚠️ No clases data received!');
+        }
+        console.log('=== END CLASES DEBUG ===');
+    }, [clases, selectedGrade]);
+
     // Estados para lapsos y semanas
     const anoEscolar = '2025-2026'; // TODO: Obtener del contexto/configuración
     const [lapsos, setLapsos] = useState<Lapso[]>([]);
@@ -6555,8 +6570,21 @@ const ScheduleView: React.FC<{
     };
 
     const unassignedClasses = useMemo(() => {
+        console.log('=== UNASSIGNED CLASSES DEBUG ===');
+        console.log('Total clases:', clases.length);
+        console.log('Selected grade:', selectedGrade);
+        console.log('Weekly schedule length:', weeklySchedule.length);
+
         const assignedClassIds = new Set(weeklySchedule.filter(s => s.id_clase).map(s => s.id_clase));
-        return clases.filter(c => {
+        console.log('Assigned class IDs:', Array.from(assignedClassIds));
+
+        const filtered = clases.filter(c => {
+            const matchesGrade = c.grado_asignado === selectedGrade;
+
+            if (!matchesGrade && c.grado_asignado) {
+                console.log(`Class "${c.nombre_materia}" grade mismatch: "${c.grado_asignado}" !== "${selectedGrade}"`);
+            }
+
             // Incluir clases del grado seleccionado normalmente
             if (c.grado_asignado === selectedGrade && !assignedClassIds.has(c.id_clase)) {
                 // Para clases de inglés consolidadas (SOLO 5to-6to), solo mostrar si no están asignadas
@@ -6590,6 +6618,12 @@ const ScheduleView: React.FC<{
 
             return false;
         });
+
+        console.log('Unassigned classes count:', filtered.length);
+        console.log('Unassigned classes:', filtered.map(c => `${c.nombre_materia} (${c.grado_asignado})`));
+        console.log('=== END DEBUG ===');
+
+        return filtered;
     }, [clases, weeklySchedule, selectedGrade]);
 
     const handleOpenEventModal = (dia: number, hora: string, existingEvent: Horario | null = null) => {
