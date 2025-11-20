@@ -3271,7 +3271,10 @@ const StudentListView: React.FC<{
                 <h2 className="text-2xl font-bold text-apple-gray-dark tracking-tight">Lista de Alumnos</h2>
                 <div className="flex gap-3">
                     <button
-                        onClick={onOpenBulkImport}
+                        onClick={() => {
+                            console.log('🔵 Bulk Import button clicked');
+                            onOpenBulkImport();
+                        }}
                         className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:opacity-90 text-sm sm:text-base font-medium min-h-[44px] transition-apple"
                     >
                         📤
@@ -10573,7 +10576,10 @@ const App: React.FC = () => {
                     onAddStudent={handleAddStudent}
                     onEditStudent={handleEditStudent}
                     onDeleteStudent={handleDeleteStudent}
-                    onOpenBulkImport={() => setIsBulkImportOpen(true)}
+                    onOpenBulkImport={() => {
+                        console.log('🟢 onOpenBulkImport called, setting isBulkImportOpen to true');
+                        setIsBulkImportOpen(true);
+                    }}
                 />;
             case 'teachers':
                 return <TeachersView docentes={docentes} clases={clases} alumnos={alumnos} aulas={aulas} setDocentes={setDocentes} setClases={setClases} currentUser={currentUser!} />;
@@ -10694,13 +10700,20 @@ const App: React.FC = () => {
                 />
             )}
             {isBulkImportOpen && (
-                <BulkImportModal
-                    isOpen={isBulkImportOpen}
-                    onClose={() => setIsBulkImportOpen(false)}
-                    onSuccess={() => {
-                        loadAlumnos(); // Reload students after successful import
-                    }}
-                />
+                <>
+                    {console.log('🟡 Rendering BulkImportModal, isBulkImportOpen:', isBulkImportOpen)}
+                    <BulkImportModal
+                        isOpen={isBulkImportOpen}
+                        onClose={() => {
+                            console.log('🔴 Closing BulkImportModal');
+                            setIsBulkImportOpen(false);
+                        }}
+                        onSuccess={() => {
+                            console.log('✅ Import successful, reloading students');
+                            loadAlumnos(); // Reload students after successful import
+                        }}
+                    />
+                </>
             )}
         </div>
     );
