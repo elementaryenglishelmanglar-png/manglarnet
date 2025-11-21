@@ -150,7 +150,8 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
             id: authData.user.id,
             username,
             email,
-            password_hash: '', // Password is managed by Supabase Auth
+            nombres: username, // Use username as nombres for now
+            apellidos: '', // Empty apellidos for now
             role: formData.role,
             is_active: true,
             created_by: currentUser.id,
