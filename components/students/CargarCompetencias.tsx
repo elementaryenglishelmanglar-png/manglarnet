@@ -36,10 +36,6 @@ export const CargarCompetencias: React.FC<CargarCompetenciasProps> = ({ clases, 
 
     // Define all available subjects by level
     const ASIGNATURAS_POR_NIVEL: { [key: string]: string[] } = {
-        "Nivel Preescolar": [
-            "Personal y Social", "Relación con el ambiente", "Comunicación y Representación", "Inglés",
-            "EDUCACIÓN FÍSICA Y DEPORTE", "Música", "Arte", "Francés", "Robótica", "Computación", "Ajedrez"
-        ],
         "Nivel Primaria": [
             "Matemáticas", "Lenguaje", "Ciencias", "Sociales", "Proyecto", "Inglés",
             "Evaluación", "Francés", "Literatura", "Música", "Arte", "Tecnología",
@@ -48,7 +44,6 @@ export const CargarCompetencias: React.FC<CargarCompetenciasProps> = ({ clases, 
     };
 
     const GRADOS = [
-        "Maternal", "Pre-Kinder", "Kinder", "Preparatorio",
         "1er Grado", "2do Grado", "3er Grado", "4to Grado", "5to Grado", "6to Grado"
     ];
 
@@ -72,13 +67,7 @@ export const CargarCompetencias: React.FC<CargarCompetenciasProps> = ({ clases, 
 
         // Generate virtual classes for all grade-subject combinations
         GRADOS.forEach(grado => {
-            // Determine level
-            let nivel = "Nivel Primaria";
-            if (["Maternal", "Pre-Kinder", "Kinder", "Preparatorio"].includes(grado)) {
-                nivel = "Nivel Preescolar";
-            }
-
-            const subjects = ASIGNATURAS_POR_NIVEL[nivel] || [];
+            const subjects = ASIGNATURAS_POR_NIVEL["Nivel Primaria"] || [];
 
             subjects.forEach(materia => {
                 // Special handling for English in grades 5-6
