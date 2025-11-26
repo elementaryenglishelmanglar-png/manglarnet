@@ -217,7 +217,7 @@ export const CargarCompetencias: React.FC<CargarCompetenciasProps> = ({ clases, 
                 const newClaseData = {
                     nombre_materia: virtualClase.materia,
                     grado_asignado: virtualClase.grado,
-                    id_docente_asignado: '', // No teacher assigned yet
+                    id_docente_asignado: null as any, // No teacher assigned yet
                     student_ids: [],
                     nivel_ingles: virtualClase.nivel_ingles || null,
                     skill_rutina: null,
