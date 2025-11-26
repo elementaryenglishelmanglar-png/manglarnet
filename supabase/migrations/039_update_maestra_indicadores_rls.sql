@@ -7,8 +7,8 @@ DROP POLICY IF EXISTS "Coordinadores and directivos can manage maestra_indicador
 -- Create new policy allowing all authenticated users to insert/update/delete
 CREATE POLICY "Authenticated users can manage maestra_indicadores" ON maestra_indicadores
   FOR ALL
-  USING (auth.role() = 'authenticated')
-  WITH CHECK (auth.role() = 'authenticated');
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
 
 COMMENT ON POLICY "Authenticated users can manage maestra_indicadores" ON maestra_indicadores 
 IS 'Allows all authenticated users to create, update, and delete pedagogical indicators';
