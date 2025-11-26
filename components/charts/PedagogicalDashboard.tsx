@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CompetencyRadarChart } from './CompetencyRadarChart';
+import { CompetencyBarChart } from './CompetencyBarChart';
 import { AttendanceScatterPlot } from './AttendanceScatterPlot';
+import { PedagogicalDistributionCharts } from './PedagogicalDistributionCharts';
 import { EvaluacionAlumno, Alumno } from '@/services/supabaseDataService';
 
 interface PedagogicalDashboardProps {
@@ -47,8 +48,8 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
         }).filter(item => item !== null && (item.attendance > 0 || item.grade > 0));
     }, [students, studentEvals]);
 
-    // 2. Prepare Radar Chart Data (Class Average by Competency/Indicator)
-    const radarData = useMemo(() => {
+    // 2. Prepare Bar Chart Data (Class Average by Competency/Indicator)
+    const barData = useMemo(() => {
         if (!indicators || indicators.length === 0) return [];
 
         // Map A-E to 5-1
@@ -66,7 +67,7 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
                         indicatorScores[indicatorId] = {
                             sum: 0,
                             count: 0,
-                            name: ind ? ind.descripcion.substring(0, 15) + '...' : 'Indicador'
+                            name: ind ? ind.descripcion.substring(0, 40) + (ind.descripcion.length > 40 ? '...' : '') : 'Indicador'
                         };
                     }
                     indicatorScores[indicatorId].sum += score;
@@ -82,29 +83,60 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
         }));
     }, [detallesIndicadores, indicators]);
 
-    if (scatterData.length === 0 && radarData.length === 0) {
+    // 3. Prepare Distribution Data (Independence, Emotion, Efficacy)
+    const distributionData = useMemo(() => {
+        const independenceCounts: Record<string, number> = {};
+        const emotionCounts: Record<string, number> = {};
+        const efficacyCounts: Record<string, number> = {};
+
+        studentEvals.forEach((evalData) => {
+            if (evalData.nivel_independencia) {
+                independenceCounts[evalData.nivel_independencia] = (independenceCounts[evalData.nivel_independencia] || 0) + 1;
+            }
+            if (evalData.estado_emocional) {
+                emotionCounts[evalData.estado_emocional] = (emotionCounts[evalData.estado_emocional] || 0) + 1;
+            }
+            if (evalData.eficacia_accion_anterior) {
+                efficacyCounts[evalData.eficacia_accion_anterior] = (efficacyCounts[evalData.eficacia_accion_anterior] || 0) + 1;
+            }
+        });
+
+        const toArray = (counts: Record<string, number>) => Object.entries(counts).map(([name, value]) => ({ name, value }));
+
+        return {
+            independence: toArray(independenceCounts),
+            emotion: toArray(emotionCounts),
+            efficacy: toArray(efficacyCounts)
+        };
+    }, [studentEvals]);
+
+    if (scatterData.length === 0 && barData.length === 0 && distributionData.independence.length === 0) {
         return null; // Don't show if no data
     }
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Correlación: Inasistencias vs Nota</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <AttendanceScatterPlot data={scatterData as any} />
-                </CardContent>
-            </Card>
+        <div className="space-y-6 mt-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Correlación: Inasistencias vs Nota</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <AttendanceScatterPlot data={scatterData as any} />
+                    </CardContent>
+                </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Promedio de Indicadores (Clase)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <CompetencyRadarChart data={radarData} />
-                </CardContent>
-            </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Promedio de Indicadores (Clase)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <CompetencyBarChart data={barData} />
+                    </CardContent>
+                </Card>
+            </div>
+
+            <PedagogicalDistributionCharts data={distributionData} />
         </div>
     );
 };
