@@ -9496,14 +9496,10 @@ const EvaluationView: React.FC<{
         return { groups, competencyMap };
     }, [indicadoresDisponibles]);
 
-    // Helper function to extract English level from subject name
-    const extractEnglishLevel = (subjectName: string): string | null => {
-        // Format: "Inglés - Skill - Level" (e.g., "Inglés - Listening - Basic")
-        const parts = subjectName.split(' - ');
-        if (parts.length === 3 && parts[0].toLowerCase().includes('inglés')) {
-            return parts[2]; // Return the level (Basic, Lower, Upper, etc.)
-        }
-        return null;
+    // Helper function to check if subject is an English level
+    const isEnglishLevel = (subjectName: string): boolean => {
+        const englishLevels = ['Basic', 'Lower', 'Upper', 'Advanced', 'IB'];
+        return englishLevels.includes(subjectName);
     };
 
     const availableSubjects = useMemo(() => {
@@ -9511,36 +9507,39 @@ const EvaluationView: React.FC<{
 
         const isEnglishGrade = filters.grado === '5to Grado' || filters.grado === '6to Grado';
 
-        // Get regular subjects (excluding English level classes for 5to-6to)
+        // Get regular subjects (excluding English for 5to-6to)
         const regularSubjects = clases
             .filter(c => c.grado_asignado === filters.grado)
             .filter(c => c.nombre_materia && c.nombre_materia.trim() !== '')
             .filter(c => {
-                // For 5to-6to, exclude English classes that have nivel_ingles and skill_rutina
+                // For 5to-6to, exclude all English classes (they'll be replaced by levels)
                 if (isEnglishGrade &&
                     (c.nombre_materia?.toLowerCase().includes('inglés') || c.nombre_materia?.toLowerCase().includes('ingles'))) {
-                    // Exclude if it has nivel_ingles and skill_rutina (these are English level classes)
-                    return !((c as any).nivel_ingles && (c as any).skill_rutina);
+                    return false;
                 }
                 return true;
             });
 
-        // For 5to-6to, add English level subjects
+        // For 5to-6to, add English levels as subjects
         if (isEnglishGrade) {
-            const englishLevelClasses = clases
-                .filter(c => c.grado_asignado === filters.grado)
-                .filter(c => (c as any).nivel_ingles && (c as any).skill_rutina)
-                .map(c => ({
-                    ...c,
-                    // Create a formatted name: "Inglés - Skill - Level"
-                    nombre_materia: `Inglés - ${(c as any).skill_rutina} - ${(c as any).nivel_ingles}`
-                }));
+            // Get unique English levels from students in this grade
+            const studentsInGrade = alumnos.filter(a => a.salon === filters.grado);
+            const uniqueLevels = [...new Set(studentsInGrade.map(s => s.nivel_ingles).filter(Boolean))];
 
-            return [...regularSubjects, ...englishLevelClasses];
+            // Create a fake clase object for each level
+            const englishLevelSubjects = uniqueLevels.map(level => ({
+                id_clase: `english-level-${level}`,
+                nombre_materia: level as string,
+                grado_asignado: filters.grado,
+                id_docente_asignado: '',
+                studentIds: []
+            }));
+
+            return [...regularSubjects, ...englishLevelSubjects];
         }
 
         return regularSubjects;
-    }, [filters.grado, clases]);
+    }, [filters.grado, clases, alumnos]);
 
     const studentsInGrade = useMemo(() => {
         if (!filters.grado) return [];
@@ -9548,12 +9547,11 @@ const EvaluationView: React.FC<{
         // Filter by grade first
         let students = alumnos.filter(a => a.salon === filters.grado);
 
-        // If an English level subject is selected for 5to-6to, filter by nivel_ingles
+        // If an English level is selected for 5to-6to, filter by nivel_ingles
         if (filters.materia && (filters.grado === '5to Grado' || filters.grado === '6to Grado')) {
-            const englishLevel = extractEnglishLevel(filters.materia);
-            if (englishLevel) {
+            if (isEnglishLevel(filters.materia)) {
                 // Filter students by their English level
-                students = students.filter(a => a.nivel_ingles === englishLevel);
+                students = students.filter(a => a.nivel_ingles === filters.materia);
             }
         }
 
