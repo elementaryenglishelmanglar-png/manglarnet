@@ -221,7 +221,7 @@ interface EvaluacionAlumno {
     adaptacion: Adaptacion;
     observaciones: string;
     // Pedagogical Intelligence Fields
-    asistencia_periodo?: number;
+    inasistencias?: number;
     nivel_independencia?: 'Autónomo' | 'Apoyo Parcial' | 'Apoyo Constante' | 'No Logrado';
     estado_emocional?: 'Enfocado' | 'Ansioso/Nervioso' | 'Distraído' | 'Apatía/Desinterés' | 'Cansado' | 'Participativo';
     eficacia_accion_anterior?: 'Resuelto' | 'En Proceso' | 'Ineficaz' | 'No Aplica';
@@ -9707,7 +9707,7 @@ const EvaluationView: React.FC<{
     };
 
     // Handler to update indicator level for a student
-    const handleIndicadorChange = (idAlumno: string, idIndicador: string, nivel: number) => {
+    const handleIndicadorChange = (idAlumno: string, idIndicador: string, nivel: string) => {
         setDetallesIndicadores(prev => {
             const newMap = new Map(prev);
             if (!newMap.has(idAlumno)) {
@@ -9715,6 +9715,35 @@ const EvaluationView: React.FC<{
             }
             const studentMap = newMap.get(idAlumno)!;
             studentMap.set(idIndicador, nivel);
+            return newMap;
+        });
+    };
+
+    // New State for Selected Indicators (The "Bank")
+    const [selectedIndicators, setSelectedIndicators] = useState<Map<string, Set<string>>>(new Map());
+
+    const toggleIndicatorSelection = (idAlumno: string, idIndicador: string) => {
+        setSelectedIndicators(prev => {
+            const newMap = new Map(prev);
+            const studentSet = new Set(newMap.get(idAlumno) || []);
+
+            if (studentSet.has(idIndicador)) {
+                studentSet.delete(idIndicador);
+                // Also remove the rating if deselected
+                setDetallesIndicadores(prevDetails => {
+                    const newDetails = new Map(prevDetails);
+                    const studentDetails = newDetails.get(idAlumno);
+                    if (studentDetails) {
+                        studentDetails.delete(idIndicador);
+                        newDetails.set(idAlumno, studentDetails);
+                    }
+                    return newDetails;
+                });
+            } else {
+                studentSet.add(idIndicador);
+            }
+
+            newMap.set(idAlumno, studentSet);
             return newMap;
         });
     };
@@ -9773,12 +9802,12 @@ const EvaluationView: React.FC<{
 
             for (const [idAlumno, indicadoresMap] of detallesIndicadores.entries()) {
                 for (const [idIndicador, nivelLogro] of indicadoresMap.entries()) {
-                    if (nivelLogro > 0) { // Only save if a level was selected
+                    if (nivelLogro) { // Only save if a level was selected (string check)
                         detallesParaGuardar.push({
                             id_minuta: created.id_minuta,
                             id_alumno: idAlumno,
                             id_indicador: idIndicador,
-                            nivel_logro: nivelLogro
+                            nivel_logro: nivelLogro // Now string (A-E)
                         });
                     }
                 }
@@ -9793,12 +9822,12 @@ const EvaluationView: React.FC<{
 
             for (const evalData of studentEvals.values()) {
                 // Only save if there is some data worth saving (grade or soft data)
-                if (evalData.nota || evalData.asistencia_periodo !== undefined || evalData.nivel_independencia || evalData.estado_emocional || evalData.eficacia_accion_anterior || evalData.observaciones) {
+                if (evalData.nota || evalData.inasistencias !== undefined || evalData.nivel_independencia || evalData.estado_emocional || evalData.eficacia_accion_anterior || evalData.observaciones) {
                     resumenesParaGuardar.push({
                         id_minuta: created.id_minuta,
                         id_alumno: evalData.id_alumno,
                         nota: evalData.nota || undefined,
-                        asistencia_periodo: evalData.asistencia_periodo,
+                        inasistencias: evalData.inasistencias, // Now number (count)
                         nivel_independencia: evalData.nivel_independencia,
                         estado_emocional: evalData.estado_emocional,
                         eficacia_accion_anterior: evalData.eficacia_accion_anterior,
@@ -9966,14 +9995,13 @@ const EvaluationView: React.FC<{
                                                                     {/* Pedagogical Intelligence Inputs */}
                                                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-blue-50/50 rounded-lg border border-blue-100">
                                                                         <div className="space-y-2">
-                                                                            <Label className="text-xs font-semibold text-blue-800 uppercase tracking-wide">Asistencia (%)</Label>
+                                                                            <Label className="text-xs font-semibold text-blue-800 uppercase tracking-wide">Inasistencias (Cant.)</Label>
                                                                             <Input
                                                                                 type="number"
                                                                                 min="0"
-                                                                                max="100"
-                                                                                placeholder="Ej. 95"
-                                                                                value={evalData.asistencia_periodo || ''}
-                                                                                onChange={(e) => handleStudentEvalChange(student.id_alumno, 'asistencia_periodo', parseInt(e.target.value) || 0)}
+                                                                                placeholder="Ej. 3"
+                                                                                value={evalData.inasistencias !== undefined ? evalData.inasistencias : ''}
+                                                                                onChange={(e) => handleStudentEvalChange(student.id_alumno, 'inasistencias', parseInt(e.target.value) || 0)}
                                                                                 className="bg-white"
                                                                             />
                                                                         </div>
@@ -10027,23 +10055,44 @@ const EvaluationView: React.FC<{
                                                                     </div>
 
                                                                     <div className="border rounded-lg p-4 bg-background">
-                                                                        <p className="text-sm text-muted-foreground mb-4">
-                                                                            Evalúa cada indicador en escala 1-5:
-                                                                            <span className="ml-2 font-semibold">1=No logrado</span> •
-                                                                            <span className="ml-1 font-semibold">3=En desarrollo</span> •
-                                                                            <span className="ml-1 font-semibold">5=Logrado con excelencia</span>
-                                                                        </p>
+                                                                        <div className="flex justify-between items-center mb-4">
+                                                                            <p className="text-sm text-muted-foreground">
+                                                                                Selecciona los indicadores a evaluar y califícalos (A-E):
+                                                                            </p>
+
+                                                                            {/* Indicator Selector Dropdown */}
+                                                                            <Select onValueChange={(val) => toggleIndicatorSelection(student.id_alumno, val)}>
+                                                                                <SelectTrigger className="w-[300px]">
+                                                                                    <SelectValue placeholder="➕ Agregar Indicador a Evaluar" />
+                                                                                </SelectTrigger>
+                                                                                <SelectContent className="max-h-[300px]">
+                                                                                    {Object.entries(groupedIndicators.groups).flatMap(([rutina, competencies]) =>
+                                                                                        Object.entries(competencies).flatMap(([compId, indicators]) =>
+                                                                                            indicators.map(ind => (
+                                                                                                <SelectItem
+                                                                                                    key={ind.id_indicador}
+                                                                                                    value={ind.id_indicador}
+                                                                                                    disabled={selectedIndicators.get(student.id_alumno)?.has(ind.id_indicador)}
+                                                                                                >
+                                                                                                    {ind.descripcion.substring(0, 50)}...
+                                                                                                </SelectItem>
+                                                                                            ))
+                                                                                        )
+                                                                                    )}
+                                                                                </SelectContent>
+                                                                            </Select>
+                                                                        </div>
 
                                                                         <div className="space-y-3">
                                                                             {Object.entries(groupedIndicators.groups).map(([rutina, competencies]) => (
-                                                                                <div key={rutina} className="mb-6">
-                                                                                    {rutina !== 'General' && (
-                                                                                        <div className="bg-blue-50 p-2 rounded mb-2 border-l-4 border-blue-500">
-                                                                                            <h4 className="font-bold text-sm text-blue-800 uppercase tracking-wide">{rutina}</h4>
-                                                                                        </div>
-                                                                                    )}
-
+                                                                                <div key={rutina}>
                                                                                     {Object.entries(competencies).map(([compId, indicators]) => {
+                                                                                        // Filter indicators: only show selected ones
+                                                                                        const studentSelectedSet = selectedIndicators.get(student.id_alumno);
+                                                                                        const visibleIndicators = indicators.filter(ind => studentSelectedSet?.has(ind.id_indicador));
+
+                                                                                        if (visibleIndicators.length === 0) return null;
+
                                                                                         const competency = groupedIndicators.competencyMap.get(compId);
                                                                                         return (
                                                                                             <div key={compId} className="mb-4 ml-2">
@@ -10054,29 +10103,32 @@ const EvaluationView: React.FC<{
                                                                                                 )}
 
                                                                                                 <div className="space-y-2 pl-4">
-                                                                                                    {indicators.map((indicador, idx) => {
-                                                                                                        const currentValue = detallesIndicadores.get(student.id_alumno)?.get(indicador.id_indicador) || 0;
+                                                                                                    {visibleIndicators.map((indicador, idx) => {
+                                                                                                        const currentValue = detallesIndicadores.get(student.id_alumno)?.get(indicador.id_indicador) || '';
 
                                                                                                         return (
                                                                                                             <div key={indicador.id_indicador} className="flex items-center gap-4 p-2 hover:bg-muted/50 rounded border border-transparent hover:border-gray-200 transition-colors">
-                                                                                                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
-                                                                                                                    {idx + 1}
-                                                                                                                </div>
+                                                                                                                <Button
+                                                                                                                    variant="ghost"
+                                                                                                                    size="icon"
+                                                                                                                    className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                                                                                                    onClick={() => toggleIndicatorSelection(student.id_alumno, indicador.id_indicador)}
+                                                                                                                    title="Remover indicador"
+                                                                                                                >
+                                                                                                                    ✕
+                                                                                                                </Button>
 
                                                                                                                 <div className="flex-1 min-w-0">
                                                                                                                     <p className="text-sm font-medium">{indicador.descripcion}</p>
-                                                                                                                    {indicador.categoria && indicador.categoria !== 'Indicador' && (
-                                                                                                                        <span className="text-xs text-muted-foreground">{indicador.categoria}</span>
-                                                                                                                    )}
                                                                                                                 </div>
 
                                                                                                                 <div className="flex gap-1">
-                                                                                                                    {[1, 2, 3, 4, 5].map(nivel => (
+                                                                                                                    {['A', 'B', 'C', 'D', 'E'].map(nivel => (
                                                                                                                         <button
                                                                                                                             key={nivel}
                                                                                                                             type="button"
                                                                                                                             onClick={() => handleIndicadorChange(student.id_alumno, indicador.id_indicador, nivel)}
-                                                                                                                            className={`w-10 h-10 rounded-md border-2 font-semibold transition-all ${currentValue === nivel
+                                                                                                                            className={`w-8 h-8 rounded-md border text-sm font-bold transition-all ${currentValue === nivel
                                                                                                                                 ? 'bg-primary text-primary-foreground border-primary shadow-md scale-110'
                                                                                                                                 : 'bg-background border-border hover:border-primary/50 hover:bg-muted'
                                                                                                                                 }`}
@@ -10094,6 +10146,13 @@ const EvaluationView: React.FC<{
                                                                                     })}
                                                                                 </div>
                                                                             ))}
+
+                                                                            {(!selectedIndicators.get(student.id_alumno) || selectedIndicators.get(student.id_alumno)?.size === 0) && (
+                                                                                <div className="text-center p-8 text-muted-foreground italic border-2 border-dashed rounded-lg">
+                                                                                    No has seleccionado indicadores para evaluar. <br />
+                                                                                    Usa el selector arriba para agregar indicadores del banco.
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -10101,7 +10160,7 @@ const EvaluationView: React.FC<{
                                                         </tr>
                                                     )}
                                                 </React.Fragment>
-                                            )
+                                            );
                                         })}
                                     </tbody>
                                 </table>

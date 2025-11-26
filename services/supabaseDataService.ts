@@ -156,7 +156,7 @@ export interface DetalleEvaluacionAlumno {
   id_minuta: string;
   id_alumno: string;
   id_indicador: string;
-  nivel_logro: number; // 1-5 scale for radar charts
+  nivel_logro: string; // A-E scale
   observaciones?: string;
   created_at?: string;
   updated_at?: string;
@@ -167,7 +167,7 @@ export interface ResumenEvaluacionAlumno {
   id_minuta: string;
   id_alumno: string;
   nota?: string;
-  asistencia_periodo?: number; // 0-100
+  inasistencias?: number; // Count of absences
   nivel_independencia?: 'Autónomo' | 'Apoyo Parcial' | 'Apoyo Constante' | 'No Logrado';
   estado_emocional?: 'Enfocado' | 'Ansioso/Nervioso' | 'Distraído' | 'Apatía/Desinterés' | 'Cansado' | 'Participativo';
   eficacia_accion_anterior?: 'Resuelto' | 'En Proceso' | 'Ineficaz' | 'No Aplica';
