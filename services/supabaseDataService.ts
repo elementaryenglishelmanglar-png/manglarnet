@@ -176,6 +176,22 @@ export interface ResumenEvaluacionAlumno {
   updated_at?: string;
 }
 
+// --- NEW TYPES FOR EVALUATION MODULE ---
+export type Nota = 'A' | 'B' | 'C' | 'D' | 'E' | 'SE' | '';
+export type Adaptacion = 'Reg' | 'AC+' | 'AC-' | '';
+
+export interface EvaluacionAlumno {
+  id_alumno: string;
+  nota: Nota;
+  adaptacion: Adaptacion;
+  observaciones: string;
+  // Pedagogical Intelligence Fields
+  inasistencias?: number;
+  nivel_independencia?: 'Autónomo' | 'Apoyo Parcial' | 'Apoyo Constante' | 'No Logrado';
+  estado_emocional?: 'Enfocado' | 'Ansioso/Nervioso' | 'Distraído' | 'Apatía/Desinterés' | 'Cansado' | 'Participativo';
+  eficacia_accion_anterior?: 'Resuelto' | 'En Proceso' | 'Ineficaz' | 'No Aplica';
+}
+
 export interface EventoCalendario {
   id_evento: string;
   titulo: string;

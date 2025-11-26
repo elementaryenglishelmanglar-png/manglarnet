@@ -14,6 +14,8 @@ import { Skeleton } from './components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from './components/ui/alert';
 import { Badge } from './components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip';
+import { AdaptationGradeDistributionCharts } from './components/charts/AdaptationGradeDistributionCharts';
+import { PedagogicalDashboard } from './components/charts/PedagogicalDashboard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
 import { Label } from './components/ui/label';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -72,7 +74,10 @@ import {
     type Aula,
     type MaestraIndicador,
     type DetalleEvaluacionAlumno,
-    type ResumenEvaluacionAlumno
+    type ResumenEvaluacionAlumno,
+    type EvaluacionAlumno,
+    type Nota,
+    type Adaptacion
 } from './services/supabaseDataService';
 
 
@@ -212,20 +217,7 @@ interface EventoCalendario {
 }
 
 // --- NEW TYPES FOR EVALUATION MODULE ---
-type Nota = 'A' | 'B' | 'C' | 'D' | 'E' | 'SE' | '';
-type Adaptacion = 'Reg' | 'AC+' | 'AC-' | '';
 
-interface EvaluacionAlumno {
-    id_alumno: string;
-    nota: Nota;
-    adaptacion: Adaptacion;
-    observaciones: string;
-    // Pedagogical Intelligence Fields
-    inasistencias?: number;
-    nivel_independencia?: 'Autónomo' | 'Apoyo Parcial' | 'Apoyo Constante' | 'No Logrado';
-    estado_emocional?: 'Enfocado' | 'Ansioso/Nervioso' | 'Distraído' | 'Apatía/Desinterés' | 'Cansado' | 'Participativo';
-    eficacia_accion_anterior?: 'Resuelto' | 'En Proceso' | 'Ineficaz' | 'No Aplica';
-}
 
 interface AnalisisDificultad {
     dificultad: string;
@@ -10174,82 +10166,20 @@ const EvaluationView: React.FC<{
                                     <PieChart title="Porcentaje Global de Notas" data={advancedAnalytics.overallGradeCounts} colors={gradeColors} />
                                 </div>
                                 <AdaptationGradeDistributionCharts data={advancedAnalytics.gradeDistributionByAdaptation as any} />
+
+                                {/* Phase 2: Pedagogical Intelligence Dashboard */}
+                                <PedagogicalDashboard
+                                    students={alumnos}
+                                    studentEvals={studentEvals}
+                                    detallesIndicadores={detallesIndicadores}
+                                    indicators={indicadoresDisponibles}
+                                />
                             </div>
                         </CardContent>
                     </Card>
                 )}
 
-                {isFormReady && indicadoresDisponibles.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>2.5 Datos de Contexto (Opcional)</CardTitle>
-                            <p className="text-sm text-muted-foreground">
-                                Información complementaria sobre el desempeño general del grupo en esta evaluación
-                            </p>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {/* Nivel de Independencia */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="nivel-independencia">Nivel de Independencia</Label>
-                                    <select
-                                        id="nivel-independencia"
-                                        value={softData.nivel_independencia}
-                                        onChange={(e) => setSoftData(prev => ({
-                                            ...prev,
-                                            nivel_independencia: e.target.value as any
-                                        }))}
-                                        className="w-full border rounded px-3 py-2"
-                                    >
-                                        <option value="">Seleccionar...</option>
-                                        <option value="Autónomo">Autónomo</option>
-                                        <option value="Apoyo Parcial">Apoyo Parcial</option>
-                                        <option value="Apoyo Total">Apoyo Total</option>
-                                    </select>
-                                </div>
 
-                                {/* Estado Emocional */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="estado-emocional">Estado Emocional</Label>
-                                    <select
-                                        id="estado-emocional"
-                                        value={softData.estado_emocional}
-                                        onChange={(e) => setSoftData(prev => ({
-                                            ...prev,
-                                            estado_emocional: e.target.value as any
-                                        }))}
-                                        className="w-full border rounded px-3 py-2"
-                                    >
-                                        <option value="">Seleccionar...</option>
-                                        <option value="Enfocado">Enfocado</option>
-                                        <option value="Ansioso">Ansioso</option>
-                                        <option value="Distraído">Distraído</option>
-                                        <option value="Participativo">Participativo</option>
-                                    </select>
-                                </div>
-
-                                {/* Eficacia de Acción Anterior */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="eficacia-accion">Eficacia de Acción Anterior</Label>
-                                    <select
-                                        id="eficacia-accion"
-                                        value={softData.eficacia_accion_anterior}
-                                        onChange={(e) => setSoftData(prev => ({
-                                            ...prev,
-                                            eficacia_accion_anterior: e.target.value as any
-                                        }))}
-                                        className="w-full border rounded px-3 py-2"
-                                    >
-                                        <option value="">Seleccionar...</option>
-                                        <option value="Resuelto">Resuelto</option>
-                                        <option value="En Proceso">En Proceso</option>
-                                        <option value="Ineficaz">Ineficaz</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
 
                 {isFormReady && (
                     <Card>
