@@ -34,40 +34,134 @@ export const CargarCompetencias: React.FC<CargarCompetenciasProps> = ({ clases, 
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
+    // Define all available subjects by level
+    const ASIGNATURAS_POR_NIVEL: { [key: string]: string[] } = {
+        "Nivel Preescolar": [
+            "Personal y Social", "Relación con el ambiente", "Comunicación y Representación", "Inglés",
+            "EDUCACIÓN FÍSICA Y DEPORTE", "Música", "Arte", "Francés", "Robótica", "Computación", "Ajedrez"
+        ],
+        "Nivel Primaria": [
+            "Matemáticas", "Lenguaje", "Ciencias", "Sociales", "Proyecto", "Inglés",
+            "Evaluación", "Francés", "Literatura", "Música", "Arte", "Tecnología",
+            "Ajedrez", "Ed. Física y Deporte", "Valores"
+        ],
+    };
+
+    const GRADOS = [
+        "Maternal", "Pre-Kinder", "Kinder", "Preparatorio",
+        "1er Grado", "2do Grado", "3er Grado", "4to Grado", "5to Grado", "6to Grado"
+    ];
+
+    // English levels for grades 5-6
+    const ENGLISH_LEVELS = ["Basic", "Lower", "Upper"];
+
+    // Generate all possible grade-subject combinations
+    const getAllPossibleClases = () => {
+        const allClases: Array<{ id: string; grado: string; materia: string; nivel_ingles?: string; isVirtual: boolean }> = [];
+
+        // Add existing classes
+        clases.forEach(clase => {
+            allClases.push({
+                id: clase.id_clase,
+                grado: clase.grado_asignado,
+                materia: clase.nombre_materia,
+                nivel_ingles: clase.nivel_ingles || undefined,
+                isVirtual: false
+            });
+        });
+
+        // Generate virtual classes for all grade-subject combinations
+        GRADOS.forEach(grado => {
+            // Determine level
+            let nivel = "Nivel Primaria";
+            if (["Maternal", "Pre-Kinder", "Kinder", "Preparatorio"].includes(grado)) {
+                nivel = "Nivel Preescolar";
+            }
+
+            const subjects = ASIGNATURAS_POR_NIVEL[nivel] || [];
+
+            subjects.forEach(materia => {
+                // Special handling for English in grades 5-6
+                if (materia === "Inglés" && ["5to Grado", "6to Grado"].includes(grado)) {
+                    ENGLISH_LEVELS.forEach(level => {
+                        const exists = allClases.some(c =>
+                            c.grado === grado &&
+                            c.materia.toLowerCase().includes('inglés') &&
+                            c.nivel_ingles === level
+                        );
+                        if (!exists) {
+                            allClases.push({
+                                id: `virtual-${grado}-ingles-${level}`,
+                                grado: grado,
+                                materia: `Inglés (${level})`,
+                                nivel_ingles: level,
+                                isVirtual: true
+                            });
+                        }
+                    });
+                } else {
+                    // Check if this combination already exists
+                    const exists = allClases.some(c =>
+                        c.grado === grado &&
+                        c.materia === materia
+                    );
+                    if (!exists) {
+                        allClases.push({
+                            id: `virtual-${grado}-${materia.replace(/\s+/g, '-')}`,
+                            grado: grado,
+                            materia: materia,
+                            isVirtual: true
+                        });
+                    }
+                }
+            });
+        });
+
+        return allClases;
+    };
+
+    const allPossibleClases = getAllPossibleClases();
+
+    // Find selected class data (could be real or virtual)
     const selectedClaseData = clases.find(c => c.id_clase === selectedClase);
-    const gradeColor = selectedClaseData ? getGradeColor(selectedClaseData.grado_asignado) : '#F3F4F6';
+    const selectedVirtualClase = allPossibleClases.find(c => c.id === selectedClase);
+    const gradeColor = selectedClaseData
+        ? getGradeColor(selectedClaseData.grado_asignado)
+        : selectedVirtualClase
+            ? getGradeColor(selectedVirtualClase.grado)
+            : '#F3F4F6';
 
     // Group English classes for better UX
     const getGroupedClases = () => {
-        const grouped: { [key: string]: Clase[] } = {};
+        const grouped: { [key: string]: typeof allPossibleClases } = {};
 
-        clases.forEach(clase => {
-            const isEnglish = clase.nombre_materia.toLowerCase().includes('inglés') ||
-                clase.nombre_materia.toLowerCase().includes('ingles');
+        allPossibleClases.forEach(clase => {
+            const isEnglish = clase.materia.toLowerCase().includes('inglés') ||
+                clase.materia.toLowerCase().includes('ingles');
 
             // Check if it's grades 1-4
-            const isGrades1to4 = ['1er Grado', '2do Grado', '3er Grado', '4to Grado'].includes(clase.grado_asignado);
+            const isGrades1to4 = ['1er Grado', '2do Grado', '3er Grado', '4to Grado'].includes(clase.grado);
 
             // Check if it's grades 5-6 with level
-            const isGrades5to6 = ['5to Grado', '6to Grado'].includes(clase.grado_asignado);
+            const isGrades5to6 = ['5to Grado', '6to Grado'].includes(clase.grado);
 
             if (isEnglish && isGrades1to4) {
                 // Group all English routines for grades 1-4 under "Inglés"
-                const groupKey = `${clase.grado_asignado} - Inglés`;
+                const groupKey = `${clase.grado} - Inglés`;
                 if (!grouped[groupKey]) {
                     grouped[groupKey] = [];
                 }
                 grouped[groupKey].push(clase);
             } else if (isEnglish && isGrades5to6 && clase.nivel_ingles) {
                 // For grades 5-6, show by English level
-                const groupKey = `${clase.grado_asignado} - Inglés (${clase.nivel_ingles})`;
+                const groupKey = `${clase.grado} - Inglés (${clase.nivel_ingles})`;
                 if (!grouped[groupKey]) {
                     grouped[groupKey] = [];
                 }
                 grouped[groupKey].push(clase);
             } else {
                 // Regular classes, no grouping
-                const groupKey = `${clase.grado_asignado} - ${clase.nombre_materia}`;
+                const groupKey = `${clase.grado} - ${clase.materia}`;
                 grouped[groupKey] = [clase];
             }
         });
@@ -178,9 +272,13 @@ export const CargarCompetencias: React.FC<CargarCompetenciasProps> = ({ clases, 
             }}>
                 <CardTitle className="flex items-center gap-2">
                     Cargar Nueva Competencia
-                    {selectedClaseData && (
+                    {(selectedClaseData || selectedVirtualClase) && (
                         <Badge style={{ backgroundColor: gradeColor, color: '#000' }}>
-                            {selectedClaseData.grado_asignado} - {selectedClaseData.nombre_materia}
+                            {selectedClaseData
+                                ? `${selectedClaseData.grado_asignado} - ${selectedClaseData.nombre_materia}`
+                                : selectedVirtualClase
+                                    ? `${selectedVirtualClase.grado} - ${selectedVirtualClase.materia}`
+                                    : ''}
                         </Badge>
                     )}
                 </CardTitle>
@@ -202,14 +300,14 @@ export const CargarCompetencias: React.FC<CargarCompetenciasProps> = ({ clases, 
                                 .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
                                 .map(([groupName, clasesInGroup]) => {
                                     const firstClase = clasesInGroup[0];
-                                    const color = getGradeColor(firstClase.grado_asignado);
+                                    const color = getGradeColor(firstClase.grado);
 
                                     // If there's only one class in the group, show it directly
                                     if (clasesInGroup.length === 1) {
                                         return (
                                             <option
-                                                key={firstClase.id_clase}
-                                                value={firstClase.id_clase}
+                                                key={firstClase.id}
+                                                value={firstClase.id}
                                                 style={{ backgroundColor: `${color}20` }}
                                             >
                                                 {groupName}
@@ -222,11 +320,11 @@ export const CargarCompetencias: React.FC<CargarCompetenciasProps> = ({ clases, 
                                         <optgroup key={groupName} label={groupName}>
                                             {clasesInGroup.map(clase => (
                                                 <option
-                                                    key={clase.id_clase}
-                                                    value={clase.id_clase}
+                                                    key={clase.id}
+                                                    value={clase.id}
                                                     style={{ backgroundColor: `${color}20` }}
                                                 >
-                                                    {clase.nombre_materia}
+                                                    {clase.materia}
                                                 </option>
                                             ))}
                                         </optgroup>
