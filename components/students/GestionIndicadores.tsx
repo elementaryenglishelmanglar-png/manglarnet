@@ -1,21 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import { Alert, AlertDescription } from '../ui/alert';
 import { maestraIndicadoresService, type MaestraIndicador, type Clase } from '../../services/supabaseDataService';
 import { ImportIndicadoresExcel } from './ImportIndicadoresExcel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { PlusIcon, DeleteIcon, EditIcon } from '../Icons';
+import { DeleteIcon, EditIcon, SaveIcon, CloseIcon, SearchIcon } from '../Icons';
 import { Badge } from '../ui/badge';
 
 interface GestionIndicadoresProps {
     clases: Clase[];
 }
 
+// Grade color mapping (from App.tsx)
+const getGradeColor = (grade: string): string => {
+    const gradeColors: { [key: string]: string } = {
+        '1er Grado': '#00ff01',
+        '2do Grado': '#99cdff',
+        '3er Grado': '#ff00fe',
+        '4to Grado': '#99cdff',
+        '5to Grado': '#3e85c7',
+        '6to Grado': '#00ffff',
+    };
+    return gradeColors[grade] || '#F3F4F6';
+};
+
 export const GestionIndicadores: React.FC<GestionIndicadoresProps> = ({ clases }) => {
     const [indicadores, setIndicadores] = useState<MaestraIndicador[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedClaseFilter, setSelectedClaseFilter] = useState<string>('all');
+    const [searchCodigo, setSearchCodigo] = useState<string>('');
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editingText, setEditingText] = useState<string>('');
 
     const loadIndicadores = async () => {
         setIsLoading(true);
@@ -41,6 +58,41 @@ export const GestionIndicadores: React.FC<GestionIndicadoresProps> = ({ clases }
             await loadIndicadores();
         } catch (error: any) {
             alert('Error al eliminar indicador: ' + error.message);
+        }
+    };
+
+    const handleEdit = (id: string, currentText: string) => {
+        setEditingId(id);
+        setEditingText(currentText);
+    };
+
+    const handleSave = async (id: string) => {
+        try {
+            await maestraIndicadoresService.update(id, { descripcion: editingText });
+            setEditingId(null);
+            setEditingText('');
+            await loadIndicadores();
+        } catch (error: any) {
+            alert('Error al actualizar: ' + error.message);
+        }
+    };
+
+    const handleCancel = () => {
+        setEditingId(null);
+        setEditingText('');
+    };
+
+    const handleSearchCodigo = async () => {
+        if (!searchCodigo.trim()) {
+            loadIndicadores();
+            return;
+        }
+
+        try {
+            const results = await maestraIndicadoresService.searchByCodigo(searchCodigo);
+            setIndicadores(results);
+        } catch (error) {
+            console.error('Error searching by code:', error);
         }
     };
 
@@ -75,11 +127,11 @@ export const GestionIndicadores: React.FC<GestionIndicadoresProps> = ({ clases }
                 </TabsList>
 
                 <TabsContent value="view" className="space-y-4">
-                    {/* Filter */}
+                    {/* Filters and Search */}
                     <Card>
-                        <CardContent className="pt-6">
+                        <CardContent className="pt-6 space-y-4">
                             <div className="flex items-center gap-4">
-                                <label className="font-semibold text-sm">Filtrar por clase:</label>
+                                <label className="font-semibold text-sm whitespace-nowrap">Filtrar por clase:</label>
                                 <select
                                     className="border rounded px-3 py-2 flex-1 max-w-md"
                                     value={selectedClaseFilter}
@@ -94,6 +146,27 @@ export const GestionIndicadores: React.FC<GestionIndicadoresProps> = ({ clases }
                                             </option>
                                         ))}
                                 </select>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <label className="font-semibold text-sm whitespace-nowrap">Buscar por código:</label>
+                                <Input
+                                    type="text"
+                                    placeholder="Ej: 6G-MAT-C-001"
+                                    value={searchCodigo}
+                                    onChange={(e) => setSearchCodigo(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSearchCodigo()}
+                                    className="max-w-xs"
+                                />
+                                <Button onClick={handleSearchCodigo} size="sm">
+                                    <SearchIcon />
+                                    Buscar
+                                </Button>
+                                {searchCodigo && (
+                                    <Button onClick={() => { setSearchCodigo(''); loadIndicadores(); }} variant="outline" size="sm">
+                                        Limpiar
+                                    </Button>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -116,12 +189,14 @@ export const GestionIndicadores: React.FC<GestionIndicadoresProps> = ({ clases }
                             const clase = clases.find(c => c.id_clase === idClase);
                             if (!clase) return null;
 
+                            const gradeColor = getGradeColor(clase.grado_asignado);
+
                             return (
-                                <Card key={idClase}>
-                                    <CardHeader>
-                                        <CardTitle className="text-lg">
-                                            {clase.grado_asignado} - {clase.nombre_materia}
-                                            <Badge variant="secondary" className="ml-2">{inds.length} indicadores</Badge>
+                                <Card key={idClase} style={{ borderLeft: `4px solid ${gradeColor}` }}>
+                                    <CardHeader style={{ backgroundColor: `${gradeColor}15` }}>
+                                        <CardTitle className="text-lg flex items-center gap-2">
+                                            <span>{clase.grado_asignado} - {clase.nombre_materia}</span>
+                                            <Badge variant="secondary">{inds.length} indicadores</Badge>
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
@@ -141,17 +216,58 @@ export const GestionIndicadores: React.FC<GestionIndicadoresProps> = ({ clases }
                                                                 <Badge variant={ind.categoria === 'Competencia' ? 'default' : 'outline'}>
                                                                     {ind.categoria}
                                                                 </Badge>
+                                                                {ind.codigo_unico && (
+                                                                    <Badge variant="secondary" className="font-mono text-xs">
+                                                                        {ind.codigo_unico}
+                                                                    </Badge>
+                                                                )}
                                                             </div>
-                                                            <p className="text-sm">{ind.descripcion}</p>
+                                                            {editingId === ind.id_indicador ? (
+                                                                <Input
+                                                                    value={editingText}
+                                                                    onChange={(e) => setEditingText(e.target.value)}
+                                                                    className="mt-2"
+                                                                />
+                                                            ) : (
+                                                                <p className="text-sm">{ind.descripcion}</p>
+                                                            )}
                                                         </div>
                                                         <div className="flex gap-2">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => handleDelete(ind.id_indicador)}
-                                                            >
-                                                                <DeleteIcon className="h-4 w-4 text-destructive" />
-                                                            </Button>
+                                                            {editingId === ind.id_indicador ? (
+                                                                <>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => handleSave(ind.id_indicador)}
+                                                                    >
+                                                                        <SaveIcon />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={handleCancel}
+                                                                    >
+                                                                        <CloseIcon />
+                                                                    </Button>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => handleEdit(ind.id_indicador, ind.descripcion)}
+                                                                    >
+                                                                        <EditIcon className="h-4 w-4 text-blue-600" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => handleDelete(ind.id_indicador)}
+                                                                    >
+                                                                        <DeleteIcon className="h-4 w-4 text-destructive" />
+                                                                    </Button>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 ))}

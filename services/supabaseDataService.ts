@@ -146,6 +146,7 @@ export interface MaestraIndicador {
   activo: boolean;
   rutina?: string;
   id_padre?: string;
+  codigo_unico?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -1673,6 +1674,32 @@ export const maestraIndicadoresService = {
       .from('maestra_indicadores')
       .insert(indicadores)
       .select();
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByCodigoUnico(codigo: string): Promise<MaestraIndicador | null> {
+    const { data, error } = await supabase
+      .from('maestra_indicadores')
+      .select('*')
+      .eq('codigo_unico', codigo)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null; // Not found
+      throw error;
+    }
+    return data;
+  },
+
+  async searchByCodigo(codigoPartial: string): Promise<MaestraIndicador[]> {
+    const { data, error } = await supabase
+      .from('maestra_indicadores')
+      .select('*')
+      .ilike('codigo_unico', `%${codigoPartial}%`)
+      .eq('activo', true)
+      .order('codigo_unico', { ascending: true });
 
     if (error) throw error;
     return data || [];

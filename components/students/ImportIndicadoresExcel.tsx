@@ -5,16 +5,7 @@ import { Input } from '../ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { maestraIndicadoresService } from '../../services/supabaseDataService';
-import { UploadIcon, CheckIcon, AlertTriangle, FileSpreadsheetIcon, RefreshCwIcon } from 'lucide-react';
-
-interface ExcelRow {
-    grado: string;
-    asignatura: string;
-    rutina: string;
-    competencia: string;
-    indicador: string;
-    orden: number;
-}
+import { CheckIcon, AlertTriangle, FileSpreadsheetIcon, RefreshCwIcon } from 'lucide-react';
 
 interface ProcessedData {
     claseId?: string;
@@ -81,7 +72,7 @@ export const ImportIndicadoresExcel: React.FC<ImportIndicadoresProps> = ({ clase
                 // Helper to normalize strings
                 const norm = (s: any) => String(s || '').trim();
 
-                jsonData.forEach((row, idx) => {
+                jsonData.forEach((row) => {
                     // Detect columns (flexible naming)
                     const grado = norm(row['Grado'] || row['grado'] || row['Nivel']);
                     const asignatura = norm(row['Asignatura'] || row['Materia'] || row['Código'] || row['Codigo']); // Sometimes Code is used for Subject
@@ -235,13 +226,27 @@ export const ImportIndicadoresExcel: React.FC<ImportIndicadoresProps> = ({ clase
                     <AlertDescription>
                         <p className="font-semibold">Formato requerido (Columnas):</p>
                         <p className="text-sm text-muted-foreground">
-                            Grado | Asignatura | Rutina | Competencia | Indicadores
+                            Grado | Asignatura | Competencia | Indicador | Código (opcional)
                         </p>
                         <p className="text-xs mt-2 text-blue-600">
                             * El sistema buscará automáticamente las clases que coincidan con Grado y Asignatura.
                         </p>
+                        <p className="text-xs text-blue-600">
+                            * Los códigos únicos se generan automáticamente si no se proporcionan.
+                        </p>
                     </AlertDescription>
                 </Alert>
+
+                <div className="flex items-center gap-4">
+                    <a
+                        href="/plantilla_competencias_indicadores.xlsx"
+                        download
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                    >
+                        <FileSpreadsheetIcon className="h-4 w-4" />
+                        Descargar Plantilla Excel
+                    </a>
+                </div>
 
                 <div className="flex items-center gap-4">
                     <Input
