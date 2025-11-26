@@ -1,0 +1,280 @@
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Alert, AlertDescription } from '../ui/alert';
+import { Badge } from '../ui/badge';
+import { maestraIndicadoresService, type Clase } from '../../services/supabaseDataService';
+import { PlusIcon, DeleteIcon, SaveIcon } from '../Icons';
+
+interface CargarCompetenciasProps {
+    clases: Clase[];
+    onSaveComplete: () => void;
+}
+
+// Grade color mapping
+const getGradeColor = (grade: string): string => {
+    const gradeColors: { [key: string]: string } = {
+        '1er Grado': '#00ff01',
+        '2do Grado': '#99cdff',
+        '3er Grado': '#ff00fe',
+        '4to Grado': '#99cdff',
+        '5to Grado': '#3e85c7',
+        '6to Grado': '#00ffff',
+    };
+    return gradeColors[grade] || '#F3F4F6';
+};
+
+export const CargarCompetencias: React.FC<CargarCompetenciasProps> = ({ clases, onSaveComplete }) => {
+    const [selectedClase, setSelectedClase] = useState<string>('');
+    const [competenciaDescripcion, setCompetenciaDescripcion] = useState<string>('');
+    const [indicadores, setIndicadores] = useState<string[]>(['']);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
+
+    const selectedClaseData = clases.find(c => c.id_clase === selectedClase);
+    const gradeColor = selectedClaseData ? getGradeColor(selectedClaseData.grado_asignado) : '#F3F4F6';
+
+    const handleAddIndicador = () => {
+        setIndicadores([...indicadores, '']);
+    };
+
+    const handleRemoveIndicador = (index: number) => {
+        if (indicadores.length > 1) {
+            setIndicadores(indicadores.filter((_, i) => i !== index));
+        }
+    };
+
+    const handleIndicadorChange = (index: number, value: string) => {
+        const newIndicadores = [...indicadores];
+        newIndicadores[index] = value;
+        setIndicadores(newIndicadores);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        setSuccess(null);
+
+        // Validations
+        if (!selectedClase) {
+            setError('Por favor selecciona una clase');
+            return;
+        }
+
+        if (!competenciaDescripcion.trim()) {
+            setError('Por favor ingresa la descripción de la competencia');
+            return;
+        }
+
+        const validIndicadores = indicadores.filter(ind => ind.trim() !== '');
+        if (validIndicadores.length === 0) {
+            setError('Por favor agrega al menos un indicador');
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            // 1. Create Competency
+            const competenciaData = {
+                id_clase: selectedClase,
+                categoria: 'Competencia' as const,
+                descripcion: competenciaDescripcion.trim(),
+                orden: 1,
+                activo: true,
+            };
+
+            const createdCompetencia = await maestraIndicadoresService.create(competenciaData);
+
+            // 2. Create Indicators
+            const indicadoresData = validIndicadores.map((indText, idx) => ({
+                id_clase: selectedClase,
+                categoria: 'Indicador' as const,
+                descripcion: indText.trim(),
+                orden: idx + 1,
+                activo: true,
+                id_padre: createdCompetencia.id_indicador,
+            }));
+
+            await maestraIndicadoresService.createBulk(indicadoresData);
+
+            setSuccess(`✅ Competencia creada exitosamente con ${validIndicadores.length} indicadores. Código: ${createdCompetencia.codigo_unico || 'Generado automáticamente'}`);
+
+            // Reset form
+            setSelectedClase('');
+            setCompetenciaDescripcion('');
+            setIndicadores(['']);
+
+            // Notify parent to reload
+            setTimeout(() => {
+                onSaveComplete();
+                setSuccess(null);
+            }, 2000);
+
+        } catch (err: any) {
+            console.error('Error saving competencia:', err);
+            setError(`Error al guardar: ${err.message}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleCancel = () => {
+        setSelectedClase('');
+        setCompetenciaDescripcion('');
+        setIndicadores(['']);
+        setError(null);
+        setSuccess(null);
+    };
+
+    return (
+        <Card>
+            <CardHeader style={{
+                backgroundColor: selectedClaseData ? `${gradeColor}15` : undefined,
+                borderLeft: selectedClaseData ? `4px solid ${gradeColor}` : undefined
+            }}>
+                <CardTitle className="flex items-center gap-2">
+                    Cargar Nueva Competencia
+                    {selectedClaseData && (
+                        <Badge style={{ backgroundColor: gradeColor, color: '#000' }}>
+                            {selectedClaseData.grado_asignado} - {selectedClaseData.nombre_materia}
+                        </Badge>
+                    )}
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Clase Selection */}
+                    <div className="space-y-2">
+                        <Label htmlFor="clase">Clase (Grado - Asignatura) *</Label>
+                        <select
+                            id="clase"
+                            value={selectedClase}
+                            onChange={(e) => setSelectedClase(e.target.value)}
+                            className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                            required
+                        >
+                            <option value="">Selecciona una clase...</option>
+                            {clases
+                                .sort((a, b) => a.grado_asignado.localeCompare(b.grado_asignado))
+                                .map(clase => {
+                                    const color = getGradeColor(clase.grado_asignado);
+                                    return (
+                                        <option
+                                            key={clase.id_clase}
+                                            value={clase.id_clase}
+                                            style={{ backgroundColor: `${color}20` }}
+                                        >
+                                            {clase.grado_asignado} - {clase.nombre_materia}
+                                        </option>
+                                    );
+                                })}
+                        </select>
+                    </div>
+
+                    {/* Competencia Description */}
+                    <div className="space-y-2">
+                        <Label htmlFor="competencia">Descripción de la Competencia *</Label>
+                        <Input
+                            id="competencia"
+                            type="text"
+                            value={competenciaDescripcion}
+                            onChange={(e) => setCompetenciaDescripcion(e.target.value)}
+                            placeholder="Ej: Resuelve problemas de álgebra básica"
+                            required
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            El código único se generará automáticamente al guardar
+                        </p>
+                    </div>
+
+                    {/* Indicadores */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <Label>Indicadores *</Label>
+                            <Button
+                                type="button"
+                                onClick={handleAddIndicador}
+                                size="sm"
+                                variant="outline"
+                            >
+                                <PlusIcon />
+                                <span className="ml-2">Agregar Indicador</span>
+                            </Button>
+                        </div>
+
+                        <div className="space-y-3">
+                            {indicadores.map((indicador, index) => (
+                                <div key={index} className="flex items-start gap-2">
+                                    <div className="flex-1">
+                                        <Input
+                                            type="text"
+                                            value={indicador}
+                                            onChange={(e) => handleIndicadorChange(index, e.target.value)}
+                                            placeholder={`Indicador ${index + 1}`}
+                                            required={index === 0}
+                                        />
+                                    </div>
+                                    {indicadores.length > 1 && (
+                                        <Button
+                                            type="button"
+                                            onClick={() => handleRemoveIndicador(index)}
+                                            size="sm"
+                                            variant="ghost"
+                                        >
+                                            <DeleteIcon className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Agrega al menos un indicador. Puedes agregar más haciendo clic en "Agregar Indicador"
+                        </p>
+                    </div>
+
+                    {/* Error/Success Messages */}
+                    {error && (
+                        <Alert variant="destructive">
+                            <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                    )}
+
+                    {success && (
+                        <Alert className="border-green-500 bg-green-50">
+                            <AlertDescription className="text-green-800">{success}</AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3 justify-end">
+                        <Button
+                            type="button"
+                            onClick={handleCancel}
+                            variant="outline"
+                            disabled={isLoading}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={isLoading}
+                        >
+                            {isLoading ? (
+                                'Guardando...'
+                            ) : (
+                                <>
+                                    <SaveIcon />
+                                    <span className="ml-2">Guardar Competencia</span>
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                </form>
+            </CardContent>
+        </Card>
+    );
+};

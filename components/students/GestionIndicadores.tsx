@@ -5,6 +5,7 @@ import { Input } from '../ui/input';
 import { Alert, AlertDescription } from '../ui/alert';
 import { maestraIndicadoresService, type MaestraIndicador, type Clase } from '../../services/supabaseDataService';
 import { ImportIndicadoresExcel } from './ImportIndicadoresExcel';
+import { CargarCompetencias } from './CargarCompetencias';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { DeleteIcon, EditIcon, SaveIcon, CloseIcon, SearchIcon } from '../Icons';
 import { Badge } from '../ui/badge';
@@ -123,6 +124,7 @@ export const GestionIndicadores: React.FC<GestionIndicadoresProps> = ({ clases }
             <Tabs defaultValue="view" className="w-full">
                 <TabsList>
                     <TabsTrigger value="view">Ver Indicadores</TabsTrigger>
+                    <TabsTrigger value="cargar">Cargar Competencias</TabsTrigger>
                     <TabsTrigger value="import">Importar desde Excel</TabsTrigger>
                 </TabsList>
 
@@ -257,7 +259,7 @@ export const GestionIndicadores: React.FC<GestionIndicadoresProps> = ({ clases }
                                                                         size="sm"
                                                                         onClick={() => handleEdit(ind.id_indicador, ind.descripcion)}
                                                                     >
-                                                                        <EditIcon className="h-4 w-4 text-blue-600" />
+                                                                        <EditIcon />
                                                                     </Button>
                                                                     <Button
                                                                         variant="ghost"
@@ -277,6 +279,10 @@ export const GestionIndicadores: React.FC<GestionIndicadoresProps> = ({ clases }
                             );
                         })
                     )}
+                </TabsContent>
+
+                <TabsContent value="cargar">
+                    <CargarCompetencias clases={clases} onSaveComplete={loadIndicadores} />
                 </TabsContent>
 
                 <TabsContent value="import">
