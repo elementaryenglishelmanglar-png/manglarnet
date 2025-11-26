@@ -140,13 +140,51 @@ export const GestionIndicadores: React.FC<GestionIndicadoresProps> = ({ clases }
                                     onChange={(e) => setSelectedClaseFilter(e.target.value)}
                                 >
                                     <option value="all">Todas las clases</option>
-                                    {clases
-                                        .sort((a, b) => a.grado_asignado.localeCompare(b.grado_asignado))
-                                        .map(clase => (
-                                            <option key={clase.id_clase} value={clase.id_clase}>
-                                                {clase.grado_asignado} - {clase.nombre_materia}
-                                            </option>
-                                        ))}
+                                    {(() => {
+                                        // Group English classes for better UX
+                                        const grouped: { [key: string]: { id: string; label: string }[] } = {};
+
+                                        clases.forEach(clase => {
+                                            const isEnglish = clase.nombre_materia.toLowerCase().includes('inglés') ||
+                                                clase.nombre_materia.toLowerCase().includes('ingles');
+                                            const isGrades1to4 = ['1er Grado', '2do Grado', '3er Grado', '4to Grado'].includes(clase.grado_asignado);
+                                            const isGrades5to6 = ['5to Grado', '6to Grado'].includes(clase.grado_asignado);
+
+                                            if (isEnglish && isGrades1to4) {
+                                                const groupKey = `${clase.grado_asignado} - Inglés`;
+                                                if (!grouped[groupKey]) grouped[groupKey] = [];
+                                                grouped[groupKey].push({ id: clase.id_clase, label: clase.nombre_materia });
+                                            } else if (isEnglish && isGrades5to6 && clase.nivel_ingles) {
+                                                const groupKey = `${clase.grado_asignado} - Inglés (${clase.nivel_ingles})`;
+                                                if (!grouped[groupKey]) grouped[groupKey] = [];
+                                                grouped[groupKey].push({ id: clase.id_clase, label: clase.nombre_materia });
+                                            } else {
+                                                const groupKey = `${clase.grado_asignado} - ${clase.nombre_materia}`;
+                                                grouped[groupKey] = [{ id: clase.id_clase, label: clase.nombre_materia }];
+                                            }
+                                        });
+
+                                        return Object.entries(grouped)
+                                            .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+                                            .map(([groupName, items]) => {
+                                                if (items.length === 1) {
+                                                    return (
+                                                        <option key={items[0].id} value={items[0].id}>
+                                                            {groupName}
+                                                        </option>
+                                                    );
+                                                }
+                                                return (
+                                                    <optgroup key={groupName} label={groupName}>
+                                                        {items.map(item => (
+                                                            <option key={item.id} value={item.id}>
+                                                                {item.label}
+                                                            </option>
+                                                        ))}
+                                                    </optgroup>
+                                                );
+                                            });
+                                    })()}
                                 </select>
                             </div>
 

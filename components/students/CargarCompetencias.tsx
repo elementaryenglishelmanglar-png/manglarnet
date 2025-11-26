@@ -37,6 +37,46 @@ export const CargarCompetencias: React.FC<CargarCompetenciasProps> = ({ clases, 
     const selectedClaseData = clases.find(c => c.id_clase === selectedClase);
     const gradeColor = selectedClaseData ? getGradeColor(selectedClaseData.grado_asignado) : '#F3F4F6';
 
+    // Group English classes for better UX
+    const getGroupedClases = () => {
+        const grouped: { [key: string]: Clase[] } = {};
+
+        clases.forEach(clase => {
+            const isEnglish = clase.nombre_materia.toLowerCase().includes('inglés') ||
+                clase.nombre_materia.toLowerCase().includes('ingles');
+
+            // Check if it's grades 1-4
+            const isGrades1to4 = ['1er Grado', '2do Grado', '3er Grado', '4to Grado'].includes(clase.grado_asignado);
+
+            // Check if it's grades 5-6 with level
+            const isGrades5to6 = ['5to Grado', '6to Grado'].includes(clase.grado_asignado);
+
+            if (isEnglish && isGrades1to4) {
+                // Group all English routines for grades 1-4 under "Inglés"
+                const groupKey = `${clase.grado_asignado} - Inglés`;
+                if (!grouped[groupKey]) {
+                    grouped[groupKey] = [];
+                }
+                grouped[groupKey].push(clase);
+            } else if (isEnglish && isGrades5to6 && clase.nivel_ingles) {
+                // For grades 5-6, show by English level
+                const groupKey = `${clase.grado_asignado} - Inglés (${clase.nivel_ingles})`;
+                if (!grouped[groupKey]) {
+                    grouped[groupKey] = [];
+                }
+                grouped[groupKey].push(clase);
+            } else {
+                // Regular classes, no grouping
+                const groupKey = `${clase.grado_asignado} - ${clase.nombre_materia}`;
+                grouped[groupKey] = [clase];
+            }
+        });
+
+        return grouped;
+    };
+
+    const groupedClases = getGroupedClases();
+
     const handleAddIndicador = () => {
         setIndicadores([...indicadores, '']);
     };
@@ -158,18 +198,38 @@ export const CargarCompetencias: React.FC<CargarCompetenciasProps> = ({ clases, 
                             required
                         >
                             <option value="">Selecciona una clase...</option>
-                            {clases
-                                .sort((a, b) => a.grado_asignado.localeCompare(b.grado_asignado))
-                                .map(clase => {
-                                    const color = getGradeColor(clase.grado_asignado);
+                            {Object.entries(groupedClases)
+                                .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+                                .map(([groupName, clasesInGroup]) => {
+                                    const firstClase = clasesInGroup[0];
+                                    const color = getGradeColor(firstClase.grado_asignado);
+
+                                    // If there's only one class in the group, show it directly
+                                    if (clasesInGroup.length === 1) {
+                                        return (
+                                            <option
+                                                key={firstClase.id_clase}
+                                                value={firstClase.id_clase}
+                                                style={{ backgroundColor: `${color}20` }}
+                                            >
+                                                {groupName}
+                                            </option>
+                                        );
+                                    }
+
+                                    // If there are multiple classes (English routines), show as optgroup
                                     return (
-                                        <option
-                                            key={clase.id_clase}
-                                            value={clase.id_clase}
-                                            style={{ backgroundColor: `${color}20` }}
-                                        >
-                                            {clase.grado_asignado} - {clase.nombre_materia}
-                                        </option>
+                                        <optgroup key={groupName} label={groupName}>
+                                            {clasesInGroup.map(clase => (
+                                                <option
+                                                    key={clase.id_clase}
+                                                    value={clase.id_clase}
+                                                    style={{ backgroundColor: `${color}20` }}
+                                                >
+                                                    {clase.nombre_materia}
+                                                </option>
+                                            ))}
+                                        </optgroup>
                                     );
                                 })}
                         </select>
