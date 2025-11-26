@@ -131,6 +131,34 @@ export interface MinutaEvaluacion {
   analisis_ia: any[];
   created_by?: string;
   updated_at?: string;
+  // Clinical-Pedagogical Diagnostic System: "Soft data" fields
+  nivel_independencia?: 'Autónomo' | 'Apoyo Parcial' | 'Apoyo Total';
+  estado_emocional?: 'Enfocado' | 'Ansioso' | 'Distraído' | 'Participativo';
+  eficacia_accion_anterior?: 'Resuelto' | 'En Proceso' | 'Ineficaz';
+}
+
+export interface MaestraIndicador {
+  id_indicador: string;
+  id_clase: string;
+  categoria: 'Competencia' | 'Indicador';
+  descripcion: string;
+  orden: number;
+  activo: boolean;
+  rutina?: string;
+  id_padre?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DetalleEvaluacionAlumno {
+  id_detalle: string;
+  id_minuta: string;
+  id_alumno: string;
+  id_indicador: string;
+  nivel_logro: number; // 1-5 scale for radar charts
+  observaciones?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface EventoCalendario {
@@ -1585,6 +1613,185 @@ export const tareasCoordinadorService = {
       .from('tareas_coordinador')
       .delete()
       .eq('id_tarea', id);
+
+    if (error) throw error;
+  }
+};
+
+// ============================================
+// MAESTRA INDICADORES (Master Indicators)
+// ============================================
+
+export const maestraIndicadoresService = {
+  async getAll(): Promise<MaestraIndicador[]> {
+    const { data, error } = await supabase
+      .from('maestra_indicadores')
+      .select('*')
+      .eq('activo', true)
+      .order('orden', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByClase(idClase: string): Promise<MaestraIndicador[]> {
+    const { data, error } = await supabase
+      .from('maestra_indicadores')
+      .select('*')
+      .eq('id_clase', idClase)
+      .eq('activo', true)
+      .order('orden', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getById(id: string): Promise<MaestraIndicador | null> {
+    const { data, error } = await supabase
+      .from('maestra_indicadores')
+      .select('*')
+      .eq('id_indicador', id)
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async create(indicador: Omit<MaestraIndicador, 'id_indicador' | 'created_at' | 'updated_at'>): Promise<MaestraIndicador> {
+    const { data, error } = await supabase
+      .from('maestra_indicadores')
+      .insert([indicador])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async createBulk(indicadores: Omit<MaestraIndicador, 'id_indicador' | 'created_at' | 'updated_at'>[]): Promise<MaestraIndicador[]> {
+    const { data, error } = await supabase
+      .from('maestra_indicadores')
+      .insert(indicadores)
+      .select();
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async update(id: string, updates: Partial<MaestraIndicador>): Promise<MaestraIndicador> {
+    const { data, error } = await supabase
+      .from('maestra_indicadores')
+      .update(updates)
+      .eq('id_indicador', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('maestra_indicadores')
+      .delete()
+      .eq('id_indicador', id);
+
+    if (error) throw error;
+  }
+};
+
+// ============================================
+// DETALLE EVALUACION ALUMNO (Student Evaluation Detail)
+// ============================================
+
+export const detalleEvaluacionService = {
+  async getByMinuta(idMinuta: string): Promise<DetalleEvaluacionAlumno[]> {
+    const { data, error } = await supabase
+      .from('detalle_evaluacion_alumno')
+      .select('*')
+      .eq('id_minuta', idMinuta);
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByAlumno(idAlumno: string): Promise<DetalleEvaluacionAlumno[]> {
+    const { data, error } = await supabase
+      .from('detalle_evaluacion_alumno')
+      .select(`
+        *,
+        maestra_indicadores (
+          descripcion,
+          categoria
+        )
+      `)
+      .eq('id_alumno', idAlumno)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByMinutaAndAlumno(idMinuta: string, idAlumno: string): Promise<DetalleEvaluacionAlumno[]> {
+    const { data, error } = await supabase
+      .from('detalle_evaluacion_alumno')
+      .select('*')
+      .eq('id_minuta', idMinuta)
+      .eq('id_alumno', idAlumno);
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(detalle: Omit<DetalleEvaluacionAlumno, 'id_detalle' | 'created_at' | 'updated_at'>): Promise<DetalleEvaluacionAlumno> {
+    const { data, error } = await supabase
+      .from('detalle_evaluacion_alumno')
+      .insert([detalle])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async createBulk(detalles: Omit<DetalleEvaluacionAlumno, 'id_detalle' | 'created_at' | 'updated_at'>[]): Promise<DetalleEvaluacionAlumno[]> {
+    if (detalles.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('detalle_evaluacion_alumno')
+      .insert(detalles)
+      .select();
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async update(id: string, updates: Partial<DetalleEvaluacionAlumno>): Promise<DetalleEvaluacionAlumno> {
+    const { data, error } = await supabase
+      .from('detalle_evaluacion_alumno')
+      .update(updates)
+      .eq('id_detalle', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('detalle_evaluacion_alumno')
+      .delete()
+      .eq('id_detalle', id);
+
+    if (error) throw error;
+  },
+
+  async deleteByMinuta(idMinuta: string): Promise<void> {
+    const { error } = await supabase
+      .from('detalle_evaluacion_alumno')
+      .delete()
+      .eq('id_minuta', idMinuta);
 
     if (error) throw error;
   }
