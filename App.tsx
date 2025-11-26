@@ -30,6 +30,7 @@ import { supabase } from './services/supabaseClient';
 const LoginScreen = lazy(() => import('./components/LoginScreen').then(module => ({ default: module.LoginScreen })));
 const AuthorizedUsersView = lazy(() => import('./components/AuthorizedUsersView').then(module => ({ default: module.AuthorizedUsersView })));
 import BulkImportModal from './components/students/BulkImportModal';
+import { GestionIndicadores } from './components/students/GestionIndicadores';
 import { marked } from 'marked';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -54,6 +55,8 @@ import {
     aulasService,
     configuracionHorariosService,
     generacionesHorariosService,
+    maestraIndicadoresService,
+    detalleEvaluacionService,
     type Alumno as AlumnoDB,
     type Docente as DocenteDB,
     type Clase as ClaseDB,
@@ -65,7 +68,9 @@ import {
     type EventoCalendario as EventoCalendarioDB,
     type ConfiguracionHorario,
     type GeneracionHorario,
-    type Aula
+    type Aula,
+    type MaestraIndicador,
+    type DetalleEvaluacionAlumno
 } from './services/supabaseDataService';
 
 
@@ -233,6 +238,10 @@ interface MinutaEvaluacion {
     fecha_creacion: string;
     datos_alumnos: EvaluacionAlumno[];
     analisis_ia: AnalisisDificultad[];
+    // Clinical-Pedagogical Diagnostic System: "Soft data" fields
+    nivel_independencia?: 'Autónomo' | 'Apoyo Parcial' | 'Apoyo Total';
+    estado_emocional?: 'Enfocado' | 'Ansioso' | 'Distraído' | 'Participativo';
+    eficacia_accion_anterior?: 'Resuelto' | 'En Proceso' | 'Ineficaz';
 }
 
 
@@ -995,6 +1004,7 @@ const Sidebar: React.FC<{
         { id: 'calendar', label: 'Calendario', icon: CalendarIcon, roles: ['directivo', 'coordinador', 'docente'] },
         { id: 'planning', label: 'Planificaciones', icon: PlanningIcon, roles: ['directivo', 'coordinador', 'docente'] },
         { id: 'evaluation', label: 'Evaluación', icon: EvaluationIcon, roles: ['directivo', 'coordinador'] },
+        { id: 'indicadores', label: 'Indicadores', icon: ClipboardCheckIcon, roles: ['directivo', 'coordinador'] },
         { id: 'authorized-users', label: 'Gestión de Usuarios', icon: UsersIcon, roles: ['directivo', 'coordinador'] },
         { id: 'lapsos-admin', label: 'Gestión de Lapsos', icon: CalendarIcon, roles: ['coordinador', 'directivo'] },
     ];
@@ -9447,17 +9457,108 @@ const EvaluationView: React.FC<{
     const [aiAnalysis, setAiAnalysis] = useState<AnalisisDificultad[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
+    // Clinical-Pedagogical Diagnostic System States
+    const [indicadoresDisponibles, setIndicadoresDisponibles] = useState<MaestraIndicador[]>([]);
+    const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
+    const [detallesIndicadores, setDetallesIndicadores] = useState<Map<string, Map<string, number>>>(new Map());
+    const [softData, setSoftData] = useState<{
+        nivel_independencia: '' | 'Autónomo' | 'Apoyo Parcial' | 'Apoyo Total';
+        estado_emocional: '' | 'Enfocado' | 'Ansioso' | 'Distraído' | 'Participativo';
+        eficacia_accion_anterior: '' | 'Resuelto' | 'En Proceso' | 'Ineficaz';
+    }>({
+        nivel_independencia: '',
+        estado_emocional: '',
+        eficacia_accion_anterior: ''
+    });
+
+    // Group indicators by Routine and Competency
+    const groupedIndicators = useMemo(() => {
+        const groups: Record<string, Record<string, MaestraIndicador[]>> = {};
+        const competencyMap = new Map<string, MaestraIndicador>();
+
+        // First pass: Find competencies
+        indicadoresDisponibles.filter(i => i.categoria === 'Competencia').forEach(c => {
+            competencyMap.set(c.id_indicador, c);
+        });
+
+        // Initialize groups
+        indicadoresDisponibles.forEach(ind => {
+            const rutina = ind.rutina || 'General';
+            if (!groups[rutina]) groups[rutina] = {};
+
+            if (ind.categoria === 'Indicador') {
+                const parentId = ind.id_padre || 'NoCompetencia';
+                if (!groups[rutina][parentId]) groups[rutina][parentId] = [];
+                groups[rutina][parentId].push(ind);
+            }
+        });
+
+        return { groups, competencyMap };
+    }, [indicadoresDisponibles]);
+
+    // Helper function to extract English level from subject name
+    const extractEnglishLevel = (subjectName: string): string | null => {
+        // Format: "Inglés - Skill - Level" (e.g., "Inglés - Listening - Basic")
+        const parts = subjectName.split(' - ');
+        if (parts.length === 3 && parts[0].toLowerCase().includes('inglés')) {
+            return parts[2]; // Return the level (Basic, Lower, Upper, etc.)
+        }
+        return null;
+    };
+
     const availableSubjects = useMemo(() => {
         if (!filters.grado) return [];
-        return clases
+
+        const isEnglishGrade = filters.grado === '5to Grado' || filters.grado === '6to Grado';
+
+        // Get regular subjects (excluding English level classes for 5to-6to)
+        const regularSubjects = clases
             .filter(c => c.grado_asignado === filters.grado)
-            .filter(c => c.nombre_materia && c.nombre_materia.trim() !== ''); // Filtrar materias vacías
+            .filter(c => c.nombre_materia && c.nombre_materia.trim() !== '')
+            .filter(c => {
+                // For 5to-6to, exclude English classes that have nivel_ingles and skill_rutina
+                if (isEnglishGrade &&
+                    (c.nombre_materia?.toLowerCase().includes('inglés') || c.nombre_materia?.toLowerCase().includes('ingles'))) {
+                    // Exclude if it has nivel_ingles and skill_rutina (these are English level classes)
+                    return !((c as any).nivel_ingles && (c as any).skill_rutina);
+                }
+                return true;
+            });
+
+        // For 5to-6to, add English level subjects
+        if (isEnglishGrade) {
+            const englishLevelClasses = clases
+                .filter(c => c.grado_asignado === filters.grado)
+                .filter(c => (c as any).nivel_ingles && (c as any).skill_rutina)
+                .map(c => ({
+                    ...c,
+                    // Create a formatted name: "Inglés - Skill - Level"
+                    nombre_materia: `Inglés - ${(c as any).skill_rutina} - ${(c as any).nivel_ingles}`
+                }));
+
+            return [...regularSubjects, ...englishLevelClasses];
+        }
+
+        return regularSubjects;
     }, [filters.grado, clases]);
 
     const studentsInGrade = useMemo(() => {
         if (!filters.grado) return [];
-        return alumnos.filter(a => a.salon === filters.grado);
-    }, [filters.grado, alumnos]);
+
+        // Filter by grade first
+        let students = alumnos.filter(a => a.salon === filters.grado);
+
+        // If an English level subject is selected for 5to-6to, filter by nivel_ingles
+        if (filters.materia && (filters.grado === '5to Grado' || filters.grado === '6to Grado')) {
+            const englishLevel = extractEnglishLevel(filters.materia);
+            if (englishLevel) {
+                // Filter students by their English level
+                students = students.filter(a => a.nivel_ingles === englishLevel);
+            }
+        }
+
+        return students;
+    }, [filters.grado, filters.materia, alumnos]);
 
     const calculateAdvancedAnalytics = (evals: EvaluacionAlumno[]) => {
         const adaptationCounts: { [key: string]: number } = {};
@@ -9521,6 +9622,53 @@ const EvaluationView: React.FC<{
         });
     };
 
+    // Clinical-Pedagogical Diagnostic System: Load indicators when class/subject is selected
+    useEffect(() => {
+        if (filters.grado && filters.materia) {
+            const claseSeleccionada = clases.find(
+                c => c.grado_asignado === filters.grado && c.nombre_materia === filters.materia
+            );
+
+            if (claseSeleccionada) {
+                maestraIndicadoresService.getByClase(claseSeleccionada.id_clase)
+                    .then(data => {
+                        setIndicadoresDisponibles(data);
+                    })
+                    .catch(err => console.error('Error loading indicators:', err));
+            } else {
+                setIndicadoresDisponibles([]);
+            }
+        } else {
+            setIndicadoresDisponibles([]);
+        }
+    }, [filters.grado, filters.materia, clases]);
+
+    // Handler to toggle student detail panel
+    const toggleExpandStudent = (idAlumno: string) => {
+        setExpandedStudents(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(idAlumno)) {
+                newSet.delete(idAlumno);
+            } else {
+                newSet.add(idAlumno);
+            }
+            return newSet;
+        });
+    };
+
+    // Handler to update indicator level for a student
+    const handleIndicadorChange = (idAlumno: string, idIndicador: string, nivel: number) => {
+        setDetallesIndicadores(prev => {
+            const newMap = new Map(prev);
+            if (!newMap.has(idAlumno)) {
+                newMap.set(idAlumno, new Map());
+            }
+            const studentMap = newMap.get(idAlumno)!;
+            studentMap.set(idIndicador, nivel);
+            return newMap;
+        });
+    };
+
     const handleGenerateAnalysis = async () => {
         setIsLoading(true);
         setAiAnalysis([]);
@@ -9557,34 +9705,52 @@ const EvaluationView: React.FC<{
 
     const handleSaveMinuta = async () => {
         try {
-            const newMinuta: MinutaEvaluacion = {
-                id_minuta: `minuta-${Date.now()}`, // Temporal, será omitido
+            // Prepare basic minuta data with soft data included
+            const minutaToSave = {
                 ...filters,
-                fecha_creacion: new Date().toISOString(),
                 datos_alumnos: Array.from(studentEvals.values()),
                 analisis_ia: aiAnalysis,
+                nivel_independencia: softData.nivel_independencia || null,
+                estado_emocional: softData.estado_emocional || null,
+                eficacia_accion_anterior: softData.eficacia_accion_anterior || null
             };
 
-            // Save to Supabase - omitir id_minuta para que Supabase lo genere
-            const { id_minuta, fecha_creacion, ...minutaData } = newMinuta;
-
-            // Asegurar que los arrays estén en el formato correcto
-            const minutaToSave = {
-                ...minutaData,
-                datos_alumnos: minutaData.datos_alumnos || [],
-                analisis_ia: minutaData.analisis_ia || []
-            };
-
+            // Create minuta in database
             const created = await minutasService.create(minutaToSave);
 
-            // Recargar todas las minutas desde Supabase para asegurar sincronización
+            // Save detailed indicator evaluations if any exist
+            const detallesParaGuardar: Omit<DetalleEvaluacionAlumno, 'id_detalle' | 'created_at' | 'updated_at'>[] = [];
+
+            for (const [idAlumno, indicadoresMap] of detallesIndicadores.entries()) {
+                for (const [idIndicador, nivelLogro] of indicadoresMap.entries()) {
+                    if (nivelLogro > 0) { // Only save if a level was selected
+                        detallesParaGuardar.push({
+                            id_minuta: created.id_minuta,
+                            id_alumno: idAlumno,
+                            id_indicador: idIndicador,
+                            nivel_logro: nivelLogro
+                        });
+                    }
+                }
+            }
+
+            if (detallesParaGuardar.length > 0) {
+                await detalleEvaluacionService.createBulk(detallesParaGuardar);
+            }
+
+            // Reload all minutas
             const allMinutas = await minutasService.getAll();
             setMinutas(allMinutas);
 
-            alert('Minuta de la reunión guardada con éxito.');
+            alert(`Minuta guardada con éxito${detallesParaGuardar.length > 0 ? ` (incluidos ${detallesParaGuardar.length} detalles de indicadores)` : ''}.`);
+
+            // Reset form
             setFilters({ ano_escolar: '2025-2026', lapso: 'I Lapso', evaluacion: 'I Mensual', grado: '', materia: '' });
             setStudentEvals(new Map());
             setAiAnalysis([]);
+            setDetallesIndicadores(new Map());
+            setSoftData({ nivel_independencia: '', estado_emocional: '', eficacia_accion_anterior: '' });
+            setExpandedStudents(new Set());
         } catch (error: any) {
             console.error('Error saving minuta:', error);
             console.error('Error details:', JSON.stringify(error, null, 2));
@@ -9641,6 +9807,7 @@ const EvaluationView: React.FC<{
                             <CardTitle>2. Carga de Datos de Evaluación</CardTitle>
                         </CardHeader>
                         <CardContent>
+
                             <div className="overflow-x-auto">
                                 <table className="min-w-full divide-y divide-border">
                                     <thead className="bg-muted">
@@ -9649,58 +9816,155 @@ const EvaluationView: React.FC<{
                                             <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Nota</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Adaptación</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/2">Observaciones</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Detalle</th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-background divide-y divide-border">
                                         {(studentsInGrade || []).map(student => {
                                             const evalData = studentEvals.get(student.id_alumno) || { nota: '', adaptacion: '', observaciones: '' };
                                             return (
-                                                <tr key={student.id_alumno} className="hover:bg-muted/50">
-                                                    <td className="px-4 py-2 whitespace-nowrap font-medium">{student.apellidos}, {student.nombres}</td>
-                                                    <td className="px-4 py-2">
-                                                        <Select
-                                                            value={evalData.nota || undefined}
-                                                            onValueChange={(value) => handleStudentEvalChange(student.id_alumno, 'nota', value === 'none' ? '' : value)}
-                                                        >
-                                                            <SelectTrigger className="w-full">
-                                                                <SelectValue placeholder="Seleccionar nota" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="none">Sin nota</SelectItem>
-                                                                <SelectItem value="A">A</SelectItem>
-                                                                <SelectItem value="B">B</SelectItem>
-                                                                <SelectItem value="C">C</SelectItem>
-                                                                <SelectItem value="D">D</SelectItem>
-                                                                <SelectItem value="E">E</SelectItem>
-                                                                <SelectItem value="SE">SE</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        <Select
-                                                            value={evalData.adaptacion || undefined}
-                                                            onValueChange={(value) => handleStudentEvalChange(student.id_alumno, 'adaptacion', value === 'none' ? '' : value)}
-                                                        >
-                                                            <SelectTrigger className="w-full">
-                                                                <SelectValue placeholder="Seleccionar adaptación" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="none">Sin adaptación</SelectItem>
-                                                                <SelectItem value="Reg">Reg</SelectItem>
-                                                                <SelectItem value="AC+">AC+</SelectItem>
-                                                                <SelectItem value="AC-">AC-</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        <Input
-                                                            type="text"
-                                                            value={evalData.observaciones}
-                                                            onChange={e => handleStudentEvalChange(student.id_alumno, 'observaciones', e.target.value)}
-                                                            placeholder="Observaciones..."
-                                                        />
-                                                    </td>
-                                                </tr>
+                                                <React.Fragment key={student.id_alumno}>
+                                                    <tr className="hover:bg-muted/50">
+                                                        <td className="px-4 py-2 whitespace-nowrap font-medium">{student.apellidos}, {student.nombres}</td>
+                                                        <td className="px-4 py-2">
+                                                            <Select
+                                                                value={evalData.nota || undefined}
+                                                                onValueChange={(value) => handleStudentEvalChange(student.id_alumno, 'nota', value === 'none' ? '' : value)}
+                                                            >
+                                                                <SelectTrigger className="w-full">
+                                                                    <SelectValue placeholder="Seleccionar nota" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="none">Sin nota</SelectItem>
+                                                                    <SelectItem value="A">A</SelectItem>
+                                                                    <SelectItem value="B">B</SelectItem>
+                                                                    <SelectItem value="C">C</SelectItem>
+                                                                    <SelectItem value="D">D</SelectItem>
+                                                                    <SelectItem value="E">E</SelectItem>
+                                                                    <SelectItem value="SE">SE</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </td>
+                                                        <td className="px-4 py-2">
+                                                            <Select
+                                                                value={evalData.adaptacion || undefined}
+                                                                onValueChange={(value) => handleStudentEvalChange(student.id_alumno, 'adaptacion', value === 'none' ? '' : value)}
+                                                            >
+                                                                <SelectTrigger className="w-full">
+                                                                    <SelectValue placeholder="Seleccionar adaptación" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="none">Sin adaptación</SelectItem>
+                                                                    <SelectItem value="Reg">Reg</SelectItem>
+                                                                    <SelectItem value="AC+">AC+</SelectItem>
+                                                                    <SelectItem value="AC-">AC-</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </td>
+                                                        <td className="px-4 py-2">
+                                                            <Input
+                                                                type="text"
+                                                                value={evalData.observaciones}
+                                                                onChange={e => handleStudentEvalChange(student.id_alumno, 'observaciones', e.target.value)}
+                                                                placeholder="Observaciones..."
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-2">
+                                                            {indicadoresDisponibles.length > 0 && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => toggleExpandStudent(student.id_alumno)}
+                                                                >
+                                                                    {expandedStudents.has(student.id_alumno) ? 'Ocultar ▲' : 'Ver Detalle 🔍'}
+                                                                </Button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                    {expandedStudents.has(student.id_alumno) && indicadoresDisponibles.length > 0 && (
+                                                        <tr>
+                                                            <td colSpan={5} className="bg-muted/30">
+                                                                <div className="p-6 space-y-4">
+                                                                    <h4 className="font-semibold text-lg flex items-center gap-2">
+                                                                        <span className="text-primary">📊</span>
+                                                                        Evaluación Detallada: {student.nombres} {student.apellidos}
+                                                                    </h4>
+
+                                                                    <div className="border rounded-lg p-4 bg-background">
+                                                                        <p className="text-sm text-muted-foreground mb-4">
+                                                                            Evalúa cada indicador en escala 1-5:
+                                                                            <span className="ml-2 font-semibold">1=No logrado</span> •
+                                                                            <span className="ml-1 font-semibold">3=En desarrollo</span> •
+                                                                            <span className="ml-1 font-semibold">5=Logrado con excelencia</span>
+                                                                        </p>
+
+                                                                        <div className="space-y-3">
+                                                                            {Object.entries(groupedIndicators.groups).map(([rutina, competencies]) => (
+                                                                                <div key={rutina} className="mb-6">
+                                                                                    {rutina !== 'General' && (
+                                                                                        <div className="bg-blue-50 p-2 rounded mb-2 border-l-4 border-blue-500">
+                                                                                            <h4 className="font-bold text-sm text-blue-800 uppercase tracking-wide">{rutina}</h4>
+                                                                                        </div>
+                                                                                    )}
+
+                                                                                    {Object.entries(competencies).map(([compId, indicators]) => {
+                                                                                        const competency = groupedIndicators.competencyMap.get(compId);
+                                                                                        return (
+                                                                                            <div key={compId} className="mb-4 ml-2">
+                                                                                                {competency && (
+                                                                                                    <div className="mb-2 pl-2 border-l-2 border-gray-300">
+                                                                                                        <h5 className="font-semibold text-sm text-gray-700 italic">{competency.descripcion}</h5>
+                                                                                                    </div>
+                                                                                                )}
+
+                                                                                                <div className="space-y-2 pl-4">
+                                                                                                    {indicators.map((indicador, idx) => {
+                                                                                                        const currentValue = detallesIndicadores.get(student.id_alumno)?.get(indicador.id_indicador) || 0;
+
+                                                                                                        return (
+                                                                                                            <div key={indicador.id_indicador} className="flex items-center gap-4 p-2 hover:bg-muted/50 rounded border border-transparent hover:border-gray-200 transition-colors">
+                                                                                                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                                                                                                                    {idx + 1}
+                                                                                                                </div>
+
+                                                                                                                <div className="flex-1 min-w-0">
+                                                                                                                    <p className="text-sm font-medium">{indicador.descripcion}</p>
+                                                                                                                    {indicador.categoria && indicador.categoria !== 'Indicador' && (
+                                                                                                                        <span className="text-xs text-muted-foreground">{indicador.categoria}</span>
+                                                                                                                    )}
+                                                                                                                </div>
+
+                                                                                                                <div className="flex gap-1">
+                                                                                                                    {[1, 2, 3, 4, 5].map(nivel => (
+                                                                                                                        <button
+                                                                                                                            key={nivel}
+                                                                                                                            type="button"
+                                                                                                                            onClick={() => handleIndicadorChange(student.id_alumno, indicador.id_indicador, nivel)}
+                                                                                                                            className={`w-10 h-10 rounded-md border-2 font-semibold transition-all ${currentValue === nivel
+                                                                                                                                ? 'bg-primary text-primary-foreground border-primary shadow-md scale-110'
+                                                                                                                                : 'bg-background border-border hover:border-primary/50 hover:bg-muted'
+                                                                                                                                }`}
+                                                                                                                        >
+                                                                                                                            {nivel}
+                                                                                                                        </button>
+                                                                                                                    ))}
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                        );
+                                                                                                    })}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
                                             )
                                         })}
                                     </tbody>
@@ -9715,6 +9979,78 @@ const EvaluationView: React.FC<{
                                     <PieChart title="Porcentaje Global de Notas" data={advancedAnalytics.overallGradeCounts} colors={gradeColors} />
                                 </div>
                                 <AdaptationGradeDistributionCharts data={advancedAnalytics.gradeDistributionByAdaptation as any} />
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {isFormReady && indicadoresDisponibles.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>2.5 Datos de Contexto (Opcional)</CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                                Información complementaria sobre el desempeño general del grupo en esta evaluación
+                            </p>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* Nivel de Independencia */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="nivel-independencia">Nivel de Independencia</Label>
+                                    <select
+                                        id="nivel-independencia"
+                                        value={softData.nivel_independencia}
+                                        onChange={(e) => setSoftData(prev => ({
+                                            ...prev,
+                                            nivel_independencia: e.target.value as any
+                                        }))}
+                                        className="w-full border rounded px-3 py-2"
+                                    >
+                                        <option value="">Seleccionar...</option>
+                                        <option value="Autónomo">Autónomo</option>
+                                        <option value="Apoyo Parcial">Apoyo Parcial</option>
+                                        <option value="Apoyo Total">Apoyo Total</option>
+                                    </select>
+                                </div>
+
+                                {/* Estado Emocional */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="estado-emocional">Estado Emocional</Label>
+                                    <select
+                                        id="estado-emocional"
+                                        value={softData.estado_emocional}
+                                        onChange={(e) => setSoftData(prev => ({
+                                            ...prev,
+                                            estado_emocional: e.target.value as any
+                                        }))}
+                                        className="w-full border rounded px-3 py-2"
+                                    >
+                                        <option value="">Seleccionar...</option>
+                                        <option value="Enfocado">Enfocado</option>
+                                        <option value="Ansioso">Ansioso</option>
+                                        <option value="Distraído">Distraído</option>
+                                        <option value="Participativo">Participativo</option>
+                                    </select>
+                                </div>
+
+                                {/* Eficacia de Acción Anterior */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="eficacia-accion">Eficacia de Acción Anterior</Label>
+                                    <select
+                                        id="eficacia-accion"
+                                        value={softData.eficacia_accion_anterior}
+                                        onChange={(e) => setSoftData(prev => ({
+                                            ...prev,
+                                            eficacia_accion_anterior: e.target.value as any
+                                        }))}
+                                        className="w-full border rounded px-3 py-2"
+                                    >
+                                        <option value="">Seleccionar...</option>
+                                        <option value="Resuelto">Resuelto</option>
+                                        <option value="En Proceso">En Proceso</option>
+                                        <option value="Ineficaz">Ineficaz</option>
+                                    </select>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -10595,6 +10931,8 @@ const App: React.FC = () => {
                 return <ScheduleGeneratorView currentUser={currentUser!} />;
             case 'evaluation':
                 return <EvaluationView alumnos={alumnos} clases={clases} minutas={minutas} setMinutas={setMinutas} />;
+            case 'indicadores':
+                return <GestionIndicadores clases={clases} />;
             case 'authorized-users':
                 return (
                     <Suspense fallback={
