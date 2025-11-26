@@ -201,9 +201,37 @@ export const CargarCompetencias: React.FC<CargarCompetenciasProps> = ({ clases, 
         setIsLoading(true);
 
         try {
+            let claseId = selectedClase;
+
+            // Check if this is a virtual class (starts with 'virtual-')
+            if (selectedClase.startsWith('virtual-')) {
+                // Find the virtual class data
+                const virtualClase = selectedVirtualClase;
+                if (!virtualClase) {
+                    throw new Error('No se encontró la información de la clase virtual');
+                }
+
+                // Create the class in the database first
+                const { clasesService } = await import('../../services/supabaseDataService');
+
+                const newClaseData = {
+                    nombre_materia: virtualClase.materia,
+                    grado_asignado: virtualClase.grado,
+                    id_docente_asignado: '', // No teacher assigned yet
+                    student_ids: [],
+                    nivel_ingles: virtualClase.nivel_ingles || null,
+                    skill_rutina: null,
+                    es_ingles_primaria: virtualClase.materia.toLowerCase().includes('inglés'),
+                    es_proyecto: virtualClase.materia.toLowerCase().includes('proyecto'),
+                };
+
+                const createdClase = await clasesService.create(newClaseData);
+                claseId = createdClase.id_clase;
+            }
+
             // 1. Create Competency
             const competenciaData = {
-                id_clase: selectedClase,
+                id_clase: claseId,
                 categoria: 'Competencia' as const,
                 descripcion: competenciaDescripcion.trim(),
                 orden: 1,
@@ -214,7 +242,7 @@ export const CargarCompetencias: React.FC<CargarCompetenciasProps> = ({ clases, 
 
             // 2. Create Indicators
             const indicadoresData = validIndicadores.map((indText, idx) => ({
-                id_clase: selectedClase,
+                id_clase: claseId,
                 categoria: 'Indicador' as const,
                 descripcion: indText.trim(),
                 orden: idx + 1,
