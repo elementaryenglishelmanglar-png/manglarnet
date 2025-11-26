@@ -9587,12 +9587,17 @@ const EvaluationView: React.FC<{
         // Regular grade filtering
         let students = alumnos.filter(a => a.salon === filters.grado);
 
-        // If an English level is selected for 5to-6to, filter by nivel_ingles
-        if (filters.materia && (filters.grado === '5to Grado' || filters.grado === '6to Grado')) {
-            if (isEnglishLevel(filters.materia)) {
-                // Filter students by their English level
-                students = students.filter(a => a.nivel_ingles === filters.materia);
-            }
+        // SPECIAL: If 6to Grado + English level selected, show students from BOTH 5to and 6to
+        if (filters.grado === '6to Grado' && filters.materia && isEnglishLevel(filters.materia)) {
+            // Get all students from both grades with this English level
+            students = alumnos.filter(a =>
+                (a.salon === '5to Grado' || a.salon === '6to Grado') &&
+                a.nivel_ingles === filters.materia
+            );
+        }
+        // For 5to Grado with English level, show only 5to students (normal behavior)
+        else if (filters.grado === '5to Grado' && filters.materia && isEnglishLevel(filters.materia)) {
+            students = students.filter(a => a.nivel_ingles === filters.materia);
         }
 
         return students;
