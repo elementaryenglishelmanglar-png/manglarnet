@@ -485,7 +485,8 @@ const ASIGNATURAS_POR_NIVEL = {
 const GRADOS = [
     "Maternal", "Pre-Kinder", "Kinder", "Preparatorio",
     "1er Grado", "2do Grado", "3er Grado", "4to Grado", "5to Grado", "6to Grado",
-    "1er Año", "2do Año", "3er Año", "4to Año", "5to Año"
+    "1er Año", "2do Año", "3er Año", "4to Año", "5to Año",
+    "Niveles de Inglés (5to-6to)" // Special option for English levels across 5th and 6th grade
 ];
 
 // Función helper para generar años escolares desde 2025-2026 hasta 2040-2041
@@ -9506,15 +9507,37 @@ const EvaluationView: React.FC<{
         if (!filters.grado) return [];
 
         const isEnglishGrade = filters.grado === '5to Grado' || filters.grado === '6to Grado';
+        const isEnglishLevelsGrade = filters.grado === 'Niveles de Inglés (5to-6to)';
+
+        // Special case: Niveles de Inglés (5to-6to) - show only English levels
+        if (isEnglishLevelsGrade) {
+            // Get unique English levels from students in 5th and 6th grade
+            const studentsIn5thAnd6th = alumnos.filter(a =>
+                a.salon === '5to Grado' || a.salon === '6to Grado'
+            );
+            const uniqueLevels = [...new Set(studentsIn5thAnd6th.map(s => s.nivel_ingles).filter(Boolean))];
+
+            // Create a subject entry for each level
+            const englishLevelSubjects = uniqueLevels.map(level => ({
+                id_clase: `english-level-${level}`,
+                nombre_materia: level as string,
+                grado_asignado: filters.grado,
+                id_docente_asignado: '',
+                studentIds: []
+            }));
+
+            return englishLevelSubjects;
+        }
 
         // Get regular subjects (excluding English for 5to-6to)
         const regularSubjects = clases
             .filter(c => c.grado_asignado === filters.grado)
             .filter(c => c.nombre_materia && c.nombre_materia.trim() !== '')
             .filter(c => {
-                // For 5to-6to, exclude all English classes (they'll be replaced by levels)
+                // For 5to-6to, exclude all English classes
                 if (isEnglishGrade &&
-                    (c.nombre_materia?.toLowerCase().includes('inglés') || c.nombre_materia?.toLowerCase().includes('ingles'))) {
+                    (c.nombre_materia?.toLowerCase().includes('inglés') ||
+                        c.nombre_materia?.toLowerCase().includes('ingles'))) {
                     return false;
                 }
                 return true;
@@ -9526,7 +9549,7 @@ const EvaluationView: React.FC<{
             const studentsInGrade = alumnos.filter(a => a.salon === filters.grado);
             const uniqueLevels = [...new Set(studentsInGrade.map(s => s.nivel_ingles).filter(Boolean))];
 
-            // Create a fake clase object for each level
+            // Create a subject entry for each level
             const englishLevelSubjects = uniqueLevels.map(level => ({
                 id_clase: `english-level-${level}`,
                 nombre_materia: level as string,
@@ -9544,7 +9567,24 @@ const EvaluationView: React.FC<{
     const studentsInGrade = useMemo(() => {
         if (!filters.grado) return [];
 
-        // Filter by grade first
+        const isEnglishLevelsGrade = filters.grado === 'Niveles de Inglés (5to-6to)';
+
+        // Special case: Niveles de Inglés (5to-6to)
+        if (isEnglishLevelsGrade) {
+            // Start with all students from 5th and 6th grade
+            let students = alumnos.filter(a =>
+                a.salon === '5to Grado' || a.salon === '6to Grado'
+            );
+
+            // If an English level is selected, filter by nivel_ingles
+            if (filters.materia && isEnglishLevel(filters.materia)) {
+                students = students.filter(a => a.nivel_ingles === filters.materia);
+            }
+
+            return students;
+        }
+
+        // Regular grade filtering
         let students = alumnos.filter(a => a.salon === filters.grado);
 
         // If an English level is selected for 5to-6to, filter by nivel_ingles
