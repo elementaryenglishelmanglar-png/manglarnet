@@ -162,6 +162,20 @@ export interface DetalleEvaluacionAlumno {
   updated_at?: string;
 }
 
+export interface ResumenEvaluacionAlumno {
+  id_resumen: string;
+  id_minuta: string;
+  id_alumno: string;
+  nota?: string;
+  asistencia_periodo?: number; // 0-100
+  nivel_independencia?: 'Autónomo' | 'Apoyo Parcial' | 'Apoyo Constante' | 'No Logrado';
+  estado_emocional?: 'Enfocado' | 'Ansioso/Nervioso' | 'Distraído' | 'Apatía/Desinterés' | 'Cansado' | 'Participativo';
+  eficacia_accion_anterior?: 'Resuelto' | 'En Proceso' | 'Ineficaz' | 'No Aplica';
+  observaciones?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface EventoCalendario {
   id_evento: string;
   titulo: string;
@@ -1824,3 +1838,50 @@ export const detalleEvaluacionService = {
   }
 };
 
+
+// ============================================
+// RESUMEN EVALUACION ALUMNO (Pedagogical Intelligence)
+// ============================================
+
+export const resumenEvaluacionService = {
+  async getByMinuta(idMinuta: string): Promise<ResumenEvaluacionAlumno[]> {
+    const { data, error } = await supabase
+      .from('resumen_evaluacion_alumno')
+      .select('*')
+      .eq('id_minuta', idMinuta);
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async createBulk(resumenes: Omit<ResumenEvaluacionAlumno, 'id_resumen' | 'created_at' | 'updated_at'>[]): Promise<ResumenEvaluacionAlumno[]> {
+    const { data, error } = await supabase
+      .from('resumen_evaluacion_alumno')
+      .insert(resumenes)
+      .select();
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async update(id: string, updates: Partial<ResumenEvaluacionAlumno>): Promise<ResumenEvaluacionAlumno> {
+    const { data, error } = await supabase
+      .from('resumen_evaluacion_alumno')
+      .update(updates)
+      .eq('id_resumen', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('resumen_evaluacion_alumno')
+      .delete()
+      .eq('id_resumen', id);
+
+    if (error) throw error;
+  }
+};

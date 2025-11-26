@@ -57,6 +57,7 @@ import {
     generacionesHorariosService,
     maestraIndicadoresService,
     detalleEvaluacionService,
+    resumenEvaluacionService,
     type Alumno as AlumnoDB,
     type Docente as DocenteDB,
     type Clase as ClaseDB,
@@ -70,7 +71,8 @@ import {
     type GeneracionHorario,
     type Aula,
     type MaestraIndicador,
-    type DetalleEvaluacionAlumno
+    type DetalleEvaluacionAlumno,
+    type ResumenEvaluacionAlumno
 } from './services/supabaseDataService';
 
 
@@ -218,6 +220,11 @@ interface EvaluacionAlumno {
     nota: Nota;
     adaptacion: Adaptacion;
     observaciones: string;
+    // Pedagogical Intelligence Fields
+    asistencia_periodo?: number;
+    nivel_independencia?: 'Autónomo' | 'Apoyo Parcial' | 'Apoyo Constante' | 'No Logrado';
+    estado_emocional?: 'Enfocado' | 'Ansioso/Nervioso' | 'Distraído' | 'Apatía/Desinterés' | 'Cansado' | 'Participativo';
+    eficacia_accion_anterior?: 'Resuelto' | 'En Proceso' | 'Ineficaz' | 'No Aplica';
 }
 
 interface AnalisisDificultad {
@@ -9656,7 +9663,7 @@ const EvaluationView: React.FC<{
         setAiAnalysis([]);
     };
 
-    const handleStudentEvalChange = (studentId: string, field: keyof Omit<EvaluacionAlumno, 'id_alumno'>, value: string) => {
+    const handleStudentEvalChange = (studentId: string, field: keyof Omit<EvaluacionAlumno, 'id_alumno'>, value: string | number) => {
         setStudentEvals(prevMap => {
             const newMap = new Map(prevMap);
             const currentData = newMap.get(studentId) || { id_alumno: studentId, nota: '', adaptacion: '', observaciones: '' };
@@ -9779,6 +9786,29 @@ const EvaluationView: React.FC<{
 
             if (detallesParaGuardar.length > 0) {
                 await detalleEvaluacionService.createBulk(detallesParaGuardar);
+            }
+
+            // Save Pedagogical Intelligence Summaries (ResumenEvaluacionAlumno)
+            const resumenesParaGuardar: Omit<ResumenEvaluacionAlumno, 'id_resumen' | 'created_at' | 'updated_at'>[] = [];
+
+            for (const evalData of studentEvals.values()) {
+                // Only save if there is some data worth saving (grade or soft data)
+                if (evalData.nota || evalData.asistencia_periodo !== undefined || evalData.nivel_independencia || evalData.estado_emocional || evalData.eficacia_accion_anterior || evalData.observaciones) {
+                    resumenesParaGuardar.push({
+                        id_minuta: created.id_minuta,
+                        id_alumno: evalData.id_alumno,
+                        nota: evalData.nota || undefined,
+                        asistencia_periodo: evalData.asistencia_periodo,
+                        nivel_independencia: evalData.nivel_independencia,
+                        estado_emocional: evalData.estado_emocional,
+                        eficacia_accion_anterior: evalData.eficacia_accion_anterior,
+                        observaciones: evalData.observaciones
+                    });
+                }
+            }
+
+            if (resumenesParaGuardar.length > 0) {
+                await resumenEvaluacionService.createBulk(resumenesParaGuardar);
             }
 
             // Reload all minutas
@@ -9932,6 +9962,69 @@ const EvaluationView: React.FC<{
                                                                         <span className="text-primary">📊</span>
                                                                         Evaluación Detallada: {student.nombres} {student.apellidos}
                                                                     </h4>
+
+                                                                    {/* Pedagogical Intelligence Inputs */}
+                                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-blue-50/50 rounded-lg border border-blue-100">
+                                                                        <div className="space-y-2">
+                                                                            <Label className="text-xs font-semibold text-blue-800 uppercase tracking-wide">Asistencia (%)</Label>
+                                                                            <Input
+                                                                                type="number"
+                                                                                min="0"
+                                                                                max="100"
+                                                                                placeholder="Ej. 95"
+                                                                                value={evalData.asistencia_periodo || ''}
+                                                                                onChange={(e) => handleStudentEvalChange(student.id_alumno, 'asistencia_periodo', parseInt(e.target.value) || 0)}
+                                                                                className="bg-white"
+                                                                            />
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <Label className="text-xs font-semibold text-blue-800 uppercase tracking-wide">Nivel de Independencia</Label>
+                                                                            <Select
+                                                                                value={evalData.nivel_independencia}
+                                                                                onValueChange={(val) => handleStudentEvalChange(student.id_alumno, 'nivel_independencia', val)}
+                                                                            >
+                                                                                <SelectTrigger className="bg-white"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                                                                                <SelectContent>
+                                                                                    <SelectItem value="Autónomo">Autónomo</SelectItem>
+                                                                                    <SelectItem value="Apoyo Parcial">Apoyo Parcial</SelectItem>
+                                                                                    <SelectItem value="Apoyo Constante">Apoyo Constante</SelectItem>
+                                                                                    <SelectItem value="No Logrado">No Logrado</SelectItem>
+                                                                                </SelectContent>
+                                                                            </Select>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <Label className="text-xs font-semibold text-blue-800 uppercase tracking-wide">Estado Emocional</Label>
+                                                                            <Select
+                                                                                value={evalData.estado_emocional}
+                                                                                onValueChange={(val) => handleStudentEvalChange(student.id_alumno, 'estado_emocional', val)}
+                                                                            >
+                                                                                <SelectTrigger className="bg-white"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                                                                                <SelectContent>
+                                                                                    <SelectItem value="Enfocado">Enfocado</SelectItem>
+                                                                                    <SelectItem value="Participativo">Participativo</SelectItem>
+                                                                                    <SelectItem value="Ansioso/Nervioso">Ansioso/Nervioso</SelectItem>
+                                                                                    <SelectItem value="Distraído">Distraído</SelectItem>
+                                                                                    <SelectItem value="Apatía/Desinterés">Apatía/Desinterés</SelectItem>
+                                                                                    <SelectItem value="Cansado">Cansado</SelectItem>
+                                                                                </SelectContent>
+                                                                            </Select>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <Label className="text-xs font-semibold text-blue-800 uppercase tracking-wide">Eficacia Acción Anterior</Label>
+                                                                            <Select
+                                                                                value={evalData.eficacia_accion_anterior}
+                                                                                onValueChange={(val) => handleStudentEvalChange(student.id_alumno, 'eficacia_accion_anterior', val)}
+                                                                            >
+                                                                                <SelectTrigger className="bg-white"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                                                                                <SelectContent>
+                                                                                    <SelectItem value="Resuelto">Resuelto</SelectItem>
+                                                                                    <SelectItem value="En Proceso">En Proceso</SelectItem>
+                                                                                    <SelectItem value="Ineficaz">Ineficaz</SelectItem>
+                                                                                    <SelectItem value="No Aplica">No Aplica</SelectItem>
+                                                                                </SelectContent>
+                                                                            </Select>
+                                                                        </div>
+                                                                    </div>
 
                                                                     <div className="border rounded-lg p-4 bg-background">
                                                                         <p className="text-sm text-muted-foreground mb-4">
