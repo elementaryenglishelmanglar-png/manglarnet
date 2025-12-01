@@ -30,8 +30,8 @@ export const CompetencyBarChart: React.FC<CompetencyBarChartProps> = ({ data }) 
                     <YAxis
                         type="category"
                         dataKey="subject"
-                        width={150}
-                        tick={{ fontSize: 11 }}
+                        width={200}
+                        tick={{ fontSize: 13, fill: '#374151' }}
                         interval={0}
                     />
                     <Tooltip
@@ -40,7 +40,7 @@ export const CompetencyBarChart: React.FC<CompetencyBarChartProps> = ({ data }) 
                             if (active && payload && payload.length) {
                                 const data = payload[0].payload;
                                 return (
-                                    <div className="bg-white p-2 border rounded shadow-md text-xs max-w-[200px]">
+                                    <div className="bg-white p-3 border rounded shadow-md text-sm max-w-[250px]">
                                         <p className="font-bold mb-1">{data.subject}</p>
                                         <p>Promedio: <span className="font-semibold text-blue-600">{data.A.toFixed(2)}</span> / 5.0</p>
                                     </div>
@@ -49,11 +49,11 @@ export const CompetencyBarChart: React.FC<CompetencyBarChartProps> = ({ data }) 
                             return null;
                         }}
                     />
-                    <Bar dataKey="A" radius={[0, 4, 4, 0]} barSize={20}>
+                    <Bar dataKey="A" radius={[0, 4, 4, 0]} barSize={24}>
                         {sortedData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.A >= 4 ? '#4ade80' : entry.A >= 3 ? '#facc15' : '#f87171'} />
+                            <Cell key={`cell-${index}`} fill={entry.A >= 4.0 ? '#22c55e' : entry.A >= 3.0 ? '#eab308' : '#ef4444'} />
                         ))}
-                        <LabelList dataKey="A" position="right" formatter={(val: any) => Number(val).toFixed(1)} fontSize={10} />
+                        <LabelList dataKey="A" position="right" formatter={(val: any) => Number(val).toFixed(1)} fontSize={12} fontWeight="bold" />
                     </Bar>
                 </BarChart>
             </ResponsiveContainer>

@@ -12,11 +12,38 @@ interface PedagogicalDistributionChartsProps {
     data: DistributionData;
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+
+
+const getIndependenceColor = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes('alto')) return '#22c55e';
+    if (n.includes('medio') || n.includes('regular')) return '#eab308';
+    if (n.includes('bajo')) return '#ef4444';
+    return '#94a3b8'; // Slate-400 for unknown
+};
+
+const getEmotionColor = (name: string) => {
+    const n = name.toLowerCase();
+    // Positive
+    if (['alegre', 'feliz', 'contento', 'entusiasmado', 'tranquilo', 'motivado', 'bien'].some(e => n.includes(e))) return '#22c55e';
+    // Negative
+    if (['triste', 'enojado', 'molesto', 'frustrado', 'aburrido', 'miedo', 'ansioso', 'mal'].some(e => n.includes(e))) return '#ef4444';
+    // Neutral/Mixed
+    if (['normal', 'indiferente', 'cansado', 'regular'].some(e => n.includes(e))) return '#eab308';
+    return '#94a3b8';
+};
+
+const getEfficacyColor = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes('resuelto') || n.includes('eficaz')) return '#22c55e';
+    if (n.includes('proceso') || n.includes('parcial')) return '#eab308';
+    if (n.includes('ineficaz') || n.includes('no resuelto')) return '#ef4444';
+    return '#94a3b8';
+};
 
 export const PedagogicalDistributionCharts: React.FC<PedagogicalDistributionChartsProps> = ({ data }) => {
 
-    const renderPieChart = (title: string, chartData: { name: string; value: number }[]) => (
+    const renderPieChart = (title: string, chartData: { name: string; value: number }[], colorFn: (name: string) => string) => (
         <Card className="flex flex-col">
             <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-center">{title}</CardTitle>
@@ -35,12 +62,12 @@ export const PedagogicalDistributionCharts: React.FC<PedagogicalDistributionChar
                                 paddingAngle={5}
                                 dataKey="value"
                             >
-                                {chartData.map((_, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                {chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={colorFn(entry.name)} />
                                 ))}
                             </Pie>
-                            <Tooltip />
-                            <Legend verticalAlign="bottom" height={36} iconSize={8} wrapperStyle={{ fontSize: '10px' }} />
+                            <Tooltip contentStyle={{ fontSize: '12px' }} />
+                            <Legend verticalAlign="bottom" height={36} iconSize={10} wrapperStyle={{ fontSize: '12px' }} />
                         </PieChart>
                     </ResponsiveContainer>
                 ) : (
@@ -53,10 +80,10 @@ export const PedagogicalDistributionCharts: React.FC<PedagogicalDistributionChar
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
             {/* 1. Nivel de Independencia (Pie) */}
-            {renderPieChart("Nivel de Independencia", data.independence)}
+            {renderPieChart("Nivel de Independencia", data.independence, getIndependenceColor)}
 
             {/* 2. Estado Emocional (Pie) */}
-            {renderPieChart("Estado Emocional", data.emotion)}
+            {renderPieChart("Estado Emocional", data.emotion, getEmotionColor)}
 
             {/* 3. Eficacia Acciones (Bar) */}
             <Card className="flex flex-col">
@@ -68,12 +95,12 @@ export const PedagogicalDistributionCharts: React.FC<PedagogicalDistributionChar
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={data.efficacy} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} />
-                                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-                                <Tooltip cursor={{ fill: 'transparent' }} />
-                                <Bar dataKey="value" fill="#82ca9d" radius={[4, 4, 0, 0]}>
+                                <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
+                                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                                <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ fontSize: '12px' }} />
+                                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                                     {data.efficacy.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.name === 'Ineficaz' ? '#f87171' : entry.name === 'Resuelto' ? '#4ade80' : '#fbbf24'} />
+                                        <Cell key={`cell-${index}`} fill={getEfficacyColor(entry.name)} />
                                     ))}
                                 </Bar>
                             </BarChart>
