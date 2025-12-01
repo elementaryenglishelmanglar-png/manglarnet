@@ -29,7 +29,7 @@ export async function getAIPlanSuggestions(plan: PlanificacionData): Promise<str
   try {
     const supabaseUrl = getSupabaseUrl();
     const supabaseAnonKey = getSupabaseAnonKey();
-    
+
     const response = await fetch(`${supabaseUrl}/functions/v1/gemini-api`, {
       method: 'POST',
       headers: {
@@ -54,6 +54,7 @@ export async function getAIPlanSuggestions(plan: PlanificacionData): Promise<str
   }
 }
 
+
 // --- NEW ---
 // Types for the evaluation analysis feature
 interface EvaluacionAlumnoData {
@@ -72,7 +73,7 @@ export async function getAIEvaluationAnalysis(evaluaciones: EvaluacionAlumnoData
   try {
     const supabaseUrl = getSupabaseUrl();
     const supabaseAnonKey = getSupabaseAnonKey();
-    
+
     const response = await fetch(`${supabaseUrl}/functions/v1/gemini-api`, {
       method: 'POST',
       headers: {
@@ -90,22 +91,101 @@ export async function getAIEvaluationAnalysis(evaluaciones: EvaluacionAlumnoData
     }
 
     const result = await response.json();
-    return result.result || JSON.stringify([{ 
-        dificultad: "Error de Conexión", 
-        categoria: "Sistema", 
-        frecuencia: 0, 
-        estudiantes: "N/A", 
-        accionesSugeridas: "No se pudo conectar con Coco. Por favor, verifique la conexión a internet y vuelva a intentarlo."
+    return result.result || JSON.stringify([{
+      dificultad: "Error de Conexión",
+      categoria: "Sistema",
+      frecuencia: 0,
+      estudiantes: "N/A",
+      accionesSugeridas: "No se pudo conectar con Coco. Por favor, verifique la conexión a internet y vuelva a intentarlo."
     }]);
   } catch (error) {
     console.error("Error fetching AI evaluation analysis:", error);
     // Return a JSON string with an error object to be handled by the frontend
-    return JSON.stringify([{ 
-        dificultad: "Error de Conexión", 
-        categoria: "Sistema", 
-        frecuencia: 0, 
-        estudiantes: "N/A", 
-        accionesSugeridas: "No se pudo conectar con Coco. Por favor, verifique la conexión a internet y vuelva a intentarlo."
+    return JSON.stringify([{
+      dificultad: "Error de Conexión",
+      categoria: "Sistema",
+      frecuencia: 0,
+      estudiantes: "N/A",
+      accionesSugeridas: "No se pudo conectar con Coco. Por favor, verifique la conexión a internet y vuelva a intentarlo."
     }]);
+  }
+}
+
+// --- SENTIMENT ANALYSIS ---
+// Types for sentiment analysis
+interface SentimentInput {
+  id_alumno: string;
+  observaciones: string;
+}
+
+interface SentimentAnalysisResult {
+  climaEmocional: {
+    enfocado: number;
+    ansioso: number;
+    distraido: number;
+    apatia: number;
+    cansado: number;
+    participativo: number;
+  };
+  sentimientoPredominante: string;
+  scorePositivo: number;
+  palabrasClave: string[];
+}
+
+/**
+ * Analyzes sentiment from student observations using Gemini AI
+ * @param observaciones - Array of student observations
+ * @returns Sentiment analysis with emotional climate breakdown
+ */
+export async function analyzeSentimentBatch(
+  observaciones: SentimentInput[]
+): Promise<SentimentAnalysisResult | null> {
+  try {
+    const supabaseUrl = getSupabaseUrl();
+    const supabaseAnonKey = getSupabaseAnonKey();
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/gemini-api`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+      },
+      body: JSON.stringify({
+        type: 'sentiment-analysis',
+        data: observaciones,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (!result.result) {
+      return null;
+    }
+
+    // Parse the result (assuming it's a JSON string)
+    const parsed = typeof result.result === 'string'
+      ? JSON.parse(result.result)
+      : result.result;
+
+    return {
+      climaEmocional: parsed.climaEmocional || {
+        enfocado: 0,
+        ansioso: 0,
+        distraido: 0,
+        apatia: 0,
+        cansado: 0,
+        participativo: 0,
+      },
+      sentimientoPredominante: parsed.sentimientoPredominante || 'Desconocido',
+      scorePositivo: parsed.scorePositivo || 50,
+      palabrasClave: parsed.palabrasClave || [],
+    };
+  } catch (error) {
+    console.error("Error analyzing sentiment:", error);
+    return null;
   }
 }

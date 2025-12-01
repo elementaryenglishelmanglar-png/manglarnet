@@ -33,6 +33,7 @@ const LoginScreen = lazy(() => import('./components/LoginScreen').then(module =>
 const AuthorizedUsersView = lazy(() => import('./components/AuthorizedUsersView').then(module => ({ default: module.AuthorizedUsersView })));
 import BulkImportModal from './components/students/BulkImportModal';
 import { GestionIndicadores } from './components/students/GestionIndicadores';
+import { IntelligenceDashboard } from './components/IntelligenceDashboard';
 import { marked } from 'marked';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -1005,6 +1006,7 @@ const Sidebar: React.FC<{
         { id: 'planning', label: 'Planificaciones', icon: PlanningIcon, roles: ['directivo', 'coordinador', 'docente'] },
         { id: 'evaluation', label: 'Evaluación', icon: EvaluationIcon, roles: ['directivo', 'coordinador'] },
         { id: 'indicadores', label: 'Indicadores', icon: ClipboardCheckIcon, roles: ['directivo', 'coordinador'] },
+        { id: 'intelligence', label: 'Intelligence Suite', icon: SparklesIcon, roles: ['directivo', 'coordinador'] },
         { id: 'authorized-users', label: 'Gestión de Usuarios', icon: UsersIcon, roles: ['directivo', 'coordinador'] },
         { id: 'lapsos-admin', label: 'Gestión de Lapsos', icon: CalendarIcon, roles: ['coordinador', 'directivo'] },
     ];
@@ -11071,6 +11073,15 @@ const App: React.FC = () => {
                 );
             case 'lapsos-admin':
                 return <LapsosAdminView currentUser={currentUser!} />;
+            case 'intelligence':
+                return (
+                    <IntelligenceDashboard
+                        availableGrados={GRADOS}
+                        availableMaterias={Object.values(ASIGNATURAS_POR_NIVEL).flat()}
+                        currentAnoEscolar="2024-2025"
+                        currentLapso="I Lapso"
+                    />
+                );
             default:
                 return <div className="bg-white p-6 rounded-lg shadow-md"><h2>Vista no implementada</h2><p>La funcionalidad para "{activeView}" estará disponible próximamente.</p></div>;
         }
@@ -11088,6 +11099,7 @@ const App: React.FC = () => {
         evaluation: 'Seguimiento Pedagógico',
         'authorized-users': 'Gestión de Usuarios',
         'lapsos-admin': 'Gestión de Lapsos',
+        intelligence: 'Intelligence Suite',
     };
 
     // Show login screen if no user is logged in
