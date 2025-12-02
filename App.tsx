@@ -9820,7 +9820,8 @@ const EvaluationView: React.FC<{
                 analisis_ia: aiAnalysis,
                 nivel_independencia: softData.nivel_independencia || null,
                 estado_emocional: softData.estado_emocional || null,
-                eficacia_accion_anterior: softData.eficacia_accion_anterior || null
+                eficacia_accion_anterior: softData.eficacia_accion_anterior || null,
+                created_by: currentUser?.id || null
             };
 
             // Create minuta in database
