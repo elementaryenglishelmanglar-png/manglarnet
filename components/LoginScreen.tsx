@@ -89,7 +89,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             <span className="text-brand-primary">Bienvenido a ManglarNet</span>
           </CardTitle>
           <CardDescription className="text-base">
-            Ingresa tu usuario y contraseña para acceder
+            Ingresa tu usuario o correo electrónico y contraseña para acceder
           </CardDescription>
         </CardHeader>
 

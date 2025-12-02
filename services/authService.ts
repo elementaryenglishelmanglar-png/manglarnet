@@ -54,7 +54,22 @@ export const authService = {
 
       if (authError) {
         console.error('Auth error:', authError);
-        throw new Error('Credenciales inválidas');
+        
+        // Provide more specific error messages
+        if (authError.message.includes('Invalid login credentials') || 
+            authError.message.includes('Invalid credentials')) {
+          throw new Error('Credenciales inválidas. Verifica tu usuario/email y contraseña.');
+        }
+        
+        if (authError.message.includes('Email not confirmed')) {
+          throw new Error('Email no confirmado. Por favor, verifica tu correo electrónico o contacta al administrador.');
+        }
+        
+        if (authError.message.includes('User not found')) {
+          throw new Error('Usuario no encontrado. Verifica que el usuario exista en el sistema.');
+        }
+        
+        throw new Error(`Error de autenticación: ${authError.message}`);
       }
 
       if (!authData.user) {
@@ -130,12 +145,37 @@ export const authService = {
 
   /**
    * Create a new user (admin only)
-   * Note: This uses signUp which requires email confirmation to be disabled in Supabase settings
-   * For production, consider using an Edge Function with service_role key
+   * Uses Edge Function for secure user creation with service_role key
+   * Falls back to signUp if Edge Function is not available
    */
   async createUser(userData: CreateUserData): Promise<User> {
     try {
-      // 1. Create user in Supabase Auth using signUp
+      // Try to use Edge Function first (recommended)
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error('No hay sesión activa');
+        }
+
+        const { data, error: functionError } = await supabase.functions.invoke('create-user', {
+          body: { userData },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (!functionError && data?.user) {
+          return data.user as User;
+        }
+
+        // If Edge Function fails, fall through to signUp method
+        console.warn('Edge Function no disponible, usando método signUp:', functionError?.message);
+      } catch (functionErr: any) {
+        // Edge Function not available or failed, use signUp as fallback
+        console.warn('Usando método signUp como fallback:', functionErr.message);
+      }
+
+      // Fallback: Create user using signUp (requires signups to be enabled)
       // IMPORTANT: Email confirmation must be disabled in Supabase Auth settings
       // Go to: Authentication > Settings > Auth Providers > Email > Disable "Confirm email"
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -151,14 +191,26 @@ export const authService = {
       });
 
       if (authError) {
+        if (authError.message.includes('Signups not allowed')) {
+          throw new Error('Los registros públicos están deshabilitados. Por favor, habilita signups en Supabase Dashboard o despliega la Edge Function create-user.');
+        }
         if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
           throw new Error('Este usuario ya está registrado');
+        }
+        // Provide more helpful error messages
+        if (authError.message.includes('email')) {
+          throw new Error(`Error con el email: ${authError.message}. Verifica que el email no esté ya registrado.`);
         }
         throw new Error(`Error al crear usuario: ${authError.message}`);
       }
 
       if (!authData.user) {
-        throw new Error('No se pudo crear el usuario en el sistema de autenticación');
+        throw new Error('No se pudo crear el usuario en el sistema de autenticación. Verifica la configuración de Supabase.');
+      }
+
+      // Check if email confirmation is required
+      if (authData.user && !authData.session) {
+        console.warn('Usuario creado pero requiere confirmación de email. Deshabilita "Confirm email" en Supabase Dashboard.');
       }
 
       // 2. Create user profile in usuarios table
