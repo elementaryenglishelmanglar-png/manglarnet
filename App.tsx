@@ -1760,6 +1760,26 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
         loadData();
     }, []);
 
+    // Función para eliminar reunión
+    const handleDeleteReunion = async (idLog: string) => {
+        if (!window.confirm('¿Estás seguro de que deseas eliminar esta reunión del historial? Esta acción no se puede deshacer.')) {
+            return;
+        }
+
+        try {
+            await logReunionesService.delete(idLog);
+            // Actualizar la lista de reuniones
+            const updatedReuniones = await logReunionesService.getAll();
+            setReuniones(updatedReuniones);
+        } catch (error) {
+            console.error('Error al eliminar reunión:', error);
+            alert('Error al eliminar la reunión. Por favor, intenta nuevamente.');
+        }
+    };
+
+    // Verificar si el usuario puede eliminar reuniones (solo coordinadores y directivos)
+    const canDeleteReuniones = currentUser?.role === 'coordinador' || currentUser?.role === 'directivo';
+
     // Filtrar minutas según filtros globales
     const filteredMinutas = useMemo(() => {
         return minutas.filter(m => {
@@ -1940,6 +1960,7 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
             .map(r => {
                 const docente = docentes.find(d => d.id_docente === r.creado_por || false);
                 return {
+                    id_log: r.id_log,
                     docente: docente ? `${docente.nombres} ${docente.apellidos}` : 'N/A',
                     materiaGrado: r.materia ? `${r.materia} / ${r.grado}` : r.grado,
                     estado: r.estado || 'Pendiente',
@@ -2313,24 +2334,37 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                             ) : (
                                 <div className="divide-y divide-border">
                                     {estatusReuniones.map((reunion, index) => (
-                                        <div key={index} className="py-3 px-2 hover:bg-accent/50 transition-colors">
-                                            <div className="flex justify-between items-start">
+                                        <div key={reunion.id_log || index} className="py-3 px-2 hover:bg-accent/50 transition-colors">
+                                            <div className="flex justify-between items-start gap-2">
                                                 <div className="flex-1">
                                                     <p className="font-medium text-foreground">{reunion.docente}</p>
                                                     <p className="text-sm text-muted-foreground mt-1">{reunion.materiaGrado}</p>
                                                     <p className="text-xs text-muted-foreground mt-1">{new Date(reunion.fecha).toLocaleDateString()}</p>
                                                 </div>
-                                                <Badge
-                                                    variant={
-                                                        reunion.estado === 'Resuelto' || reunion.estado === 'Archivado'
-                                                            ? 'default'
-                                                            : reunion.estado === 'En Proceso'
-                                                                ? 'secondary'
-                                                                : 'outline'
-                                                    }
-                                                >
-                                                    {reunion.estado}
-                                                </Badge>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge
+                                                        variant={
+                                                            reunion.estado === 'Resuelto' || reunion.estado === 'Archivado'
+                                                                ? 'default'
+                                                                : reunion.estado === 'En Proceso'
+                                                                    ? 'secondary'
+                                                                    : 'outline'
+                                                        }
+                                                    >
+                                                        {reunion.estado}
+                                                    </Badge>
+                                                    {canDeleteReuniones && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleDeleteReunion(reunion.id_log)}
+                                                            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                            title="Eliminar reunión"
+                                                        >
+                                                            <DeleteIcon className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
