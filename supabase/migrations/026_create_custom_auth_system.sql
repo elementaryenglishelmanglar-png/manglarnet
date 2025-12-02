@@ -1,3 +1,7 @@
+-- DEPRECATED: This migration has been superseded by migration 030_unified_auth_system.sql
+-- The unified system integrates with Supabase Auth and uses a permission-based approach
+-- This migration is kept for historical reference but should not be used in new deployments
+--
 -- Migration: Create custom authentication system
 -- This migration replaces Google OAuth with a custom username/password system
 -- Date: 2025-01-XX

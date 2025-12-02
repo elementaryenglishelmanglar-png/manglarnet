@@ -1,3 +1,7 @@
+-- DEPRECATED: This migration is part of the legacy authentication system
+-- The current system uses the unified 'usuarios' table (see migration 030_unified_auth_system.sql)
+-- The function link_docente_to_user() may still be useful but the view references the deprecated table
+--
 -- Migration: Link authorized_users to docentes
 -- This migration improves the linking between authorized_users (whitelist) and docentes (teachers)
 -- It ensures that when a teacher logs in, they can be automatically linked to their docente record

@@ -1,3 +1,7 @@
+-- DEPRECATED: This migration is part of the legacy authentication system
+-- RLS policies are now managed by migrations 030_unified_auth_system.sql and 040_simplify_security_policies.sql
+-- This migration is kept for historical reference but should not be used in new deployments
+--
 -- Migration: Fix planificaciones and notificaciones RLS policies
 -- The current policies try to access auth.users which is not allowed for authenticated users
 -- We need to simplify the policies to use only docentes and authorized_users tables

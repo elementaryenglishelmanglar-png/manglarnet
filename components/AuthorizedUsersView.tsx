@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
+import { authService, type CreateUserData } from '../services/authService';
 import { PlusIcon, EditIcon, DeleteIcon } from './Icons';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -11,7 +12,7 @@ import { Badge } from './ui/badge';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Skeleton } from './ui/skeleton';
 
-type UserRole = 'docente' | 'coordinador' | 'directivo' | 'administrativo';
+type UserRole = 'docente' | 'coordinador' | 'directivo';
 
 interface Usuario {
   id: string;
@@ -123,59 +124,29 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
 
         if (updateError) throw updateError;
       } else {
-        // Create new user - use signUp to create in Supabase Auth, then in usuarios table
+        // Create new user using authService (handles both Supabase Auth and usuarios table)
         const authEmail = email || `${username}@manglarnet.local`;
 
-        // Create user in Supabase Auth using signUp
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+        const createUserData: CreateUserData = {
+          username,
           email: authEmail,
           password: formData.password,
-        });
+          nombres: username, // Use username as nombres for now
+          apellidos: '', // Empty apellidos for now
+          role: formData.role,
+        };
 
-        if (authError) {
-          if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
-            throw new Error('Este usuario ya está registrado');
-          }
-          throw authError;
-        }
-
-        if (!authData.user) {
-          throw new Error('No se pudo crear el usuario en el sistema de autenticación');
-        }
-
-        // Create user in usuarios table
-        const { error: insertError } = await supabase
-          .from('usuarios')
-          .insert({
-            id: authData.user.id,
-            username,
-            email,
-            nombres: username, // Use username as nombres for now
-            apellidos: '', // Empty apellidos for now
-            role: formData.role,
-            is_active: true,
-            created_by: currentUser.id,
-          });
-
-        if (insertError) {
-          // If usuarios insert fails, the auth user will need to be cleaned up manually
-          // or we can try to delete it (requires admin privileges)
-          if (insertError.code === '23505') {
-            throw new Error('Este nombre de usuario ya está registrado');
-          }
-          console.error('Error inserting into usuarios table:', insertError);
-          throw new Error(`Error al crear usuario en la base de datos: ${insertError.message}`);
-        }
+        const newUser = await authService.createUser(createUserData);
 
         // If role is docente, create entry in docentes table
         if (formData.role === 'docente') {
           const { error: docenteError } = await supabase
             .from('docentes')
             .insert({
-              id_usuario: authData.user.id,
+              id_usuario: newUser.id,
               nombres: username,
               apellidos: '',
-              email: email || authEmail,
+              email: authEmail,
               activo: true,
             });
 
@@ -208,16 +179,13 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
 
     try {
       // Delete from usuarios table (cascade will handle related records)
+      // This will also delete from auth.users due to CASCADE constraint
       const { error: deleteError } = await supabase
         .from('usuarios')
         .delete()
         .eq('id', userId);
 
       if (deleteError) throw deleteError;
-
-      // Note: Deleting from Supabase Auth requires admin privileges
-      // The auth user should be deleted manually from Supabase Dashboard
-      // or through an Edge Function with admin access
 
       await loadUsuarios();
     } catch (err: any) {
@@ -250,7 +218,6 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
     docente: 'Docente',
     coordinador: 'Coordinador',
     directivo: 'Directivo',
-    administrativo: 'Administrativo',
   };
 
   const getRoleBadgeVariant = (role: UserRole): "default" | "secondary" | "destructive" | "outline" => {
@@ -258,7 +225,6 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
       case 'directivo': return 'default';
       case 'coordinador': return 'secondary';
       case 'docente': return 'outline';
-      case 'administrativo': return 'secondary';
       default: return 'outline';
     }
   };
@@ -519,7 +485,6 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
                   <SelectItem value="docente">Docente</SelectItem>
                   <SelectItem value="coordinador">Coordinador</SelectItem>
                   <SelectItem value="directivo">Directivo</SelectItem>
-                  <SelectItem value="administrativo">Administrativo</SelectItem>
                 </SelectContent>
               </Select>
             </div>

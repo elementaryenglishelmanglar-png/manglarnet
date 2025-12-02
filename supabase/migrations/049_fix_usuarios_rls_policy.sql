@@ -1,3 +1,8 @@
+-- OPTIONAL: This migration provides separate INSERT/UPDATE/DELETE policies for usuarios
+-- to avoid circular dependency issues when creating the first admin user.
+-- The main RLS policies are defined in migrations 030 and 040.
+-- Only run this if you encounter circular dependency errors when creating users.
+--
 -- Fix RLS policy for user creation
 -- The previous policy had a circular dependency issue
 

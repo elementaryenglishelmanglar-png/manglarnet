@@ -1,3 +1,7 @@
+-- DEPRECATED: This migration is part of the legacy authentication system
+-- RLS policies are now managed by migrations 030_unified_auth_system.sql and 040_simplify_security_policies.sql
+-- This migration is kept for historical reference but should not be used in new deployments
+--
 -- Fix RLS policies for authorized_users table
 -- This migration fixes the policies to allow authenticated users to read their own authorization status
 

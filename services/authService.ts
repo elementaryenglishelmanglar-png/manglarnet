@@ -130,18 +130,35 @@ export const authService = {
 
   /**
    * Create a new user (admin only)
+   * Note: This uses signUp which requires email confirmation to be disabled in Supabase settings
+   * For production, consider using an Edge Function with service_role key
    */
   async createUser(userData: CreateUserData): Promise<User> {
     try {
-      // 1. Create user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      // 1. Create user in Supabase Auth using signUp
+      // IMPORTANT: Email confirmation must be disabled in Supabase Auth settings
+      // Go to: Authentication > Settings > Auth Providers > Email > Disable "Confirm email"
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: userData.email,
         password: userData.password,
-        email_confirm: true,
+        options: {
+          emailRedirectTo: undefined, // No redirect needed
+          data: {
+            username: userData.username,
+            role: userData.role,
+          }
+        }
       });
 
-      if (authError || !authData.user) {
-        throw new Error('Error al crear usuario en autenticación');
+      if (authError) {
+        if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
+          throw new Error('Este usuario ya está registrado');
+        }
+        throw new Error(`Error al crear usuario: ${authError.message}`);
+      }
+
+      if (!authData.user) {
+        throw new Error('No se pudo crear el usuario en el sistema de autenticación');
       }
 
       // 2. Create user profile in usuarios table
@@ -156,21 +173,30 @@ export const authService = {
           telefono: userData.telefono,
           role: userData.role,
           is_active: true,
-          email_verified: true,
+          email_verified: true, // Set to true since we're creating admin users
         }])
         .select()
         .single();
 
       if (profileError) {
-        // Rollback: delete auth user
-        await supabase.auth.admin.deleteUser(authData.user.id);
-        throw new Error('Error al crear perfil de usuario');
+        // If usuarios insert fails, log error but can't easily rollback auth user
+        // Admin will need to manually delete from Supabase Dashboard if needed
+        console.error('Error inserting into usuarios table:', profileError);
+        if (profileError.code === '23505') {
+          throw new Error('Este nombre de usuario o correo ya está registrado');
+        }
+        throw new Error(`Error al crear perfil de usuario: ${profileError.message}`);
       }
 
       // 3. Get user with permissions
-      const { data: userWithPermissions } = await supabase
+      const { data: userWithPermissions, error: permError } = await supabase
         .rpc('get_user_with_permissions', { p_user_id: authData.user.id })
         .single();
+
+      if (permError || !userWithPermissions) {
+        console.warn('Could not fetch user with permissions, returning basic profile');
+        return profileData as User;
+      }
 
       return userWithPermissions as User;
     } catch (error: any) {

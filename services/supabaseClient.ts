@@ -69,11 +69,11 @@ export const supabase = createClient(finalUrl, finalKey, {
 // Add a flag to check if Supabase is properly configured
 (supabase as any).isConfigured = !!supabaseUrl && !!supabaseAnonKey;
 
-// Type definitions for whitelist table
+// Type definitions for whitelist table (deprecated - use usuarios table instead)
 export interface AuthorizedUser {
   id: string;
   email: string;
-  role: 'docente' | 'coordinador' | 'directivo' | 'administrativo';
+  role: 'docente' | 'coordinador' | 'directivo';
   created_at: string;
   created_by?: string;
 }

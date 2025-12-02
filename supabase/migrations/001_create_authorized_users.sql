@@ -1,3 +1,7 @@
+-- DEPRECATED: This migration is part of the legacy authentication system
+-- The current system uses the unified 'usuarios' table (see migration 030_unified_auth_system.sql)
+-- This table is kept for historical data but is no longer actively used
+-- 
 -- Create table for authorized users (whitelist)
 -- This table stores emails that are allowed to access the system
 

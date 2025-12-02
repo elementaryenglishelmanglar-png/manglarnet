@@ -8,9 +8,9 @@ Sistema de gestión pedagógica con integración de IA para planificaciones y an
 
 ## 🚀 Características
 
-- **Autenticación con Usuario y Contraseña**: Sistema seguro de login con autenticación propia
-- **Sistema de Whitelist**: Control de acceso mediante lista de usuarios autorizados
-- **Gestión de Roles**: Roles diferenciados (Directivo, Coordinador, Docente, Administrativo)
+- **Autenticación Unificada**: Sistema seguro de login con Supabase Auth integrado
+- **Sistema de Permisos Granular**: Control de acceso basado en permisos por rol
+- **Gestión de Roles**: Roles diferenciados (Directivo, Coordinador, Docente) con permisos específicos
 - **Gestión de Alumnos**: Registro completo de información estudiantil
 - **Gestión de Docentes**: Administración de personal docente
 - **Planificaciones**: Creación y revisión de planificaciones de clase con sugerencias de IA
@@ -46,21 +46,12 @@ Sistema de gestión pedagógica con integración de IA para planificaciones y an
    VITE_SUPABASE_ANON_KEY=your-anon-key-here
    ```
 
-4. **Configurar el primer usuario administrador**
+4. **Ejecutar migraciones de base de datos**
    
-   Ejecuta las migraciones SQL en Supabase Dashboard (SQL Editor):
-   - `supabase/migrations/026_create_custom_auth_system.sql`
-   - `supabase/migrations/027_create_super_admin.sql`
-   
-   Luego crea el primer usuario super administrador siguiendo las instrucciones en la migración 027.
-
-5. **Ejecutar migraciones de base de datos**
-   
-   Ejecuta la migración SQL para crear la tabla de usuarios autorizados:
-   ```bash
-   # Desde Supabase Dashboard > SQL Editor, ejecuta:
-   # supabase/migrations/001_create_authorized_users.sql
-   ```
+   Ejecuta las migraciones SQL en orden desde Supabase Dashboard (SQL Editor):
+   - Las migraciones están numeradas secuencialmente en `supabase/migrations/`
+   - La migración `030_unified_auth_system.sql` configura el sistema de autenticación unificado
+   - Sigue las instrucciones en `048_setup_admin_user.sql` para crear el primer usuario administrador
 
 6. **Ejecutar en desarrollo**
    ```bash
@@ -79,23 +70,15 @@ Sistema de gestión pedagógica con integración de IA para planificaciones y an
 
 ### Paso 2: Configurar Sistema de Autenticación
 
-1. Ejecuta las migraciones SQL en Supabase Dashboard (SQL Editor):
-   - `supabase/migrations/026_create_custom_auth_system.sql` - Crea la tabla usuarios y sistema de autenticación
-   - `supabase/migrations/027_create_super_admin.sql` - Crea función para super administrador
-   - `supabase/migrations/028_update_rls_policies_for_usuarios.sql` - Actualiza políticas RLS
+1. Ejecuta las migraciones SQL en orden desde Supabase Dashboard (SQL Editor):
+   - Ejecuta todas las migraciones numeradas secuencialmente en `supabase/migrations/`
+   - La migración `030_unified_auth_system.sql` configura el sistema de autenticación unificado con permisos granulares
 
-2. Crea el primer usuario super administrador:
-   - Ve a Supabase Dashboard > Authentication > Users
+2. Crea el primer usuario administrador:
+   - Ve a Supabase Dashboard > Authentication > Users > Add User
    - Crea un nuevo usuario con email y contraseña
    - Copia el User UID
-   - Ejecuta en SQL Editor:
-     ```sql
-     SELECT create_super_admin_user(
-       'USER_UID_AQUI'::UUID,
-       'admin',
-       'admin@manglarnet.local'
-     );
-     ```
+   - Sigue las instrucciones en `supabase/migrations/048_setup_admin_user.sql` para completar el setup
 
 ### Paso 3: Configurar Edge Function para Gemini API
 
@@ -188,12 +171,13 @@ manglarnet---conexión-pedagógica/
 
 ## 🔒 Seguridad
 
-- **Autenticación**: Sistema de whitelist que solo permite acceso a usuarios previamente autorizados
-- **Roles y Permisos**: Control de acceso basado en roles (Directivo, Coordinador, Docente, Administrativo)
+- **Autenticación Unificada**: Sistema integrado con Supabase Auth para autenticación segura
+- **Permisos Granulares**: Sistema de permisos basado en roles con control de acceso detallado
+- **Roles**: Directivo, Coordinador, Docente - cada uno con permisos específicos definidos
 - **API Keys**: La API key de Gemini está protegida en Supabase Edge Functions y nunca se expone al frontend
 - **Variables de entorno**: Nunca commitees archivos `.env.local` o `.env` con credenciales reales
 - **CORS**: Configurado correctamente para permitir solo dominios autorizados
-- **Row Level Security**: La tabla de usuarios autorizados tiene RLS habilitado para proteger los datos
+- **Row Level Security (RLS)**: Todas las tablas tienen RLS habilitado con políticas de seguridad basadas en permisos
 
 ## 🐛 Solución de Problemas
 
