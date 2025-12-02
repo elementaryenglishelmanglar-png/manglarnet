@@ -9465,7 +9465,8 @@ const EvaluationView: React.FC<{
     clases: Clase[];
     minutas: MinutaEvaluacion[];
     setMinutas: React.Dispatch<React.SetStateAction<MinutaEvaluacion[]>>;
-}> = ({ alumnos, clases, minutas, setMinutas }) => {
+    currentUser: Usuario;
+}> = ({ alumnos, clases, minutas, setMinutas, currentUser }) => {
     // Validar que los datos estén disponibles
     if (!alumnos || !clases || !minutas) {
         return (
@@ -10286,6 +10287,30 @@ const EvaluationView: React.FC<{
     }
 
 
+    // Función para eliminar minuta
+    const handleDeleteMinuta = async (idMinuta: string) => {
+        if (!window.confirm('¿Estás seguro de que deseas eliminar esta minuta del historial? Esta acción no se puede deshacer.')) {
+            return;
+        }
+
+        try {
+            await minutasService.delete(idMinuta);
+            // Actualizar la lista de minutas
+            const updatedMinutas = await minutasService.getAll();
+            setMinutas(updatedMinutas);
+            // Si la minuta eliminada estaba seleccionada, limpiar la selección
+            if (selectedMinuta?.id_minuta === idMinuta) {
+                setSelectedMinuta(null);
+            }
+        } catch (error) {
+            console.error('Error al eliminar minuta:', error);
+            alert('Error al eliminar la minuta. Por favor, intenta nuevamente.');
+        }
+    };
+
+    // Verificar si el usuario puede eliminar minutas (solo coordinadores y directivos)
+    const canDeleteMinutas = currentUser?.role === 'coordinador' || currentUser?.role === 'directivo';
+
     const renderHistoryView = () => {
         if (selectedMinuta) {
             const advancedAnalytics = calculateAdvancedAnalytics(selectedMinuta.datos_alumnos);
@@ -10412,18 +10437,31 @@ const EvaluationView: React.FC<{
                                 .sort((a, b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime())
                                 .map(minuta => (
                                     <Card key={minuta.id_minuta} className="hover:shadow-md transition-shadow">
-                                        <CardContent className="p-4 flex justify-between items-center">
-                                            <div>
+                                        <CardContent className="p-4 flex justify-between items-center gap-2">
+                                            <div className="flex-1">
                                                 <p className="font-bold">{minuta.grado} - {minuta.materia}</p>
                                                 <p className="text-sm text-muted-foreground">{minuta.evaluacion} ({minuta.lapso})</p>
                                                 <p className="text-xs text-muted-foreground">Fecha: {new Date(minuta.fecha_creacion).toLocaleDateString()}</p>
                                             </div>
-                                            <Button
-                                                onClick={() => setSelectedMinuta(minuta)}
-                                                variant="outline"
-                                            >
-                                                Ver Detalles
-                                            </Button>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    onClick={() => setSelectedMinuta(minuta)}
+                                                    variant="outline"
+                                                >
+                                                    Ver Detalles
+                                                </Button>
+                                                {canDeleteMinutas && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleDeleteMinuta(minuta.id_minuta)}
+                                                        className="h-9 w-9 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                        title="Eliminar minuta"
+                                                    >
+                                                        <DeleteIcon className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </CardContent>
                                     </Card>
                                 ))
@@ -11091,7 +11129,7 @@ const App: React.FC = () => {
             case 'schedule-generator':
                 return <ScheduleGeneratorView currentUser={currentUser!} />;
             case 'evaluation':
-                return <EvaluationView alumnos={alumnos} clases={clases} minutas={minutas} setMinutas={setMinutas} />;
+                return <EvaluationView alumnos={alumnos} clases={clases} minutas={minutas} setMinutas={setMinutas} currentUser={currentUser!} />;
             case 'indicadores':
                 return <GestionIndicadores clases={clases} />;
             case 'authorized-users':
