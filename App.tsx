@@ -9866,15 +9866,41 @@ const EvaluationView: React.FC<{
                 }
             }
 
+            // Save resúmenes (try-catch individual para no fallar toda la operación)
+            let resumenesGuardados = 0;
             if (resumenesParaGuardar.length > 0) {
-                await resumenEvaluacionService.createBulk(resumenesParaGuardar);
+                try {
+                    await resumenEvaluacionService.createBulk(resumenesParaGuardar);
+                    resumenesGuardados = resumenesParaGuardar.length;
+                } catch (resumenError: any) {
+                    console.error('Error al guardar resúmenes de evaluación:', resumenError);
+                    // Si el error es de RLS, dar instrucciones específicas
+                    if (resumenError.message?.includes('row-level security') || resumenError.message?.includes('RLS')) {
+                        console.warn('Error de RLS al guardar resúmenes. Asegúrate de aplicar la migración 051.');
+                        // Continuar con el flujo normal, la minuta ya se guardó
+                    } else {
+                        // Para otros errores, también continuar pero registrar
+                        console.warn('Error al guardar resúmenes:', resumenError.message);
+                    }
+                }
             }
 
             // Reload all minutas
             const allMinutas = await minutasService.getAll();
             setMinutas(allMinutas);
 
-            alert(`Minuta guardada con éxito${detallesParaGuardar.length > 0 ? ` (incluidos ${detallesParaGuardar.length} detalles de indicadores)` : ''}.`);
+            // Mensaje de éxito más detallado
+            let mensajeExito = 'Minuta guardada con éxito.';
+            if (detallesParaGuardar.length > 0) {
+                mensajeExito += ` ${detallesParaGuardar.length} detalles de indicadores guardados.`;
+            }
+            if (resumenesGuardados > 0) {
+                mensajeExito += ` ${resumenesGuardados} resúmenes de evaluación guardados.`;
+            } else if (resumenesParaGuardar.length > 0) {
+                mensajeExito += `\n\n⚠️ Nota: Los resúmenes de evaluación no se pudieron guardar. La minuta se guardó correctamente, pero es posible que necesites aplicar la migración 051 en Supabase.`;
+            }
+
+            alert(mensajeExito);
 
             // Reset form
             setFilters({ ano_escolar: '2025-2026', lapso: 'I Lapso', evaluacion: 'I Mensual', grado: '', materia: '' });
@@ -9886,7 +9912,21 @@ const EvaluationView: React.FC<{
         } catch (error: any) {
             console.error('Error saving minuta:', error);
             console.error('Error details:', JSON.stringify(error, null, 2));
-            alert('Error al guardar la minuta: ' + (error.message || 'Error desconocido') + '\n\nRevisa la consola para más detalles.');
+            
+            // Mensaje de error más específico
+            let mensajeError = 'Error al guardar la minuta: ' + (error.message || 'Error desconocido');
+            
+            // Si es error de RLS, dar instrucciones específicas
+            if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
+                mensajeError += '\n\n⚠️ Error de políticas RLS. Por favor, aplica la migración 051 en Supabase:\n';
+                mensajeError += '1. Ve a Supabase Dashboard > SQL Editor\n';
+                mensajeError += '2. Ejecuta el contenido de: supabase/migrations/051_fix_evaluation_tables_rls.sql\n';
+                mensajeError += '3. O revisa el archivo APLICAR_MIGRACION_051.md para más detalles.';
+            } else {
+                mensajeError += '\n\nRevisa la consola para más detalles.';
+            }
+            
+            alert(mensajeError);
         }
     }
 
