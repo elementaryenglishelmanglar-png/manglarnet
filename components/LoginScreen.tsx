@@ -70,11 +70,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
   if (isCheckingSession) {
     return (
-      <div className="min-h-screen bg-background flex flex-col justify-center items-center">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-6 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Verificando sesión...</p>
+      <div className="min-h-screen bg-gradient-to-br from-manglar-orange-light via-background to-manglar-green-light flex flex-col justify-center items-center px-4">
+        <Card className="max-w-md w-full shadow-xl border-0">
+          <CardContent className="pt-8 pb-8 text-center">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-manglar-orange to-manglar-green flex items-center justify-center shadow-lg animate-pulse">
+                <span className="text-white font-bold text-2xl">M</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-center space-y-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-manglar-orange border-t-transparent"></div>
+              <p className="text-muted-foreground font-medium">Verificando sesión...</p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -82,22 +89,32 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col justify-center items-center px-4">
-      <Card className="max-w-md w-full">
-        <CardHeader className="text-center">
+    <div className="min-h-screen bg-gradient-to-br from-manglar-orange-light via-background to-manglar-green-light flex flex-col justify-center items-center px-4">
+      <Card className="max-w-md w-full shadow-xl border-0">
+        <CardHeader className="text-center pb-6">
+          {/* Logo/Identidad */}
+          <div className="flex justify-center mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-manglar-orange to-manglar-green flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-2xl">M</span>
+            </div>
+          </div>
           <CardTitle className="text-3xl mb-2">
-            <span className="text-brand-primary">Bienvenido a ManglarNet</span>
+            <span className="bg-gradient-to-r from-manglar-orange to-manglar-green bg-clip-text text-transparent">
+              Bienvenido a ManglarNet
+            </span>
           </CardTitle>
-          <CardDescription className="text-base">
-            Ingresa tu usuario o correo electrónico y contraseña para acceder
+          <CardDescription className="text-base mt-2">
+            Sistema de gestión pedagógica del
+            <br />
+            <span className="font-semibold text-manglar-green">Colegio Integral El Manglar</span>
           </CardDescription>
         </CardHeader>
 
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             {error && (
-              <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
-                <p className="text-sm text-destructive">{error}</p>
+              <div className="p-4 bg-destructive/10 border-l-4 border-destructive rounded-md">
+                <p className="text-sm text-destructive font-medium">{error}</p>
               </div>
             )}
 
@@ -133,11 +150,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-11"
+              className="w-full h-11 bg-manglar-orange hover:bg-manglar-orange/90 text-white"
             >
               {isLoading ? (
                 <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-foreground mr-2"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
                   <span className="font-medium">Iniciando sesión...</span>
                 </>
               ) : (
@@ -147,11 +164,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           </form>
         </CardContent>
 
-        <CardFooter className="flex flex-col">
+        <CardFooter className="flex flex-col pt-6">
+          <div className="w-full h-px bg-gradient-to-r from-transparent via-apple-gray-light to-transparent mb-4"></div>
           <p className="text-xs text-muted-foreground text-center">
             Solo usuarios autorizados pueden acceder al sistema.
             <br />
-            Si necesitas acceso, contacta al administrador.
+            <span className="text-manglar-green">Si necesitas acceso, contacta al administrador.</span>
           </p>
         </CardFooter>
       </Card>

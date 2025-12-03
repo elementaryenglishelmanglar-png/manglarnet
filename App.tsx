@@ -1,8 +1,9 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import { DashboardIcon, StudentsIcon, TeachersIcon, ClassesIcon, PlusIcon, CloseIcon, EditIcon, DeleteIcon, ChevronDownIcon, LogoutIcon, PlanningIcon, GradesIcon, FilterIcon, CalendarIcon, SearchIcon, SpecialSubjectIcon, SparklesIcon, ArrowLeftIcon, UserCircleIcon, AcademicCapIcon, UsersIcon, IdentificationIcon, CakeIcon, LocationMarkerIcon, MailIcon, PhoneIcon, ClipboardCheckIcon, SendIcon, BellIcon, TagIcon, DownloadIcon, EvaluationIcon, SaveIcon, MenuIcon, MagicWandIcon } from './components/Icons';
+import { DashboardIcon, StudentsIcon, TeachersIcon, PlusIcon, CloseIcon, EditIcon, DeleteIcon, ChevronDownIcon, LogoutIcon, PlanningIcon, CalendarIcon, SearchIcon, SparklesIcon, ArrowLeftIcon, UserCircleIcon, AcademicCapIcon, UsersIcon, IdentificationIcon, CakeIcon, LocationMarkerIcon, MailIcon, PhoneIcon, ClipboardCheckIcon, SendIcon, BellIcon, TagIcon, DownloadIcon, EvaluationIcon, SaveIcon, MenuIcon, MagicWandIcon, ScheduleGeneratorIcon, TeamSchedulesIcon } from './components/Icons';
+import { AlertTriangle, AlertCircle, XCircle, Heart, UserMinus } from 'lucide-react';
 import { Button } from './components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from './components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './components/ui/dialog';
@@ -10,15 +11,99 @@ import { Input } from './components/ui/input';
 import { Textarea } from './components/ui/textarea';
 import { InputField } from './components/ui/InputField';
 import { Separator } from './components/ui/separator';
-import { Skeleton } from './components/ui/skeleton';
+import { Skeleton, LoadingState, LoadingSpinner } from './components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from './components/ui/alert';
+import { useToast } from './components/ui/toast';
+import { ConfirmDialog } from './components/ui/confirm-dialog';
+import { EmptyState, EmptyStateStudents, EmptyStateTeachers, EmptyStateSearch } from './components/ui/empty-state';
+import { Breadcrumbs } from './components/ui/breadcrumbs';
+import { ThemeToggle } from './components/ui/theme-toggle';
+import { HelpTooltip } from './components/ui/help-tooltip';
+import { OnboardingTour } from './components/ui/onboarding-tour';
+import { OptimisticButton } from './components/ui/optimistic-button';
+import { UserPreferencesDialog } from './components/ui/user-preferences-dialog';
+import { KeyboardShortcutsHelp } from './components/ui/keyboard-shortcuts-help';
+import { CommandPalette } from './components/ui/command-palette';
+import { useGlobalShortcuts, useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { GraduationCap, Home, Settings } from 'lucide-react';
 import { Badge } from './components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip';
-import { AdaptationGradeDistributionCharts } from './components/charts/AdaptationGradeDistributionCharts';
 import { PedagogicalDashboard } from './components/charts/PedagogicalDashboard';
+import { EnhancedPieChart, AdaptationGradeDistributionCharts, gradeColors, adaptationColors } from './components/charts/AdaptationCharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
 import { Label } from './components/ui/label';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, LineChart, Line } from 'recharts';
+
+// Colores de notas (duplicados aquí para asegurar que estén disponibles)
+const NOTE_COLORS: { [key: string]: string } = {
+    'A': '#22C55E', // Verde
+    'B': '#3B82F6', // Azul
+    'C': '#EAB308', // Amarillo
+    'D': '#F97316', // Naranja
+    'E': '#EF4444', // Rojo
+    'SE': '#6B7280', // Gris
+    '': '#D1D5DB'
+};
+
+// Componente helper para mostrar badges de notas con colores uniformes
+const GradeBadge: React.FC<{ nota: string }> = ({ nota }) => {
+    if (!nota || nota.trim() === '') {
+        return (
+            <span
+                className="inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                style={{
+                    backgroundColor: '#D1D5DB',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    minWidth: '2rem',
+                    height: '2rem'
+                }}
+            >
+                -
+            </span>
+        );
+    }
+    
+    // Normalizar la nota: eliminar signos + y - para buscar el color base
+    const notaUpper = nota.toUpperCase().trim();
+    const notaNormalizada = notaUpper.replace(/[+-]/g, '').replace(/\s+/g, '');
+    
+    // Usar los colores locales primero (más confiable)
+    let color = NOTE_COLORS[notaNormalizada];
+    if (!color && notaNormalizada !== notaUpper) {
+        color = NOTE_COLORS[notaUpper];
+    }
+    if (!color) {
+        // Si aún no encuentra, intentar con solo la primera letra
+        const primeraLetra = notaUpper.charAt(0);
+        color = NOTE_COLORS[primeraLetra];
+    }
+    // Fallback a gradeColors importado
+    if (!color) {
+        color = gradeColors[notaNormalizada] || gradeColors[notaUpper] || gradeColors[notaUpper.charAt(0)];
+    }
+    // Color por defecto si no se encuentra
+    if (!color) {
+        color = '#D1D5DB';
+    }
+    
+    const textColor = '#FFFFFF'; // Todos usan texto blanco para mejor contraste
+    
+    return (
+        <span
+            className="inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-all duration-200 hover:scale-105"
+            style={{
+                backgroundColor: color,
+                color: textColor,
+                border: 'none',
+                minWidth: '2rem',
+                height: '2rem'
+            }}
+        >
+            {nota}
+        </span>
+    );
+};
 
 // Icono de check para tareas completadas
 const CheckIcon = () => (
@@ -33,22 +118,20 @@ const LoginScreen = lazy(() => import('./components/LoginScreen').then(module =>
 const AuthorizedUsersView = lazy(() => import('./components/AuthorizedUsersView').then(module => ({ default: module.AuthorizedUsersView })));
 import BulkImportModal from './components/students/BulkImportModal';
 import { GestionIndicadores } from './components/students/GestionIndicadores';
-import { IntelligenceDashboard } from './components/IntelligenceDashboard';
-import { marked } from 'marked';
+import StudentDetailView from './components/students/StudentDetailView';
+import StudentListView from './components/students/StudentListView';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { lapsosService, semanasLapsoService } from './services/supabaseDataService';
-import { getWeekFromDate, getAllWeeksForAnoEscolar, formatDateRange } from './services/weekCalculator';
+import { analyticsService } from './services/supabaseDataService';
+import { getWeekFromDate, formatDateRange } from './services/weekCalculator';
 import {
     alumnosService,
     docentesService,
-    guardiasService,
     logReunionesService,
     eventosCalendarioService,
     tareasCoordinadorService,
-    type Guardia,
     type LogReunionCoordinacion,
-    type EventoCalendario,
     type TareaCoordinador,
     clasesService,
     planificacionesService,
@@ -62,14 +145,8 @@ import {
     detalleEvaluacionService,
     resumenEvaluacionService,
     type Alumno as AlumnoDB,
-    type Docente as DocenteDB,
     type Clase as ClaseDB,
-    type Planificacion as PlanificacionDB,
-    type MinutaEvaluacion,
     type Horario as HorarioDB,
-    type MinutaEvaluacion as MinutaEvaluacionDB,
-    type Notification as NotificationDB,
-    type EventoCalendario as EventoCalendarioDB,
     type ConfiguracionHorario,
     type GeneracionHorario,
     type Aula,
@@ -273,14 +350,7 @@ interface Notification {
 
 
 // --- MOCK DATABASE & USERS ---
-
-const mockUsuarios: Usuario[] = [
-    { id: 'user-director-01', email: 'director@school.edu', role: 'directivo', fullName: 'Directivo General' },
-    { id: 'user-coord-01', email: 'coord@school.edu', role: 'coordinador', fullName: 'Coordinador Académico' },
-    { id: 'user-teacher-01', email: 'j.perez@school.edu', role: 'docente', docenteId: 'docente-01', fullName: 'Juan Pérez (Docente)' },
-    { id: 'user-teacher-02', email: 'm.gomez@school.edu', role: 'docente', docenteId: 'docente-02', fullName: 'Maria Gómez (Docente)' },
-    { id: 'user-admin-01', email: 'admin@school.edu', role: 'administrativo', fullName: 'Personal Administrativo' },
-];
+// mockUsuarios removed - not used in production code
 
 const mockDocentes: Docente[] = [
     { id_docente: 'docente-01', id_usuario: 'user-teacher-01', nombres: 'Juan', apellidos: 'Pérez', email: 'j.perez@school.edu', telefono: '0412-1234567', especialidad: 'Matemáticas' },
@@ -501,253 +571,281 @@ const generateAnosEscolares = (): string[] => {
 const ANOS_ESCOLARES = generateAnosEscolares();
 
 
-// Función helper para obtener el color de una materia
+// Paleta de colores refinada para materias - Mejor accesibilidad y consistencia
+const SUBJECT_COLORS = {
+    // Matemáticas - Azul profesional
+    MATEMATICAS: '#3B82F6', // Blue-500
+    
+    // Lenguaje - Rosa suave
+    LENGUAJE: '#EC4899', // Pink-500
+    
+    // Ciencias - Verde natural
+    CIENCIAS: '#10B981', // Emerald-500
+    
+    // Sociales - Naranja cálido (inspirado en colores del colegio)
+    SOCIALES: '#F97316', // Orange-500
+    
+    // Proyecto - Amarillo suave
+    PROYECTO: '#FBBF24', // Amber-400
+    
+    // Inglés - Púrpura
+    INGLES: '#8B5CF6', // Violet-500
+    
+    // Francés - Magenta
+    FRANCES: '#D946EF', // Fuchsia-500
+    
+    // Literatura - Rojo suave
+    LITERATURA: '#EF4444', // Red-500
+    
+    // Música - Verde esmeralda
+    MUSICA: '#14B8A6', // Teal-500
+    
+    // Arte - Rosa vibrante
+    ARTE: '#F43F5E', // Rose-500
+    
+    // Tecnología - Índigo
+    TECNOLOGIA: '#6366F1', // Indigo-500
+    
+    // Ajedrez - Gris neutro
+    AJEDREZ: '#6B7280', // Gray-500
+    
+    // Educación Física - Naranja vibrante
+    EDUCACION_FISICA: '#FB923C', // Orange-400
+    
+    // Valores/ADP - Amarillo del colegio
+    VALORES: '#FADB16', // Amarillo Manglar
+    
+    // Clubes y actividades - Verde del colegio
+    CLUBES: '#78AC40', // Verde Manglar
+    
+    // Default - Gris claro
+    DEFAULT: '#E5E7EB', // Gray-200
+};
+
+// Función helper para obtener el color de una materia (refinada)
 const getSubjectColor = (subjectName: string): string => {
     const normalizedName = subjectName?.trim() || '';
 
-    // Matemáticas - #01b0f3
-    if (normalizedName.includes('Matemáticas')) {
-        return '#01b0f3';
+    // Matemáticas
+    if (normalizedName.includes('Matemáticas') || normalizedName.includes('MATEMATICA')) {
+        return SUBJECT_COLORS.MATEMATICAS;
     }
 
-    // Lenguaje - #e7b6b7
-    if (normalizedName.includes('Lenguaje')) {
-        return '#e7b6b7';
+    // Lenguaje
+    if (normalizedName.includes('Lenguaje') || normalizedName.includes('CASTELLANO')) {
+        return SUBJECT_COLORS.LENGUAJE;
     }
 
-    // Ciencias - #99ff32
-    if (normalizedName === 'Ciencias' || normalizedName.includes('Ciencias')) {
-        return '#99ff32';
+    // Ciencias (verificar antes que Física sola)
+    if (normalizedName === 'Ciencias' || normalizedName.includes('Ciencias') || 
+        normalizedName.includes('QUÍMICA') || normalizedName.includes('BIOLOGÍA') ||
+        normalizedName.includes('CIENCIAS DE LA TIERRA') || normalizedName.includes('SISTEMAS AMBIENTALES')) {
+        return SUBJECT_COLORS.CIENCIAS;
     }
 
-    // Sociales - #fe9900
-    if (normalizedName === 'Sociales') {
-        return '#fe9900';
+    // Educación Física y Deporte (verificar antes que Física sola)
+    if (normalizedName.includes('Deporte') || normalizedName.includes('EDUCACIÓN FÍSICA') || 
+        normalizedName.includes('Ed, Física') || normalizedName === 'FÍSICA (Inglés)') {
+        return SUBJECT_COLORS.EDUCACION_FISICA;
     }
 
-    // Proyecto - #feff99
-    if (normalizedName === 'Proyecto') {
-        return '#feff99';
-    }
-
-    // Inglés - #9b99fd
-    if (normalizedName.includes('Inglés') || normalizedName.includes('English')) {
-        return '#9b99fd';
-    }
-
-    // Francés - #c17ba0
-    if (normalizedName === 'Francés' || normalizedName === 'FRANCES') {
-        return '#c17ba0';
-    }
-
-    // Literatura - #a64d79
-    if (normalizedName === 'Literatura') {
-        return '#a64d79';
-    }
-
-    // Música - #00ff99
-    if (normalizedName === 'Música' || normalizedName === 'MUSICA' || normalizedName.includes('Música')) {
-        return '#00ff99';
-    }
-
-    // Arte - #ff99ff
-    if (normalizedName === 'Arte' || normalizedName.includes('Arte')) {
-        return '#ff99ff';
-    }
-
-    // Tecnología - #c17ba0
-    if (normalizedName.includes('Tecnología') || normalizedName.includes('Tecnologia') || normalizedName.includes('Computación') || normalizedName.includes('Robótica') || normalizedName.includes('Robotica')) {
-        return '#c17ba0';
-    }
-
-    // Ajedrez - #cccccc
-    if (normalizedName === 'Ajedrez') {
-        return '#cccccc';
-    }
-
-    // Ed, Física y Deporte - #ffc000 (debe verificarse antes que Ciencias para evitar conflictos)
-    if (normalizedName.includes('Deporte') || normalizedName.includes('EDUCACIÓN FÍSICA') || normalizedName.includes('Ed, Física') || normalizedName === 'FÍSICA (Inglés)') {
-        return '#ffc000';
-    }
-
-    // Física (como materia de ciencias) - #99ff32
+    // Física (como materia de ciencias)
     if (normalizedName === 'Física') {
-        return '#99ff32';
+        return SUBJECT_COLORS.CIENCIAS;
     }
 
-    // Valores - #ffff00
-    if (normalizedName === 'Valores') {
-        return '#ffff00';
+    // Sociales
+    if (normalizedName === 'Sociales' || normalizedName.includes('GHC')) {
+        return SUBJECT_COLORS.SOCIALES;
     }
 
-    // ADP - #ffff00
-    if (normalizedName === 'ADP') {
-        return '#ffff00';
+    // Proyecto
+    if (normalizedName === 'Proyecto') {
+        return SUBJECT_COLORS.PROYECTO;
     }
 
-    // Taller Mañanero - #feff97
+    // Inglés
+    if (normalizedName.includes('Inglés') || normalizedName.includes('English') || normalizedName.includes('INGLES')) {
+        return SUBJECT_COLORS.INGLES;
+    }
+
+    // Francés
+    if (normalizedName === 'Francés' || normalizedName === 'FRANCES') {
+        return SUBJECT_COLORS.FRANCES;
+    }
+
+    // Literatura
+    if (normalizedName === 'Literatura') {
+        return SUBJECT_COLORS.LITERATURA;
+    }
+
+    // Música
+    if (normalizedName === 'Música' || normalizedName === 'MUSICA' || normalizedName.includes('Música')) {
+        return SUBJECT_COLORS.MUSICA;
+    }
+
+    // Arte
+    if (normalizedName === 'Arte' || normalizedName.includes('Arte') || normalizedName.includes('ARTE Y PATRIMONIO')) {
+        return SUBJECT_COLORS.ARTE;
+    }
+
+    // Tecnología
+    if (normalizedName.includes('Tecnología') || normalizedName.includes('Tecnologia') || 
+        normalizedName.includes('Computación') || normalizedName.includes('Robótica') || 
+        normalizedName.includes('Robotica') || normalizedName.includes('COMPUTACION')) {
+        return SUBJECT_COLORS.TECNOLOGIA;
+    }
+
+    // Ajedrez
+    if (normalizedName === 'Ajedrez') {
+        return SUBJECT_COLORS.AJEDREZ;
+    }
+
+    // Valores y ADP
+    if (normalizedName === 'Valores' || normalizedName === 'ADP') {
+        return SUBJECT_COLORS.VALORES;
+    }
+
+    // Clubes y actividades especiales
+    if (normalizedName.includes('Club') || normalizedName.includes('HUB') || 
+        normalizedName === 'Metacognición' || normalizedName === 'Metacogción' ||
+        normalizedName === 'Psicomotricidad' || normalizedName.includes('Conciencia')) {
+        return SUBJECT_COLORS.CLUBES;
+    }
+
+    // Taller Mañanero
     if (normalizedName === 'Taller Mañanero') {
-        return '#feff97';
-    }
-
-    // Metacognición - #feff99
-    if (normalizedName === 'Metacognición' || normalizedName === 'Metacogción') {
-        return '#feff99';
-    }
-
-    // Psicomotricidad - #feff99
-    if (normalizedName === 'Psicomotricidad') {
-        return '#feff99';
-    }
-
-    // Conciencia Fonológica - #feff99
-    if (normalizedName === 'Conciencia fonológica' || normalizedName === 'Conciencia Fonológica') {
-        return '#feff99';
-    }
-
-    // Clubes - #feff99
-    if (normalizedName.includes('Club')) {
-        return '#feff99';
+        return SUBJECT_COLORS.PROYECTO;
     }
 
     // Color por defecto
-    return '#F3F4F6';
+    return SUBJECT_COLORS.DEFAULT;
 };
 
-// Objeto de colores para compatibilidad con código existente
+// Objeto de colores para compatibilidad con código existente (usando paleta refinada)
 const subjectColors: { [key: string]: string } = {
     // Matemáticas
-    'Matemáticas': '#01b0f3',
-    'Matemáticas (EAC)': '#01b0f3',
-    'Matemáticas (AC)': '#01b0f3',
-    'Matemáticas (OB)': '#01b0f3',
-    'Matemáticas (Prob)': '#01b0f3',
-    'Matemáticas (Geometría)': '#01b0f3',
-    'Matemáticas (EV)': '#01b0f3',
-    'MATEMATICA': '#01b0f3',
+    'Matemáticas': SUBJECT_COLORS.MATEMATICAS,
+    'Matemáticas (EAC)': SUBJECT_COLORS.MATEMATICAS,
+    'Matemáticas (AC)': SUBJECT_COLORS.MATEMATICAS,
+    'Matemáticas (OB)': SUBJECT_COLORS.MATEMATICAS,
+    'Matemáticas (Prob)': SUBJECT_COLORS.MATEMATICAS,
+    'Matemáticas (Geometría)': SUBJECT_COLORS.MATEMATICAS,
+    'Matemáticas (EV)': SUBJECT_COLORS.MATEMATICAS,
+    'MATEMATICA': SUBJECT_COLORS.MATEMATICAS,
 
     // Lenguaje
-    'Lenguaje': '#e7b6b7',
-    'Lenguaje (AC)': '#e7b6b7',
-    'Lenguaje (EAC)': '#e7b6b7',
-    'Lenguaje (CL)': '#e7b6b7',
-    'Lenguaje (LO)': '#e7b6b7',
-    'Lenguaje (PT)': '#e7b6b7',
-    'Lenguaje (Gram)': '#e7b6b7',
-    'CASTELLANO': '#e7b6b7',
+    'Lenguaje': SUBJECT_COLORS.LENGUAJE,
+    'Lenguaje (AC)': SUBJECT_COLORS.LENGUAJE,
+    'Lenguaje (EAC)': SUBJECT_COLORS.LENGUAJE,
+    'Lenguaje (CL)': SUBJECT_COLORS.LENGUAJE,
+    'Lenguaje (LO)': SUBJECT_COLORS.LENGUAJE,
+    'Lenguaje (PT)': SUBJECT_COLORS.LENGUAJE,
+    'Lenguaje (Gram)': SUBJECT_COLORS.LENGUAJE,
+    'CASTELLANO': SUBJECT_COLORS.LENGUAJE,
 
     // Ciencias
-    'Ciencias': '#99ff32',
-    'Física': '#99ff32',
-    'QUÍMICA': '#99ff32',
-    'BIOLOGÍA': '#99ff32',
-    'CIENCIAS DE LA TIERRA': '#99ff32',
-    'SISTEMAS AMBIENTALES': '#99ff32',
+    'Ciencias': SUBJECT_COLORS.CIENCIAS,
+    'Física': SUBJECT_COLORS.CIENCIAS,
+    'QUÍMICA': SUBJECT_COLORS.CIENCIAS,
+    'BIOLOGÍA': SUBJECT_COLORS.CIENCIAS,
+    'CIENCIAS DE LA TIERRA': SUBJECT_COLORS.CIENCIAS,
+    'SISTEMAS AMBIENTALES': SUBJECT_COLORS.CIENCIAS,
 
     // Sociales
-    'Sociales': '#fe9900',
-    'GHC (Geografía, Historia y Ciudadanía)': '#fe9900',
+    'Sociales': SUBJECT_COLORS.SOCIALES,
+    'GHC (Geografía, Historia y Ciudadanía)': SUBJECT_COLORS.SOCIALES,
 
     // Proyecto
-    'Proyecto': '#feff99',
+    'Proyecto': SUBJECT_COLORS.PROYECTO,
+    'Taller Mañanero': SUBJECT_COLORS.PROYECTO,
 
     // Inglés
-    'Inglés': '#9b99fd',
-    'Inglés (reading)': '#9b99fd',
-    'Inglés (Use of English)': '#9b99fd',
-    'Inglés (Writing)': '#9b99fd',
-    'Inglés (Writting)': '#9b99fd',
-    'Inglés (Speaking)': '#9b99fd',
-    'Inglés (Project)': '#9b99fd',
-    'Inglés (Basic)': '#9b99fd',
-    'Inglés (Lower)': '#9b99fd',
-    'Inglés (Upper)': '#9b99fd',
-    'INGLES': '#9b99fd',
-    'English Club (Board Games Club)': '#9b99fd',
-    'English Club (Reading Club)': '#9b99fd',
-    'English Club (Entertainment Club)': '#9b99fd',
-    'English Club (Drawing and Animation Club)': '#9b99fd',
+    'Inglés': SUBJECT_COLORS.INGLES,
+    'Inglés (reading)': SUBJECT_COLORS.INGLES,
+    'Inglés (Use of English)': SUBJECT_COLORS.INGLES,
+    'Inglés (Writing)': SUBJECT_COLORS.INGLES,
+    'Inglés (Writting)': SUBJECT_COLORS.INGLES,
+    'Inglés (Speaking)': SUBJECT_COLORS.INGLES,
+    'Inglés (Project)': SUBJECT_COLORS.INGLES,
+    'Inglés (Basic)': SUBJECT_COLORS.INGLES,
+    'Inglés (Lower)': SUBJECT_COLORS.INGLES,
+    'Inglés (Upper)': SUBJECT_COLORS.INGLES,
+    'INGLES': SUBJECT_COLORS.INGLES,
+    'English Club (Board Games Club)': SUBJECT_COLORS.INGLES,
+    'English Club (Reading Club)': SUBJECT_COLORS.INGLES,
+    'English Club (Entertainment Club)': SUBJECT_COLORS.INGLES,
+    'English Club (Drawing and Animation Club)': SUBJECT_COLORS.INGLES,
 
     // Francés
-    'Francés': '#c17ba0',
-    'FRANCES': '#c17ba0',
+    'Francés': SUBJECT_COLORS.FRANCES,
+    'FRANCES': SUBJECT_COLORS.FRANCES,
 
     // Literatura
-    'Literatura': '#a64d79',
+    'Literatura': SUBJECT_COLORS.LITERATURA,
 
     // Música
-    'Música': '#00ff99',
-    'MUSICA': '#00ff99',
-    'Club (Música)': '#feff99',
-    'HUB (Música)': '#00ff99',
+    'Música': SUBJECT_COLORS.MUSICA,
+    'MUSICA': SUBJECT_COLORS.MUSICA,
+    'HUB (Música)': SUBJECT_COLORS.MUSICA,
 
     // Arte
-    'Arte': '#ff99ff',
-    'ARTE Y PATRIMONIO': '#ff99ff',
-    'HUB (Arte)': '#ff99ff',
+    'Arte': SUBJECT_COLORS.ARTE,
+    'ARTE Y PATRIMONIO': SUBJECT_COLORS.ARTE,
+    'HUB (Arte)': SUBJECT_COLORS.ARTE,
 
     // Tecnología
-    'Tecnología (Robótica)': '#c17ba0',
-    'Tecnología (Computación)': '#c17ba0',
-    'Tecnología (financiera)': '#c17ba0',
-    'Tecnología (Financiera)': '#c17ba0',
-    'Robótica': '#c17ba0',
-    'Computación': '#c17ba0',
-    'COMPUTACION': '#c17ba0',
-    'HUB (Robótica/Programación)': '#c17ba0',
+    'Tecnología (Robótica)': SUBJECT_COLORS.TECNOLOGIA,
+    'Tecnología (Computación)': SUBJECT_COLORS.TECNOLOGIA,
+    'Tecnología (financiera)': SUBJECT_COLORS.TECNOLOGIA,
+    'Tecnología (Financiera)': SUBJECT_COLORS.TECNOLOGIA,
+    'Robótica': SUBJECT_COLORS.TECNOLOGIA,
+    'Computación': SUBJECT_COLORS.TECNOLOGIA,
+    'COMPUTACION': SUBJECT_COLORS.TECNOLOGIA,
+    'HUB (Robótica/Programación)': SUBJECT_COLORS.TECNOLOGIA,
 
     // Ajedrez
-    'Ajedrez': '#cccccc',
-    'Club (Ajedrez)': '#cccccc',
+    'Ajedrez': SUBJECT_COLORS.AJEDREZ,
+    'Club (Ajedrez)': SUBJECT_COLORS.AJEDREZ,
 
     // Educación Física y Deporte
-    'Ed, Física y Deporte': '#ffc000',
-    'EDUCACIÓN FÍSICA Y DEPORTE': '#ffc000',
-    'FÍSICA (Inglés)': '#ffc000',
+    'Ed, Física y Deporte': SUBJECT_COLORS.EDUCACION_FISICA,
+    'EDUCACIÓN FÍSICA Y DEPORTE': SUBJECT_COLORS.EDUCACION_FISICA,
+    'FÍSICA (Inglés)': SUBJECT_COLORS.EDUCACION_FISICA,
 
-    // Valores
-    'Valores': '#ffff00',
+    // Valores y ADP
+    'Valores': SUBJECT_COLORS.VALORES,
+    'ADP': SUBJECT_COLORS.VALORES,
 
-    // ADP
-    'ADP': '#ffff00',
+    // Clubes y actividades
+    'Metacognición': SUBJECT_COLORS.CLUBES,
+    'Metacogción': SUBJECT_COLORS.CLUBES,
+    'Psicomotricidad': SUBJECT_COLORS.CLUBES,
+    'Conciencia fonológica': SUBJECT_COLORS.CLUBES,
+    'Conciencia Fonológica': SUBJECT_COLORS.CLUBES,
+    'Club (Teatro)': SUBJECT_COLORS.CLUBES,
+    'Club (Estudiantina)': SUBJECT_COLORS.CLUBES,
+    'Club (Música)': SUBJECT_COLORS.CLUBES,
 
-    // Taller Mañanero
-    'Taller Mañanero': '#feff97',
-
-    // Metacognición
-    'Metacognición': '#feff99',
-    'Metacogción': '#feff99',
-
-    // Psicomotricidad
-    'Psicomotricidad': '#feff99',
-
-    // Conciencia Fonológica
-    'Conciencia fonológica': '#feff99',
-    'Conciencia Fonológica': '#feff99',
-
-    // Clubes
-    'Club (Teatro)': '#feff99',
-    'Club (Estudiantina)': '#feff99',
-
-    // Otras materias
-    'Evaluación': '#F3F4F6',
-    'Personal y Social': '#F3F4F6',
-    'Relación con el ambiente': '#F3F4F6',
-    'Comunicación y Representación': '#F3F4F6',
-    'HUB (Gastronomia)': '#F3F4F6',
-    'HUB (MUN)': '#F3F4F6',
-    'ELECTIVA (Oratoria)': '#F3F4F6',
-    'ELECTIVA (Inteligencia Artificial)': '#F3F4F6',
-    'ELECTIVA (Seguridad y Prevención de Emergencias)': '#F3F4F6',
-    'ELECTIVA (Edición videos)': '#F3F4F6',
-    'ELECTIVA (Lab de Soluciones Verdes)': '#F3F4F6',
-    'TDC (Teoría del Conocimiento)': '#F3F4F6',
-    'CAS (Creatividad, Actividad y Servicio)': '#F3F4F6',
-    'MONOGRAFIA': '#F3F4F6',
-    'GESTION EMPRESARIAL': '#F3F4F6',
+    // Otras materias (default)
+    'Evaluación': SUBJECT_COLORS.DEFAULT,
+    'Personal y Social': SUBJECT_COLORS.DEFAULT,
+    'Relación con el ambiente': SUBJECT_COLORS.DEFAULT,
+    'Comunicación y Representación': SUBJECT_COLORS.DEFAULT,
+    'HUB (Gastronomia)': SUBJECT_COLORS.CLUBES,
+    'HUB (MUN)': SUBJECT_COLORS.CLUBES,
+    'ELECTIVA (Oratoria)': SUBJECT_COLORS.DEFAULT,
+    'ELECTIVA (Inteligencia Artificial)': SUBJECT_COLORS.DEFAULT,
+    'ELECTIVA (Seguridad y Prevención de Emergencias)': SUBJECT_COLORS.DEFAULT,
+    'ELECTIVA (Edición videos)': SUBJECT_COLORS.DEFAULT,
+    'ELECTIVA (Lab de Soluciones Verdes)': SUBJECT_COLORS.DEFAULT,
+    'TDC (Teoría del Conocimiento)': SUBJECT_COLORS.DEFAULT,
+    'CAS (Creatividad, Actividad y Servicio)': SUBJECT_COLORS.DEFAULT,
+    'MONOGRAFIA': SUBJECT_COLORS.DEFAULT,
+    'GESTION EMPRESARIAL': SUBJECT_COLORS.DEFAULT,
 
     // Default
-    'default': '#F3F4F6',
+    'default': SUBJECT_COLORS.DEFAULT,
 };
 
 
@@ -904,29 +1002,53 @@ const Header: React.FC<{
     }, [notifications, currentUser.docenteId]);
 
     return (
-        <header className="bg-card p-4 flex justify-between items-center sticky top-0 z-30 border-b">
+        <header className="bg-card p-4 flex justify-between items-center sticky top-0 z-30 border-b shadow-sm">
             <div className="flex items-center gap-3">
                 {onMenuToggle && (
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={onMenuToggle}
-                        className="lg:hidden"
+                        className="lg:hidden hover:text-manglar-orange hover:bg-manglar-orange-light"
                         aria-label="Toggle menu"
                     >
                         <MenuIcon className="h-6 w-6" />
                     </Button>
                 )}
-                <h1 className="text-2xl sm:text-3xl font-bold text-foreground truncate tracking-tight">{title}</h1>
+                <div className="flex items-center gap-3">
+                    <div className="hidden sm:flex w-8 h-8 rounded-lg bg-gradient-to-br from-manglar-orange to-manglar-orange/80 items-center justify-center">
+                        <span className="text-white font-bold text-sm">M</span>
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-foreground truncate tracking-tight">{title}</h1>
+                </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
+                <ThemeToggle />
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowPreferences(true)}
+                    className="hover:bg-manglar-orange-light focus-ring"
+                    aria-label="Preferencias"
+                >
+                    <Settings className="h-5 w-5" />
+                </Button>
                 {currentUser.role === 'docente' && (
                     <Popover open={isNotificationsOpen} onOpenChange={setNotificationsOpen}>
                         <PopoverTrigger asChild>
-                            <Button variant="ghost" size="icon" className="relative">
-                                <BellIcon className="h-6 w-6" />
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="relative hover:text-manglar-orange focus-ring"
+                                aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ''}`}
+                                aria-expanded={isNotificationsOpen}
+                            >
+                                <BellIcon className="h-6 w-6" aria-hidden="true" />
                                 {unreadCount > 0 && (
-                                    <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
+                                    <span 
+                                        className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-manglar-orange ring-2 ring-background animate-pulse-gentle"
+                                        aria-hidden="true"
+                                    />
                                 )}
                             </Button>
                         </PopoverTrigger>
@@ -942,8 +1064,10 @@ const Header: React.FC<{
                                                 <button
                                                     key={n.id}
                                                     onClick={() => { onNotificationClick(n); setNotificationsOpen(false); }}
-                                                    className={`w-full text-left px-4 py-3 text-sm hover:bg-accent transition-colors border-b last:border-0 ${!n.isRead ? 'bg-primary/5' : ''
+                                                    className={`w-full text-left px-4 py-3 text-sm hover:bg-manglar-orange-light transition-colors border-b last:border-0 focus-ring rounded ${!n.isRead ? 'bg-manglar-orange-light border-l-4 border-manglar-orange' : ''
                                                         }`}
+                                                    aria-label={`${n.title}. ${n.message}`}
+                                                    role="menuitem"
                                                 >
                                                     <p className="font-semibold text-foreground">{n.title}</p>
                                                     <p className="text-muted-foreground text-xs font-light mt-1">{n.message}</p>
@@ -965,20 +1089,31 @@ const Header: React.FC<{
                 )}
                 <DropdownMenu open={isMenuOpen} onOpenChange={setMenuOpen}>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="flex items-center gap-2 text-left h-auto p-2">
+                        <Button 
+                            variant="ghost" 
+                            className="flex items-center gap-2 text-left h-auto p-2 focus-ring"
+                            aria-label="Menú de usuario"
+                            aria-expanded={isMenuOpen}
+                            aria-haspopup="true"
+                        >
                             <div className="hidden sm:block text-left">
                                 <p className="font-semibold text-foreground text-sm sm:text-base">{currentUser.fullName}</p>
                                 <p className="text-xs sm:text-sm text-muted-foreground font-light capitalize">{currentUser.role}</p>
                             </div>
                             <div className="sm:hidden">
-                                <UserCircleIcon className="h-8 w-8 text-muted-foreground" />
+                                <UserCircleIcon className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
                             </div>
-                            <ChevronDownIcon className="hidden sm:block h-4 w-4" />
+                            <ChevronDownIcon className="hidden sm:block h-4 w-4" aria-hidden="true" />
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem onClick={onLogout} className="cursor-pointer">
-                            <LogoutIcon className="h-4 w-4 mr-2" />
+                    <DropdownMenuContent align="end" className="w-48" role="menu" aria-label="Menú de usuario">
+                        <DropdownMenuItem 
+                            onClick={onLogout} 
+                            className="cursor-pointer focus-ring"
+                            role="menuitem"
+                            aria-label="Cerrar sesión"
+                        >
+                            <LogoutIcon className="h-4 w-4 mr-2" aria-hidden="true" />
                             Cerrar Sesión
                         </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -995,26 +1130,64 @@ const Sidebar: React.FC<{
     isOpen: boolean;
     onClose: () => void;
 }> = ({ activeView, onNavigate, userRole, isOpen, onClose }) => {
-    const navLinks = [
-        { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon, roles: ['directivo', 'coordinador', 'docente', 'administrativo'] },
-        { id: 'students', label: 'Alumnos', icon: StudentsIcon, roles: ['directivo', 'coordinador', 'administrativo'] },
-        { id: 'teachers', label: 'Docentes', icon: TeachersIcon, roles: ['directivo', 'coordinador'] },
-        { id: 'schedules', label: 'Horarios', icon: CalendarIcon, roles: ['coordinador', 'directivo', 'docente'] },
-        { id: 'schedule-generator', label: 'Generador de Horarios', icon: MagicWandIcon, roles: ['coordinador', 'directivo'] },
-        { id: 'team-schedules', label: 'Horarios Equipo', icon: UsersIcon, roles: ['coordinador', 'directivo'] },
-        { id: 'calendar', label: 'Calendario', icon: CalendarIcon, roles: ['directivo', 'coordinador', 'docente'] },
-        { id: 'planning', label: 'Planificaciones', icon: PlanningIcon, roles: ['directivo', 'coordinador', 'docente'] },
-        { id: 'evaluation', label: 'Evaluación', icon: EvaluationIcon, roles: ['directivo', 'coordinador'] },
-        { id: 'indicadores', label: 'Indicadores', icon: ClipboardCheckIcon, roles: ['directivo', 'coordinador'] },
-        { id: 'intelligence', label: 'Intelligence Suite', icon: SparklesIcon, roles: ['directivo', 'coordinador'] },
-        { id: 'authorized-users', label: 'Gestión de Usuarios', icon: UsersIcon, roles: ['directivo', 'coordinador'] },
-        { id: 'lapsos-admin', label: 'Gestión de Lapsos', icon: CalendarIcon, roles: ['coordinador', 'directivo'] },
+    interface NavLink {
+        id: string;
+        label: string;
+        icon: React.FC<{ className?: string }>;
+        roles: UserRole[];
+        category?: string;
+    }
+
+    interface NavCategory {
+        id: string;
+        label: string;
+        roles: UserRole[];
+    }
+
+    const navLinks: NavLink[] = [
+        // 📊 Análisis
+        { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon, roles: ['directivo', 'coordinador', 'docente', 'administrativo'], category: 'analisis' },
+        
+        // 👥 Gestión
+        { id: 'students', label: 'Alumnos', icon: StudentsIcon, roles: ['directivo', 'coordinador', 'administrativo'], category: 'gestion' },
+        { id: 'teachers', label: 'Docentes', icon: TeachersIcon, roles: ['directivo', 'coordinador'], category: 'gestion' },
+        { id: 'authorized-users', label: 'Gestión de Usuarios', icon: UsersIcon, roles: ['directivo', 'coordinador'], category: 'gestion' },
+        
+        // 📅 Planificación
+        { id: 'schedules', label: 'Horarios', icon: CalendarIcon, roles: ['coordinador', 'directivo', 'docente'], category: 'planificacion' },
+        { id: 'schedule-generator', label: 'Generador de Horarios', icon: ScheduleGeneratorIcon, roles: ['coordinador', 'directivo'], category: 'planificacion' },
+        { id: 'team-schedules', label: 'Horarios Equipo', icon: TeamSchedulesIcon, roles: ['coordinador', 'directivo'], category: 'planificacion' },
+        { id: 'calendar', label: 'Calendario', icon: CalendarIcon, roles: ['directivo', 'coordinador', 'docente'], category: 'planificacion' },
+        { id: 'planning', label: 'Planificaciones', icon: PlanningIcon, roles: ['directivo', 'coordinador', 'docente'], category: 'planificacion' },
+        
+        // ✅ Evaluación
+        { id: 'evaluation', label: 'Evaluación', icon: EvaluationIcon, roles: ['directivo', 'coordinador'], category: 'evaluacion' },
+        { id: 'indicadores', label: 'Indicadores', icon: ClipboardCheckIcon, roles: ['directivo', 'coordinador'], category: 'evaluacion' },
+        { id: 'lapsos-admin', label: 'Gestión de Lapsos', icon: CalendarIcon, roles: ['coordinador', 'directivo'], category: 'evaluacion' },
+    ];
+
+    const categories: NavCategory[] = [
+        { id: 'analisis', label: 'Análisis', roles: ['directivo', 'coordinador', 'docente', 'administrativo'] },
+        { id: 'gestion', label: 'Gestión', roles: ['directivo', 'coordinador', 'administrativo'] },
+        { id: 'planificacion', label: 'Planificación', roles: ['directivo', 'coordinador', 'docente'] },
+        { id: 'evaluacion', label: 'Evaluación', roles: ['directivo', 'coordinador'] },
     ];
 
     // Filtrar links basado en el rol del usuario
     const navLinksToRender = useMemo(() => {
         return navLinks.filter(link => link.roles.includes(userRole));
     }, [userRole]);
+
+    const categoriesToRender = useMemo(() => {
+        return categories.filter(cat => {
+            const hasLinksInCategory = navLinksToRender.some(link => link.category === cat.id);
+            return hasLinksInCategory;
+        });
+    }, [navLinksToRender]);
+
+    const getLinksByCategory = (categoryId: string) => {
+        return navLinksToRender.filter(link => link.category === categoryId);
+    };
 
     const handleNavigate = (view: string) => {
         onNavigate(view);
@@ -1032,14 +1205,20 @@ const Sidebar: React.FC<{
             )}
             <aside className={`
                 fixed lg:static inset-y-0 left-0 z-50
-                w-64 bg-apple-gray-dark text-white flex flex-col
+                w-64 bg-gradient-to-b from-apple-gray-dark to-[#151518] text-white flex flex-col
                 transform transition-transform duration-300 ease-in-out
                 ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
             `}>
-                <div className="p-4 lg:p-6 flex justify-between items-center lg:block">
-                    <div className="text-center flex-1 lg:block">
-                        <h2 className="text-xl lg:text-2xl font-bold text-brand-secondary">ManglarNet</h2>
-                        <p className="text-xs lg:text-sm text-apple-gray font-light">Conexión Pedagógica</p>
+                {/* Header con logo/identidad */}
+                <div className="p-4 lg:p-6 flex justify-between items-center border-b border-white/10">
+                    <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-manglar-orange to-manglar-orange/80 flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">M</span>
+                            </div>
+                            <h2 className="text-xl lg:text-2xl font-bold text-white">ManglarNet</h2>
+                        </div>
+                        <p className="text-xs text-apple-gray font-light ml-10">Colegio El Manglar</p>
                     </div>
                     <Button
                         variant="ghost"
@@ -1051,21 +1230,41 @@ const Sidebar: React.FC<{
                         <CloseIcon />
                     </Button>
                 </div>
-                <nav className="flex-1 px-2 lg:px-4 overflow-y-auto">
-                    {navLinksToRender.map(({ id, label, icon: Icon }) => (
-                        <Button
-                            key={id}
-                            variant="ghost"
-                            onClick={() => handleNavigate(id)}
-                            className={`w-full justify-start gap-3 px-4 lg:px-5 py-3.5 my-1 h-auto text-sm font-medium transition-apple ${activeView === id
-                                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                                : 'text-apple-gray hover:bg-white/10 hover:text-white'
-                                }`}
-                        >
-                            <Icon className="h-5 w-5 flex-shrink-0" />
-                            <span>{label}</span>
-                        </Button>
-                    ))}
+
+                {/* Navegación agrupada */}
+                <nav className="flex-1 px-3 lg:px-4 py-4 overflow-y-auto" aria-label="Menú de navegación">
+                    {categoriesToRender.map((category) => {
+                        const links = getLinksByCategory(category.id);
+                        if (links.length === 0) return null;
+
+                        return (
+                            <div key={category.id} className="mb-6">
+                                <h3 className="text-xs font-semibold text-apple-gray uppercase tracking-wider px-3 mb-2" id={`nav-category-${category.id}`}>
+                                    {category.label}
+                                </h3>
+                                <div className="space-y-1" role="group" aria-labelledby={`nav-category-${category.id}`}>
+                                    {links.map(({ id, label, icon: Icon }) => (
+                                        <Button
+                                            key={id}
+                                            variant="ghost"
+                                            onClick={() => handleNavigate(id)}
+                                            className={`w-full justify-start gap-3 px-3 py-2.5 h-auto text-sm font-medium transition-apple hover-lift-smooth focus-ring ${
+                                                activeView === id
+                                                    ? 'bg-manglar-orange text-white shadow-lg shadow-manglar-orange/20'
+                                                    : 'text-apple-gray hover:bg-white/10 hover:text-white'
+                                            }`}
+                                            aria-label={label}
+                                            aria-current={activeView === id ? 'page' : undefined}
+                                            role="menuitem"
+                                        >
+                                            <Icon className={`h-5 w-5 flex-shrink-0 ${activeView === id ? 'text-white' : ''}`} aria-hidden="true" />
+                                            <span className="text-left">{label}</span>
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </nav>
             </aside>
         </>
@@ -2181,7 +2380,6 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                                 />
                                 <Bar
                                     dataKey="count"
-                                    fill="hsl(var(--primary))"
                                     onClick={(data) => {
                                         if (data && data.nota) {
                                             setSelectedNoteFilter(data.nota);
@@ -2189,17 +2387,24 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                                         }
                                     }}
                                     style={{ cursor: 'pointer' }}
+                                    radius={[0, 4, 4, 0]}
                                 >
-                                    {notaDistribution.map((entry, index) => (
-                                        <Cell
-                                            key={`cell-${index}`}
-                                            fill={selectedNoteFilter === entry.nota
-                                                ? 'hsl(var(--primary))'
-                                                : 'hsl(var(--primary))'
-                                            }
-                                            opacity={selectedNoteFilter === entry.nota ? 1 : 0.7}
-                                        />
-                                    ))}
+                                    {notaDistribution.map((entry, index) => {
+                                        const notaKey = entry.nota.toUpperCase().replace(/[+-]/g, '');
+                                        const color = gradeColors[notaKey] || gradeColors[entry.nota] || '#D1D5DB';
+                                        const isSelected = selectedNoteFilter === entry.nota;
+                                        return (
+                                            <Cell
+                                                key={`cell-${index}`}
+                                                fill={color}
+                                                opacity={isSelected ? 1 : 0.8}
+                                                style={{
+                                                    filter: isSelected ? `drop-shadow(0 2px 4px ${color}60)` : 'none',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                            />
+                                        );
+                                    })}
                                 </Bar>
                             </BarChart>
                         </ResponsiveContainer>
@@ -2246,7 +2451,6 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                                 />
                                 <Bar
                                     dataKey="frecuencia"
-                                    fill="hsl(var(--primary))"
                                     onClick={(data) => {
                                         if (data && data.nombre) {
                                             setSelectedDifficultyFilter(data.nombre);
@@ -2254,17 +2458,25 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                                         }
                                     }}
                                     style={{ cursor: 'pointer' }}
+                                    radius={[4, 4, 0, 0]}
                                 >
-                                    {topDifficulties.map((entry, index) => (
-                                        <Cell
-                                            key={`cell-${index}`}
-                                            fill={selectedDifficultyFilter === entry.nombre
-                                                ? 'hsl(var(--primary))'
-                                                : 'hsl(var(--primary))'
-                                            }
-                                            opacity={selectedDifficultyFilter === entry.nombre ? 1 : 0.7}
-                                        />
-                                    ))}
+                                    {topDifficulties.map((entry, index) => {
+                                        const isSelected = selectedDifficultyFilter === entry.nombre;
+                                        // Usar un gradiente de colores basado en la posición (más oscuro para más frecuencia)
+                                        const colors = ['#3B82F6', '#22C55E', '#EAB308', '#F97316', '#EF4444'];
+                                        const color = colors[Math.min(index, colors.length - 1)];
+                                        return (
+                                            <Cell
+                                                key={`cell-${index}`}
+                                                fill={color}
+                                                opacity={isSelected ? 1 : 0.8}
+                                                style={{
+                                                    filter: isSelected ? `drop-shadow(0 2px 4px ${color}60)` : 'none',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                            />
+                                        );
+                                    })}
                                 </Bar>
                             </BarChart>
                         </ResponsiveContainer>
@@ -2310,9 +2522,11 @@ const CoordinatorAnalyticsDashboard: React.FC<CoordinatorAnalyticsDashboardProps
                                                         {alumno.docente && <span>{alumno.docente}</span>}
                                                     </div>
                                                 </div>
-                                                <Badge variant={alumno.nota === 'C' || alumno.nota === 'D' || alumno.nota === 'E' ? 'destructive' : 'secondary'}>
-                                                    {alumno.nota}
-                                                </Badge>
+                                                {alumno.nota ? (
+                                                    <GradeBadge nota={alumno.nota} />
+                                                ) : (
+                                                    <Badge variant="secondary">-</Badge>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -3290,221 +3504,8 @@ const TeacherScheduleDashboard: React.FC<{
     );
 };
 
-const StudentListView: React.FC<{
-    students: Alumno[];
-    onSelectStudent: (student: Alumno) => void;
-    onAddStudent: () => void;
-    onEditStudent: (student: Alumno) => void;
-    onDeleteStudent: (studentId: string) => void;
-    onOpenBulkImport: () => void;
-}> = ({ students, onSelectStudent, onAddStudent, onEditStudent, onDeleteStudent, onOpenBulkImport }) => {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterGrade, setFilterGrade] = useState('all');
-
-    const grades = useMemo(() => ['all', ...Array.from(new Set(students.map(s => s.salon)))], [students]);
-
-    const filteredStudents = useMemo(() => {
-        return students.filter(student => {
-            const nameMatch = `${student.nombres} ${student.apellidos}`.toLowerCase().includes(searchTerm.toLowerCase());
-            const gradeMatch = filterGrade === 'all' || student.salon === filterGrade;
-            return nameMatch && gradeMatch;
-        });
-    }, [students, searchTerm, filterGrade]);
-
-    return (
-        <div className="mb-8">
-            <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-bold text-apple-gray-dark tracking-tight">Lista de Alumnos</h2>
-                <div className="flex gap-3">
-                    <button
-                        onClick={() => {
-                            console.log('🔵 Bulk Import button clicked');
-                            onOpenBulkImport();
-                        }}
-                        className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:opacity-90 text-sm sm:text-base font-medium min-h-[44px] transition-apple"
-                    >
-                        📤
-                        <span className="hidden sm:inline">Importar Excel</span>
-                        <span className="sm:hidden">Importar</span>
-                    </button>
-                    <button onClick={onAddStudent} className="flex items-center gap-2 bg-apple-blue text-white px-6 py-3 rounded-lg hover:opacity-90 text-sm sm:text-base font-medium min-h-[44px] transition-apple">
-                        <PlusIcon />
-                        <span className="hidden sm:inline">Añadir Alumno</span>
-                        <span className="sm:hidden">Añadir</span>
-                    </button>
-                </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                <div className="relative flex-grow">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-4">
-                        <SearchIcon className="text-apple-gray" />
-                    </span>
-                    <input
-                        type="text"
-                        placeholder="Buscar por nombre..."
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                        className="pl-12 pr-4 py-3 border border-apple-gray rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue transition-apple text-base placeholder:text-apple-gray"
-                    />
-                </div>
-                <select
-                    value={filterGrade}
-                    onChange={e => setFilterGrade(e.target.value)}
-                    className="px-4 py-3 border border-apple-gray rounded-lg text-base w-full sm:w-auto transition-apple focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-apple-blue"
-                >
-                    {grades.map(grade => <option key={grade} value={grade}>{grade === 'all' ? 'Todos los Salones' : grade}</option>)}
-                </select>
-            </div>
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-4">
-                {filteredStudents.map(student => (
-                    <div key={student.id_alumno} className="py-4 border-b border-apple-gray-light transition-apple hover:opacity-70">
-                        <div className="flex justify-between items-start mb-3">
-                            <div className="flex-1">
-                                <h3 className="font-semibold text-apple-gray-dark text-lg mb-1">{student.nombres} {student.apellidos}</h3>
-                                <p className="text-sm text-apple-gray font-light">{student.email_alumno}</p>
-                            </div>
-                            <span className={`px-3 py-1 text-xs font-medium rounded-full ${student.condicion === 'Regular' ? 'bg-apple-green text-white' : 'bg-yellow-100 text-yellow-800'}`}>
-                                {student.condicion}
-                            </span>
-                        </div>
-                        <div className="space-y-2 mb-4">
-                            <div className="flex items-center text-sm">
-                                <span className="text-apple-gray font-light w-24">Salón:</span>
-                                <span className="text-apple-gray-dark font-medium">{student.salon}</span>
-                            </div>
-                            <div className="flex items-center text-sm">
-                                <span className="text-apple-gray font-light w-24">Cédula:</span>
-                                <span className="text-apple-gray-dark font-medium">{student.cedula_escolar}</span>
-                            </div>
-                        </div>
-                        <div className="flex gap-3 pt-3 border-t border-apple-gray-light">
-                            <button
-                                onClick={() => onSelectStudent(student)}
-                                className="flex-1 px-4 py-2 bg-apple-blue text-white rounded-lg hover:opacity-90 text-sm font-medium transition-apple"
-                            >
-                                Ver
-                            </button>
-                            <button
-                                onClick={() => onEditStudent(student)}
-                                className="px-4 py-2 border border-apple-gray text-apple-gray-dark rounded-lg hover:bg-apple-gray-light text-sm font-medium transition-apple"
-                            >
-                                <EditIcon />
-                            </button>
-                            <button
-                                onClick={() => onDeleteStudent(student.id_alumno)}
-                                className="px-4 py-2 border border-apple-red text-apple-red rounded-lg hover:bg-apple-red hover:text-white text-sm font-medium transition-apple"
-                            >
-                                <DeleteIcon />
-                            </button>
-                        </div>
-                    </div>
-                ))}
-                {filteredStudents.length === 0 && (
-                    <div className="text-center py-12">
-                        <p className="text-apple-gray text-sm font-light">No se encontraron alumnos</p>
-                    </div>
-                )}
-            </div>
-
-            {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto">
-                <table className="min-w-full divide-y divide-apple-gray-light">
-                    <thead>
-                        <tr>
-                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Nombre Completo</th>
-                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Salón</th>
-                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Cédula Escolar</th>
-                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Condición</th>
-                            <th className="px-6 py-4 text-left text-sm font-semibold text-apple-gray-dark uppercase tracking-wide">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-apple-gray-light">
-                        {filteredStudents.map(student => (
-                            <tr key={student.id_alumno} className="transition-apple hover:opacity-70">
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="font-medium text-apple-gray-dark">{student.nombres} {student.apellidos}</div>
-                                    <div className="text-sm text-apple-gray font-light">{student.email_alumno}</div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-apple-gray font-light">{student.salon}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-apple-gray font-light">{student.cedula_escolar}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-3 py-1 inline-flex text-xs font-medium rounded-full ${student.condicion === 'Regular' ? 'bg-apple-green text-white' : 'bg-yellow-100 text-yellow-800'}`}>
-                                        {student.condicion}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex items-center gap-4">
-                                    <button onClick={() => onSelectStudent(student)} className="text-apple-blue hover:underline transition-apple">Ver Detalles</button>
-                                    <button onClick={() => onEditStudent(student)} className="text-apple-blue hover:text-apple-blue transition-apple"><EditIcon /></button>
-                                    <button onClick={() => onDeleteStudent(student.id_alumno)} className="text-apple-red hover:text-apple-red transition-apple"><DeleteIcon /></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-};
-
-const StudentDetailView: React.FC<{
-    student: Alumno;
-    onBack: () => void;
-}> = ({ student, onBack }) => {
-    const InfoItem: React.FC<{ icon: React.ElementType, label: string, value?: string | string[] }> = ({ icon: Icon, label, value }) => (
-        <div className="flex items-start gap-4">
-            <Icon className="h-5 w-5 text-apple-gray mt-1" />
-            <div>
-                <p className="text-sm text-apple-gray font-light mb-1">{label}</p>
-                <p className="font-medium text-apple-gray-dark">{Array.isArray(value) ? value.join(', ') : (value || 'N/A')}</p>
-            </div>
-        </div>
-    );
-
-    return (
-        <div className="mb-8">
-            <button onClick={onBack} className="flex items-center gap-2 text-sm text-apple-gray hover:text-apple-gray-dark mb-8 transition-apple">
-                <ArrowLeftIcon />
-                Volver a la Lista
-            </button>
-            <div className="flex flex-col md:flex-row gap-12">
-                <div className="flex-shrink-0 text-center">
-                    <UserCircleIcon className="h-32 w-32 text-apple-gray mx-auto opacity-40" />
-                    <h2 className="text-3xl font-bold mt-6 text-apple-gray-dark tracking-tight">{student.nombres} {student.apellidos}</h2>
-                    <p className="text-apple-gray font-light mt-2">{student.salon}</p>
-                </div>
-                <div className="flex-grow">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        <InfoItem icon={IdentificationIcon} label="Cédula Escolar" value={student.cedula_escolar} />
-                        <InfoItem icon={CakeIcon} label="Fecha de Nacimiento" value={new Date(student.fecha_nacimiento).toLocaleDateString()} />
-                        <InfoItem icon={LocationMarkerIcon} label="Lugar de Nacimiento" value={`${student.lugar_nacimiento}, ${student.estado}`} />
-                        <InfoItem icon={AcademicCapIcon} label="Condición" value={student.condicion} />
-                        <InfoItem icon={UsersIcon} label="Hermanos en el Colegio" value={student.hermanos.length > 0 ? student.hermanos : 'No tiene'} />
-                        <InfoItem icon={SparklesIcon} label="Nivel de Inglés" value={student.nivel_ingles} />
-                    </div>
-                    <hr className="my-8 border-apple-gray-light" />
-                    <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight">Información de Contacto de Representantes</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="py-6 border-b border-apple-gray-light">
-                            <h4 className="font-semibold text-apple-gray-dark mb-4">Madre: {student.info_madre.nombre}</h4>
-                            <div className="space-y-4">
-                                <InfoItem icon={MailIcon} label="Email" value={student.info_madre.email} />
-                                <InfoItem icon={PhoneIcon} label="Teléfono" value={student.info_madre.telefono} />
-                            </div>
-                        </div>
-                        <div className="py-6 border-b border-apple-gray-light">
-                            <h4 className="font-semibold text-apple-gray-dark mb-4">Padre: {student.info_padre.nombre}</h4>
-                            <div className="space-y-4">
-                                <InfoItem icon={MailIcon} label="Email" value={student.info_padre.email} />
-                                <InfoItem icon={PhoneIcon} label="Teléfono" value={student.info_padre.telefono} />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
+// StudentListView is now imported from components/students/StudentListView.tsx
+// StudentDetailView is now imported from components/students/StudentDetailView.tsx
 
 const StudentFormModal: React.FC<{
     student: Alumno | null;
@@ -4548,11 +4549,13 @@ const TeachersView: React.FC<{
     setClases: React.Dispatch<React.SetStateAction<Clase[]>>;
     currentUser: Usuario;
 }> = ({ docentes, clases, alumnos, aulas, setDocentes, setClases, currentUser }) => {
+    const { showToast } = useToast();
     const [isModalOpen, setModalOpen] = useState(false);
     const [selectedTeacher, setSelectedTeacher] = useState<Docente | null>(null);
     const [unlinkedUsers, setUnlinkedUsers] = useState<Array<{ id: string, email: string, role: string }>>([]);
     const [showUnlinkedSection, setShowUnlinkedSection] = useState(false);
     const [englishLevelAssignments, setEnglishLevelAssignments] = useState<Array<{ id_docente: string, nivel_ingles: string, id_aula?: string }>>([]);
+    const [confirmDeleteTeacher, setConfirmDeleteTeacher] = useState<{ open: boolean; teacherId: string | null; warningMessage?: string }>({ open: false, teacherId: null });
 
     // Cargar asignaciones de niveles de inglés
     useEffect(() => {
@@ -4926,34 +4929,57 @@ const TeachersView: React.FC<{
                     Math.min(englishConsolidatedClasses, 6); // 5to-6to: máximo 6 clases consolidadas (una por skill)
 
                 if (totalCreado >= totalEsperado * 0.9) { // Permitir 10% de error
-                    const mensaje = asignacionesNivelCreadas.length > 0
-                        ? `✅ Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente.\n\n` +
-                        `Clases creadas: ${createdClasses.length}\n` +
-                        `Asignaciones de nivel inglés: ${asignacionesNivelCreadas.length}\n\n` +
-                        `${asignacionesNivelCreadas.join('\n')}\n\n` +
-                        `Se crearon automáticamente las clases consolidadas por skill (Reading, Writing, Speaking, Listening, Use of English, Creative Writing) para 5to y 6to Grado.`
-                        : `✅ Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente con ${createdClasses.length} clase(s).`;
-                    alert(mensaje);
+                    if (asignacionesNivelCreadas.length > 0) {
+                        showToast({
+                            type: 'success',
+                            title: `Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente`,
+                            message: `Clases creadas: ${createdClasses.length}. Asignaciones de nivel inglés: ${asignacionesNivelCreadas.length}. Se crearon automáticamente las clases consolidadas por skill para 5to y 6to Grado.`,
+                            duration: 7000,
+                        });
+                    } else {
+                        showToast({
+                            type: 'success',
+                            title: `Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente`,
+                            message: `${createdClasses.length} clase(s) creada(s)`,
+                        });
+                    }
                 } else if (totalCreado > 0) {
-                    alert(`⚠️ Docente ${teacherExists ? 'actualizado' : 'creado'} pero solo ${totalCreado} de aproximadamente ${totalEsperado} clases se guardaron correctamente.`);
+                    showToast({
+                        type: 'warning',
+                        title: `Docente ${teacherExists ? 'actualizado' : 'creado'} con advertencias`,
+                        message: `Solo ${totalCreado} de aproximadamente ${totalEsperado} clases se guardaron correctamente.`,
+                        duration: 6000,
+                    });
                 }
             } else {
                 // Si no hay asignaturas, solo actualizar el estado local
                 setClases(otherTeachersClasses);
-                alert(`✅ Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente. Nota: No se agregaron asignaturas.`);
+                showToast({
+                    type: 'info',
+                    title: `Docente ${teacherExists ? 'actualizado' : 'creado'} exitosamente`,
+                    message: 'Nota: No se agregaron asignaturas',
+                });
             }
 
             handleCloseModal();
         } catch (error: any) {
             console.error('Error saving teacher:', error);
-            alert('Error al guardar el docente: ' + (error.message || 'Error desconocido'));
+            showToast({
+                type: 'error',
+                title: 'Error al guardar el docente',
+                message: error.message || 'No se pudo guardar el docente. Por favor, inténtalo de nuevo.',
+            });
         }
     };
 
     const handleDeleteTeacher = async (id_docente: string) => {
         // Verificar que el usuario actual no se esté eliminando a sí mismo
         if (currentUser?.docenteId === id_docente) {
-            alert('⚠️ No puedes eliminar tu propio perfil de docente. Contacta a un coordinador o directivo.');
+            showToast({
+                type: 'warning',
+                title: 'Acción no permitida',
+                message: 'No puedes eliminar tu propio perfil de docente. Contacta a un coordinador o directivo.',
+            });
             return;
         }
 
@@ -4961,21 +4987,18 @@ const TeachersView: React.FC<{
         const docenteToDelete = docentes.find(d => d.id_docente === id_docente);
         const classesToDelete = clases.filter(c => c.id_docente_asignado === id_docente);
 
-        // Mostrar advertencia detallada
-        const warningMessage = `¿Está seguro de que desea eliminar a este docente?\n\n` +
-            `Docente: ${docenteToDelete?.nombres || ''} ${docenteToDelete?.apellidos || ''}\n` +
-            `Email: ${docenteToDelete?.email || ''}\n\n` +
-            `⚠️ ADVERTENCIA: Esta acción eliminará:\n` +
-            `- El registro del docente\n` +
-            `- ${classesToDelete.length} clase(s) asignada(s)\n` +
-            `- Todas las planificaciones asociadas\n` +
-            `- Todas las notificaciones asociadas\n\n` +
-            `Esta acción NO se puede deshacer.\n\n` +
-            `¿Desea continuar?`;
+        // Preparar mensaje de advertencia
+        const warningMessage = `Docente: ${docenteToDelete?.nombres || ''} ${docenteToDelete?.apellidos || ''}\nEmail: ${docenteToDelete?.email || ''}\n\n⚠️ ADVERTENCIA: Esta acción eliminará:\n- El registro del docente\n- ${classesToDelete.length} clase(s) asignada(s)\n- Todas las planificaciones asociadas\n- Todas las notificaciones asociadas\n\nEsta acción NO se puede deshacer.`;
+        
+        setConfirmDeleteTeacher({ open: true, teacherId: id_docente, warningMessage });
+    };
 
-        if (!window.confirm(warningMessage)) {
-            return;
-        }
+    const confirmDeleteTeacherAction = async () => {
+        if (!confirmDeleteTeacher.teacherId) return;
+        
+        const id_docente = confirmDeleteTeacher.teacherId;
+        const docenteToDelete = docentes.find(d => d.id_docente === id_docente);
+        const classesToDelete = clases.filter(c => c.id_docente_asignado === id_docente);
 
         try {
             // Mostrar indicador de carga
@@ -5014,10 +5037,7 @@ const TeachersView: React.FC<{
                 );
 
                 if (!continueDelete) {
-                    if (deleteButton) {
-                        deleteButton.textContent = originalText;
-                        deleteButton.removeAttribute('disabled');
-                    }
+                    setConfirmDeleteTeacher({ open: false, teacherId: null });
                     return;
                 }
             }
@@ -5029,25 +5049,19 @@ const TeachersView: React.FC<{
             setDocentes(prev => prev.filter(d => d.id_docente !== id_docente));
             setClases(prev => prev.filter(c => c.id_docente_asignado !== id_docente));
 
-            // Mostrar mensaje de éxito
-            alert(`✅ Docente eliminado exitosamente.\n\n` +
-                `- ${deletedClasses} clase(s) eliminada(s)\n` +
-                `${failedClasses.length > 0 ? `- ${failedClasses.length} clase(s) con errores\n` : ''}`);
+            // Cerrar el diálogo de confirmación
+            setConfirmDeleteTeacher({ open: false, teacherId: null });
 
-            // Restaurar botón
-            if (deleteButton) {
-                deleteButton.textContent = originalText;
-                deleteButton.removeAttribute('disabled');
-            }
+            // Mostrar mensaje de éxito
+            showToast({
+                type: 'success',
+                title: 'Docente eliminado exitosamente',
+                message: `${deletedClasses} clase(s) eliminada(s)${failedClasses.length > 0 ? `. ${failedClasses.length} clase(s) con errores` : ''}`,
+                duration: 6000,
+            });
 
         } catch (error: any) {
             console.error('Error deleting teacher:', error);
-
-            // Restaurar botón
-            const deleteButton = document.activeElement as HTMLElement;
-            if (deleteButton) {
-                deleteButton.removeAttribute('disabled');
-            }
 
             // Manejar diferentes tipos de errores
             let errorMessage = 'Error al eliminar el docente: ';
@@ -5062,15 +5076,26 @@ const TeachersView: React.FC<{
                 errorMessage += error.message || 'Error desconocido';
             }
 
-            alert(`❌ ${errorMessage}\n\n` +
-                `Si el problema persiste, contacta al administrador del sistema.`);
+            showToast({
+                type: 'error',
+                title: 'Error al eliminar el docente',
+                message: `${errorMessage} Si el problema persiste, contacta al administrador del sistema.`,
+                duration: 8000,
+            });
         }
     };
 
     return (
         <div className="mb-8">
             <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-bold text-apple-gray-dark tracking-tight">Gestión de Docentes</h2>
+                <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-bold text-apple-gray-dark tracking-tight">Gestión de Docentes</h2>
+                    <HelpTooltip
+                        content="Administra el personal docente del colegio. Aquí puedes agregar nuevos docentes, asignar materias y grados, y gestionar sus horarios y responsabilidades."
+                        variant="icon-only"
+                        side="right"
+                    />
+                </div>
                 <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-apple-blue text-white px-6 py-3 rounded-lg hover:opacity-90 font-medium transition-apple">
                     <PlusIcon />
                     Añadir Docente
@@ -5151,9 +5176,28 @@ const TeachersView: React.FC<{
                                 </tr>
                             );
                         })}
+                        {docentes.length === 0 && (
+                            <tr>
+                                <td colSpan={5} className="px-6 py-12">
+                                    <EmptyStateTeachers onAdd={() => handleOpenModal()} />
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>
+            
+            {/* Confirmación de eliminación de docente */}
+            <ConfirmDialog
+                open={confirmDeleteTeacher.open}
+                onOpenChange={(open) => setConfirmDeleteTeacher({ open, teacherId: open ? confirmDeleteTeacher.teacherId : null })}
+                onConfirm={confirmDeleteTeacherAction}
+                title="Eliminar Docente"
+                description={confirmDeleteTeacher.warningMessage || ''}
+                confirmText="Eliminar"
+                cancelText="Cancelar"
+                variant="destructive"
+            />
 
             {/* Unlinked Authorized Users Section - Only for coordinadores and directivos */}
             {(currentUser.role === 'coordinador' || currentUser.role === 'directivo') && unlinkedUsers.length > 0 && (
@@ -9374,91 +9418,6 @@ const GradeChart: React.FC<{ data: { [key in Nota]?: number } }> = ({ data }) =>
     );
 };
 
-const PieChart: React.FC<{
-    data: { [key: string]: number };
-    title: string;
-    colors: { [key: string]: string };
-}> = ({ data, title, colors }) => {
-    const total = Object.values(data).reduce((sum, value) => sum + value, 0);
-    if (total === 0) {
-        return (
-            <Card className="h-full flex flex-col items-center justify-center">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-center text-sm">{title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-muted-foreground text-center">No hay datos para mostrar.</p>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    let cumulativePercent = 0;
-    const slices = Object.entries(data).map(([key, value]) => {
-        const percent = (value / total) * 100;
-        const item = { key, value, percent, color: colors[key] || '#cccccc' };
-        cumulativePercent += percent;
-        return item;
-    });
-
-    const gradients = slices.map((slice, index) => {
-        const startAngle = index === 0 ? 0 : slices.slice(0, index).reduce((acc, s) => acc + s.percent, 0);
-        const endAngle = startAngle + slice.percent;
-        return `${slice.color} ${startAngle}% ${endAngle}%`;
-    }).join(', ');
-
-    return (
-        <Card className="h-full flex flex-col">
-            <CardHeader className="pb-2">
-                <CardTitle className="text-center text-sm">{title}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-grow flex flex-col">
-                <div className="flex-grow flex items-center justify-center">
-                    <div className="w-32 h-32 rounded-full" style={{ background: `conic-gradient(${gradients})` }}></div>
-                </div>
-                <div className="mt-4">
-                    <ul className="text-sm space-y-1">
-                        {slices.map(slice => (
-                            <li key={slice.key} className="flex justify-between items-center">
-                                <span className="flex items-center gap-2">
-                                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: slice.color }}></span>
-                                    {slice.key}
-                                </span>
-                                <span className="font-semibold">{slice.percent.toFixed(1)}% ({slice.value})</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            </CardContent>
-        </Card>
-    );
-};
-
-const gradeColors: { [key in Nota]: string } = {
-    'A': '#22C55E', 'B': '#3B82F6', 'C': '#EAB308', 'D': '#F97316', 'E': '#EF4444', 'SE': '#6B7280', '': '#D1D5DB'
-};
-const adaptationColors: { [key in Adaptacion]: string } = {
-    'Reg': '#3B82F6', 'AC+': '#22C55E', 'AC-': '#EAB308', '': '#D1D5DB'
-};
-
-const AdaptationGradeDistributionCharts: React.FC<{
-    data: { [key in Adaptacion]?: { [key in Nota]?: number } };
-}> = ({ data }) => {
-    return (
-        <Card className="mt-6">
-            <CardHeader>
-                <CardTitle className="text-center">Distribución de Notas por Tipo de Adaptación</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <PieChart data={data['Reg'] || {}} title="Regular" colors={gradeColors} />
-                    <PieChart data={data['AC+'] || {}} title="AC+" colors={gradeColors} />
-                    <PieChart data={data['AC-'] || {}} title="AC-" colors={gradeColors} />
-                </div>
-            </CardContent>
-        </Card>
-    );
-};
 
 const EvaluationView: React.FC<{
     alumnos: Alumno[];
@@ -9467,6 +9426,7 @@ const EvaluationView: React.FC<{
     setMinutas: React.Dispatch<React.SetStateAction<MinutaEvaluacion[]>>;
     currentUser: Usuario;
 }> = ({ alumnos, clases, minutas, setMinutas, currentUser }) => {
+    const { showToast } = useToast();
     // Validar que los datos estén disponibles
     if (!alumnos || !clases || !minutas) {
         return (
@@ -9480,7 +9440,7 @@ const EvaluationView: React.FC<{
             </Card>
         );
     }
-    const [viewMode, setViewMode] = useState<'new' | 'history'>('new');
+    const [viewMode, setViewMode] = useState<'new' | 'history' | 'progress'>('new');
     const [selectedMinuta, setSelectedMinuta] = useState<MinutaEvaluacion | null>(null);
 
     const [filters, setFilters] = useState({
@@ -9507,6 +9467,23 @@ const EvaluationView: React.FC<{
         estado_emocional: '',
         eficacia_accion_anterior: ''
     });
+
+    // Estados para el dashboard de progreso
+    const [progressFilters, setProgressFilters] = useState({
+        ano_escolar: '2025-2026',
+        lapso: 'I Lapso',
+        grado: '',
+        materia: 'all'
+    });
+    const [progressData, setProgressData] = useState<any>(null);
+    const [isLoadingProgress, setIsLoadingProgress] = useState(false);
+    const [historicalBenchmark, setHistoricalBenchmark] = useState<any>(null);
+    const [riskData, setRiskData] = useState<any>(null);
+    const [isLoadingRisk, setIsLoadingRisk] = useState(false);
+    const [eficaciaData, setEficaciaData] = useState<any>(null);
+    const [isLoadingEficacia, setIsLoadingEficacia] = useState(false);
+    const [competenciasData, setCompetenciasData] = useState<any>(null);
+    const [isLoadingCompetencias, setIsLoadingCompetencias] = useState(false);
 
     // Group indicators by Routine and Competency
     const groupedIndicators = useMemo(() => {
@@ -9891,16 +9868,24 @@ const EvaluationView: React.FC<{
 
             // Mensaje de éxito más detallado
             let mensajeExito = 'Minuta guardada con éxito.';
+            let tipoToast: 'success' | 'warning' = 'success';
+            
             if (detallesParaGuardar.length > 0) {
                 mensajeExito += ` ${detallesParaGuardar.length} detalles de indicadores guardados.`;
             }
             if (resumenesGuardados > 0) {
                 mensajeExito += ` ${resumenesGuardados} resúmenes de evaluación guardados.`;
             } else if (resumenesParaGuardar.length > 0) {
-                mensajeExito += `\n\n⚠️ Nota: Los resúmenes de evaluación no se pudieron guardar. La minuta se guardó correctamente, pero es posible que necesites aplicar la migración 051 en Supabase.`;
+                mensajeExito += ' Nota: Los resúmenes de evaluación no se pudieron guardar. La minuta se guardó correctamente, pero es posible que necesites aplicar la migración 051 en Supabase.';
+                tipoToast = 'warning';
             }
 
-            alert(mensajeExito);
+            showToast({
+                type: tipoToast,
+                title: tipoToast === 'success' ? 'Minuta guardada exitosamente' : 'Minuta guardada con advertencias',
+                message: mensajeExito,
+                duration: tipoToast === 'warning' ? 8000 : 6000,
+            });
 
             // Reset form
             setFilters({ ano_escolar: '2025-2026', lapso: 'I Lapso', evaluacion: 'I Mensual', grado: '', materia: '' });
@@ -9931,6 +9916,846 @@ const EvaluationView: React.FC<{
     }
 
     const isFormReady = filters.grado && filters.materia;
+
+    // ============================================
+    // FUNCIONES DE ANÁLISIS ESTADÍSTICO
+    // ============================================
+
+    // Función para convertir nota a número (sistema de letras primaria)
+    // A = 5, B = 4, C = 3, D = 2, E = 1, F = 0, SE = 0
+    const convertNotaToNumber = (nota: string | undefined): number => {
+        if (!nota) return 0;
+        const notaUpper = nota.toUpperCase().trim();
+        const gradeMap: Record<string, number> = { 
+            'A': 5, 
+            'B': 4, 
+            'C': 3, 
+            'D': 2, 
+            'E': 1, 
+            'F': 0, 
+            'SE': 0 
+        };
+        if (gradeMap[notaUpper]) return gradeMap[notaUpper];
+        // Si es un número, intentar convertirlo (para compatibilidad)
+        const num = parseFloat(nota);
+        return isNaN(num) ? 0 : num;
+    };
+    
+    // Función para convertir número a letra (para mostrar promedios)
+    const convertNumberToLetter = (num: number): string => {
+        if (num >= 4.5) return 'A';
+        if (num >= 3.5) return 'B';
+        if (num >= 2.5) return 'C';
+        if (num >= 1.5) return 'D';
+        if (num >= 0.5) return 'E';
+        if (num > 0) return 'F';
+        return 'SE';
+    };
+    
+    // Función para obtener el valor numérico de una letra (para cálculos)
+    const getLetterValue = (letter: string): number => {
+        return convertNotaToNumber(letter);
+    };
+    
+    // Umbral de aprobación: C o superior (3 o más)
+    const isAprobado = (notaNum: number): boolean => {
+        return notaNum >= 3; // C o superior
+    };
+
+    // Función para calcular regresión lineal (pendiente y intercepto)
+    const calculateLinearRegression = (data: Array<{x: number, y: number}>): {slope: number, intercept: number, r2: number} => {
+        if (data.length < 2) return { slope: 0, intercept: 0, r2: 0 };
+        
+        const n = data.length;
+        const sumX = data.reduce((sum, d) => sum + d.x, 0);
+        const sumY = data.reduce((sum, d) => sum + d.y, 0);
+        const sumXY = data.reduce((sum, d) => sum + d.x * d.y, 0);
+        const sumX2 = data.reduce((sum, d) => sum + d.x * d.x, 0);
+        const sumY2 = data.reduce((sum, d) => sum + d.y * d.y, 0);
+        
+        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+        const intercept = (sumY - slope * sumX) / n;
+        
+        // Calcular R² (coeficiente de determinación)
+        const meanY = sumY / n;
+        const ssRes = data.reduce((sum, d) => {
+            const predicted = slope * d.x + intercept;
+            return sum + Math.pow(d.y - predicted, 2);
+        }, 0);
+        const ssTot = data.reduce((sum, d) => sum + Math.pow(d.y - meanY, 2), 0);
+        const r2 = ssTot === 0 ? 0 : 1 - (ssRes / ssTot);
+        
+        return { slope, intercept, r2 };
+    };
+
+    // Función para calcular correlación de Pearson
+    const calculatePearsonCorrelation = (x: number[], y: number[]): number => {
+        if (x.length !== y.length || x.length === 0) return 0;
+        
+        const n = x.length;
+        const sumX = x.reduce((a, b) => a + b, 0);
+        const sumY = y.reduce((a, b) => a + b, 0);
+        const sumXY = x.reduce((sum, val, i) => sum + val * y[i], 0);
+        const sumX2 = x.reduce((sum, val) => sum + val * val, 0);
+        const sumY2 = y.reduce((sum, val) => sum + val * val, 0);
+        
+        const numerator = n * sumXY - sumX * sumY;
+        const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+        
+        return denominator === 0 ? 0 : numerator / denominator;
+    };
+
+    // Función para calcular desviación estándar
+    const calculateStandardDeviation = (values: number[]): number => {
+        if (values.length === 0) return 0;
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+        return Math.sqrt(variance);
+    };
+
+    // Función para calcular percentiles
+    const calculatePercentile = (values: number[], percentile: number): number => {
+        if (values.length === 0) return 0;
+        const sorted = [...values].sort((a, b) => a - b);
+        const index = Math.ceil((percentile / 100) * sorted.length) - 1;
+        return sorted[Math.max(0, Math.min(index, sorted.length - 1))];
+    };
+
+    // Función para cargar datos de progreso
+    const loadProgressData = async () => {
+        if (!progressFilters.grado || !progressFilters.lapso) return;
+        
+        setIsLoadingProgress(true);
+        try {
+            // Obtener todas las minutas del lapso para el grado y materia seleccionados
+            const minutasFiltradas = minutas.filter(m => 
+                m.ano_escolar === progressFilters.ano_escolar &&
+                m.lapso === progressFilters.lapso &&
+                m.grado === progressFilters.grado &&
+                (progressFilters.materia === 'all' || progressFilters.materia === '' || m.materia === progressFilters.materia)
+            );
+
+            // Agrupar por evaluación (I Mensual, II Mensual, III Mensual, Seguimiento)
+            const evaluaciones = ['I Mensual', 'II Mensual', 'III Mensual', 'Seguimiento Pedagógico'];
+            
+            const progressByEvaluation: Record<string, any> = {};
+            
+            for (const evalType of evaluaciones) {
+                const minutasEval = minutasFiltradas.filter(m => m.evaluacion === evalType);
+                
+                if (minutasEval.length > 0) {
+                    // Agrupar por materia
+                    const byMateria: Record<string, any> = {};
+                    
+                    for (const minuta of minutasEval) {
+                        if (!byMateria[minuta.materia]) {
+                            byMateria[minuta.materia] = {
+                                materia: minuta.materia,
+                                datos: [],
+                                promedio: 0,
+                                totalEstudiantes: 0,
+                                aprobados: 0,
+                                reprobados: 0
+                            };
+                        }
+                        
+                        // Procesar datos de alumnos de esta minuta
+                        if (minuta.datos_alumnos && Array.isArray(minuta.datos_alumnos)) {
+                            minuta.datos_alumnos.forEach((evalData: any) => {
+                                const notaNum = convertNotaToNumber(evalData.nota);
+                                byMateria[minuta.materia].datos.push({
+                                    id_alumno: evalData.id_alumno,
+                                    nota: evalData.nota,
+                                    notaNum: notaNum,
+                                    adaptacion: evalData.adaptacion,
+                                    observaciones: evalData.observaciones
+                                });
+                                
+                                if (isAprobado(notaNum)) {
+                                    byMateria[minuta.materia].aprobados++;
+                                } else {
+                                    byMateria[minuta.materia].reprobados++;
+                                }
+                            });
+                        }
+                    }
+                    
+                    // Calcular promedios por materia
+                    Object.keys(byMateria).forEach(materia => {
+                        const datos = byMateria[materia].datos;
+                        if (datos.length > 0) {
+                            const suma = datos.reduce((acc: number, d: any) => acc + d.notaNum, 0);
+                            byMateria[materia].promedio = suma / datos.length;
+                            byMateria[materia].totalEstudiantes = datos.length;
+                        }
+                    });
+                    
+                    progressByEvaluation[evalType] = byMateria;
+                }
+            }
+            
+            setProgressData(progressByEvaluation);
+            
+            // Cargar benchmark histórico si hay materia seleccionada (y no es "all")
+            if (progressFilters.materia && progressFilters.materia !== 'all') {
+                try {
+                    const benchmark = await analyticsService.getHistoricalBenchmark(
+                        progressFilters.grado,
+                        progressFilters.materia,
+                        progressFilters.lapso,
+                        progressFilters.ano_escolar
+                    );
+                    setHistoricalBenchmark(benchmark);
+                } catch (error) {
+                    console.error('Error loading historical benchmark:', error);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading progress data:', error);
+        } finally {
+            setIsLoadingProgress(false);
+        }
+    };
+
+    // Función para cargar datos de riesgo
+    const loadRiskData = async () => {
+        if (!progressFilters.grado || !progressFilters.lapso) return;
+        
+        setIsLoadingRisk(true);
+        try {
+            // Obtener estudiantes del grado seleccionado
+            const estudiantesGrado = alumnos.filter(a => a.salon === progressFilters.grado);
+            const studentIds = estudiantesGrado.map(a => a.id_alumno);
+            
+            if (studentIds.length === 0) {
+                setRiskData(null);
+                return;
+            }
+            
+            // Obtener risk scores usando el servicio existente
+            const riskScores = await analyticsService.getRiskScores(
+                studentIds,
+                progressFilters.ano_escolar,
+                progressFilters.lapso
+            );
+            
+            // Procesar datos para análisis
+            const riskDistribution = {
+                bajo: riskScores.filter(r => (r.risk_score || 0) < 30).length,
+                medio: riskScores.filter(r => (r.risk_score || 0) >= 30 && (r.risk_score || 0) < 60).length,
+                alto: riskScores.filter(r => (r.risk_score || 0) >= 60 && (r.risk_score || 0) < 80).length,
+                critico: riskScores.filter(r => (r.risk_score || 0) >= 80).length
+            };
+            
+            // Estudiantes en riesgo (score >= 60)
+            const estudiantesEnRiesgo = riskScores
+                .filter(r => (r.risk_score || 0) >= 60)
+                .map(risk => {
+                    const estudiante = estudiantesGrado.find(a => a.id_alumno === risk.id_alumno);
+                    return {
+                        id: risk.id_alumno,
+                        nombre: estudiante ? `${estudiante.apellidos}, ${estudiante.nombres}` : 'Desconocido',
+                        salon: estudiante?.salon || '',
+                        riskScore: risk.risk_score || 0,
+                        riskLevel: risk.risk_level || 'Sin Datos',
+                        factores: risk.factores_riesgo || {}
+                    };
+                })
+                .sort((a, b) => b.riskScore - a.riskScore);
+            
+            // Análisis de factores de riesgo
+            const factoresAnalisis = {
+                promedio_bajo: riskScores.filter(r => r.factores_riesgo?.promedio_bajo).length,
+                asistencia_critica: riskScores.filter(r => r.factores_riesgo?.asistencia_critica).length,
+                asistencia_baja: riskScores.filter(r => r.factores_riesgo?.asistencia_baja).length,
+                evaluaciones_reprobadas: riskScores.filter(r => r.factores_riesgo?.evaluaciones_reprobadas > 0).length,
+                estados_negativos: riskScores.filter(r => r.factores_riesgo?.estados_negativos).length,
+                baja_independencia: riskScores.filter(r => r.factores_riesgo?.baja_independencia).length
+            };
+            
+            // Datos para histograma de distribución
+            const histogramData = [
+                { range: '0-29', label: 'Bajo', count: riskDistribution.bajo, color: '#22c55e' },
+                { range: '30-59', label: 'Medio', count: riskDistribution.medio, color: '#eab308' },
+                { range: '60-79', label: 'Alto', count: riskDistribution.alto, color: '#f97316' },
+                { range: '80-100', label: 'Crítico', count: riskDistribution.critico, color: '#ef4444' }
+            ];
+            
+            setRiskData({
+                distribution: riskDistribution,
+                histogramData,
+                estudiantesEnRiesgo,
+                factoresAnalisis,
+                totalEstudiantes: riskScores.length,
+                promedioRiskScore: riskScores.length > 0 
+                    ? riskScores.reduce((sum, r) => sum + (r.risk_score || 0), 0) / riskScores.length 
+                    : 0
+            });
+        } catch (error) {
+            console.error('Error loading risk data:', error);
+            setRiskData(null);
+        } finally {
+            setIsLoadingRisk(false);
+        }
+    };
+
+    // Función para cargar datos de eficacia pedagógica
+    const loadEficaciaData = async () => {
+        if (!progressFilters.grado || !progressFilters.lapso) return;
+        
+        setIsLoadingEficacia(true);
+        try {
+            // Obtener minutas filtradas
+            const minutasFiltradas = minutas.filter(m => 
+                m.ano_escolar === progressFilters.ano_escolar &&
+                m.lapso === progressFilters.lapso &&
+                m.grado === progressFilters.grado &&
+                (progressFilters.materia === 'all' || progressFilters.materia === '' || m.materia === progressFilters.materia)
+            );
+            
+            if (minutasFiltradas.length === 0) {
+                setEficaciaData(null);
+                return;
+            }
+            
+            // Procesar datos de eficacia
+            let totalIntervenciones = 0;
+            let intervencionesResueltas = 0;
+            let intervencionesEnProceso = 0;
+            let intervencionesIneficaces = 0;
+            
+            const timelineAcciones: any[] = [];
+            const intervencionesPorEstudiante = new Map<string, {
+                estudiante: string;
+                intervenciones: number;
+                resueltas: number;
+                enProceso: number;
+                ineficaces: number;
+                mejoras: number;
+                primeraNota: number;
+                ultimaNota: number;
+            }>();
+            
+            // Procesar cada minuta
+            minutasFiltradas.forEach((minuta) => {
+                // Obtener acciones sugeridas del análisis IA
+                const accionesSugeridas = minuta.analisis_ia && Array.isArray(minuta.analisis_ia) 
+                    ? minuta.analisis_ia.map((a: any) => a.accionesSugeridas || '').filter((a: string) => a.trim() !== '').join('; ')
+                    : '';
+                
+                // Procesar datos de alumnos para obtener eficacia de acciones
+                if (minuta.datos_alumnos && Array.isArray(minuta.datos_alumnos)) {
+                    minuta.datos_alumnos.forEach((evalData: any) => {
+                        const eficacia = evalData.eficacia_accion_anterior;
+                        
+                        if (eficacia && eficacia !== 'No Aplica' && eficacia !== '') {
+                            totalIntervenciones++;
+                            
+                            if (eficacia === 'Resuelto') {
+                                intervencionesResueltas++;
+                            } else if (eficacia === 'En Proceso') {
+                                intervencionesEnProceso++;
+                            } else if (eficacia === 'Ineficaz') {
+                                intervencionesIneficaces++;
+                            }
+                            
+                            // Trackear por estudiante
+                            const estudiante = alumnos.find(a => a.id_alumno === evalData.id_alumno);
+                            const nombreEstudiante = estudiante ? `${estudiante.apellidos}, ${estudiante.nombres}` : 'Desconocido';
+                            
+                            if (!intervencionesPorEstudiante.has(evalData.id_alumno)) {
+                                intervencionesPorEstudiante.set(evalData.id_alumno, {
+                                    estudiante: nombreEstudiante,
+                                    intervenciones: 0,
+                                    resueltas: 0,
+                                    enProceso: 0,
+                                    ineficaces: 0,
+                                    mejoras: 0,
+                                    primeraNota: convertNotaToNumber(evalData.nota),
+                                    ultimaNota: convertNotaToNumber(evalData.nota)
+                                });
+                            }
+                            
+                            const estudianteData = intervencionesPorEstudiante.get(evalData.id_alumno)!;
+                            estudianteData.intervenciones++;
+                            if (eficacia === 'Resuelto') estudianteData.resueltas++;
+                            if (eficacia === 'En Proceso') estudianteData.enProceso++;
+                            if (eficacia === 'Ineficaz') estudianteData.ineficaces++;
+                            
+                            // Actualizar última nota
+                            const notaNum = convertNotaToNumber(evalData.nota);
+                            estudianteData.ultimaNota = notaNum;
+                        }
+                    });
+                }
+                
+                // Agregar al timeline si hay acciones sugeridas
+                if (accionesSugeridas) {
+                    timelineAcciones.push({
+                        fecha: new Date(minuta.fecha_creacion),
+                        evaluacion: minuta.evaluacion,
+                        materia: minuta.materia,
+                        grado: minuta.grado,
+                        accionesSugeridas: accionesSugeridas,
+                        totalEstudiantes: minuta.datos_alumnos?.length || 0
+                    });
+                }
+            });
+            
+            // Calcular mejoras por estudiante
+            intervencionesPorEstudiante.forEach((data) => {
+                data.mejoras = data.ultimaNota - data.primeraNota;
+            });
+            
+            // Ordenar timeline por fecha
+            timelineAcciones.sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
+            
+            // Calcular tasa de éxito
+            const tasaExito = totalIntervenciones > 0 
+                ? (intervencionesResueltas / totalIntervenciones) * 100 
+                : 0;
+            
+            // Calcular ROI pedagógico
+            const estudiantesConMejora = Array.from(intervencionesPorEstudiante.values())
+                .filter(e => e.mejoras > 0);
+            const promedioMejora = estudiantesConMejora.length > 0
+                ? estudiantesConMejora.reduce((sum, e) => sum + e.mejoras, 0) / estudiantesConMejora.length
+                : 0;
+            const totalMejora = estudiantesConMejora.reduce((sum, e) => sum + e.mejoras, 0);
+            
+            // Calcular "inversión" (número de intervenciones) vs "retorno" (mejoras)
+            const totalInversion = totalIntervenciones;
+            const roi = totalInversion > 0 ? (totalMejora / totalInversion) * 100 : 0;
+            
+            setEficaciaData({
+                tasaExito: tasaExito.toFixed(1),
+                totalIntervenciones,
+                intervencionesResueltas,
+                intervencionesEnProceso,
+                intervencionesIneficaces,
+                timelineAcciones,
+                intervencionesPorEstudiante: Array.from(intervencionesPorEstudiante.values()),
+                promedioMejora: promedioMejora.toFixed(2),
+                totalMejora: totalMejora.toFixed(2),
+                estudiantesConMejora: estudiantesConMejora.length,
+                roi: roi.toFixed(1),
+                totalInversion
+            });
+        } catch (error) {
+            console.error('Error loading eficacia data:', error);
+            setEficaciaData(null);
+        } finally {
+            setIsLoadingEficacia(false);
+        }
+    };
+
+    // Función para cargar datos de competencias e indicadores
+    const loadCompetenciasData = async () => {
+        if (!progressFilters.grado || !progressFilters.lapso) return;
+        
+        setIsLoadingCompetencias(true);
+        try {
+            // Obtener minutas filtradas
+            const minutasFiltradas = minutas.filter(m => 
+                m.ano_escolar === progressFilters.ano_escolar &&
+                m.lapso === progressFilters.lapso &&
+                m.grado === progressFilters.grado &&
+                (progressFilters.materia === 'all' || progressFilters.materia === '' || m.materia === progressFilters.materia)
+            );
+            
+            if (minutasFiltradas.length === 0) {
+                setCompetenciasData(null);
+                return;
+            }
+            
+            // Obtener clases relacionadas con el grado y materia
+            const clasesFiltradas = clases.filter(c => 
+                c.grado_asignado === progressFilters.grado &&
+                (progressFilters.materia === 'all' || progressFilters.materia === '' || 
+                 c.nombre_materia.toLowerCase().includes(progressFilters.materia.toLowerCase()) ||
+                 (progressFilters.materia === 'Lengua' && (c.nombre_materia.toLowerCase().includes('lengua') || c.nombre_materia.toLowerCase().includes('lenguaje'))) ||
+                 (progressFilters.materia === 'Inglés' && c.nombre_materia.toLowerCase().includes('inglés')) ||
+                 (progressFilters.materia === 'Matemáticas' && c.nombre_materia.toLowerCase().includes('matemática')))
+            );
+            
+            // Obtener todos los indicadores de las clases
+            const allIndicadores: MaestraIndicador[] = [];
+            for (const clase of clasesFiltradas) {
+                try {
+                    const indicadores = await maestraIndicadoresService.getByClase(clase.id_clase);
+                    allIndicadores.push(...indicadores);
+                } catch (error) {
+                    console.error(`Error loading indicators for class ${clase.id_clase}:`, error);
+                }
+            }
+            
+            // Separar competencias e indicadores
+            const competencias = allIndicadores.filter(i => i.categoria === 'Competencia' && i.activo);
+            const indicadores = allIndicadores.filter(i => i.categoria === 'Indicador' && i.activo);
+            
+            // Obtener detalles de evaluación de todas las minutas
+            const allDetalles: DetalleEvaluacionAlumno[] = [];
+            for (const minuta of minutasFiltradas) {
+                try {
+                    const detalles = await detalleEvaluacionService.getByMinuta(minuta.id_minuta);
+                    allDetalles.push(...detalles);
+                } catch (error) {
+                    console.error(`Error loading details for minuta ${minuta.id_minuta}:`, error);
+                }
+            }
+            
+            // Crear mapa de competencias con sus indicadores
+            const competenciasMap = new Map<string, {
+                competencia: MaestraIndicador;
+                indicadores: MaestraIndicador[];
+                promedios: Map<string, number>; // id_indicador -> promedio nivel_logro
+                estudiantes: Map<string, number>; // id_alumno -> promedio nivel_logro
+            }>();
+            
+            competencias.forEach(comp => {
+                const indicadoresComp = indicadores.filter(ind => ind.id_padre === comp.id_indicador);
+                competenciasMap.set(comp.id_indicador, {
+                    competencia: comp,
+                    indicadores: indicadoresComp,
+                    promedios: new Map(),
+                    estudiantes: new Map()
+                });
+            });
+            
+            // Procesar detalles de evaluación
+            const indicadoresMap = new Map(indicadores.map(ind => [ind.id_indicador, ind]));
+            
+            // Contadores para calcular promedios correctamente
+            const indicadorCounts = new Map<string, number>();
+            const estudianteCounts = new Map<string, number>();
+            
+            allDetalles.forEach(detalle => {
+                const indicador = indicadoresMap.get(detalle.id_indicador);
+                if (!indicador || !indicador.id_padre) return;
+                
+                const competenciaData = competenciasMap.get(indicador.id_padre);
+                if (!competenciaData) return;
+                
+                // Convertir nivel_logro a número (1-5)
+                const nivelLogro = typeof detalle.nivel_logro === 'string' 
+                    ? parseFloat(detalle.nivel_logro) 
+                    : (detalle.nivel_logro as any);
+                
+                if (isNaN(nivelLogro) || nivelLogro < 1 || nivelLogro > 5) return;
+                
+                // Actualizar suma y contador por indicador
+                const indicadorKey = `${indicador.id_padre}-${detalle.id_indicador}`;
+                const currentSum = competenciaData.promedios.get(detalle.id_indicador) || 0;
+                const currentCount = indicadorCounts.get(indicadorKey) || 0;
+                competenciaData.promedios.set(detalle.id_indicador, currentSum + nivelLogro);
+                indicadorCounts.set(indicadorKey, currentCount + 1);
+                
+                // Actualizar suma y contador por estudiante
+                const estudianteKey = `${indicador.id_padre}-${detalle.id_alumno}`;
+                const estudianteSum = competenciaData.estudiantes.get(detalle.id_alumno) || 0;
+                const estudianteCount = estudianteCounts.get(estudianteKey) || 0;
+                competenciaData.estudiantes.set(detalle.id_alumno, estudianteSum + nivelLogro);
+                estudianteCounts.set(estudianteKey, estudianteCount + 1);
+            });
+            
+            // Calcular promedios finales
+            const competenciasConDatos = Array.from(competenciasMap.values()).map(compData => {
+                const indicadoresPromedios = Array.from(compData.promedios.entries()).map(([idInd, sum]) => {
+                    const indicadorKey = `${compData.competencia.id_indicador}-${idInd}`;
+                    const count = indicadorCounts.get(indicadorKey) || 0;
+                    return {
+                        id_indicador: idInd,
+                        indicador: compData.indicadores.find(ind => ind.id_indicador === idInd),
+                        promedio: count > 0 ? sum / count : 0,
+                        totalEvaluaciones: count
+                    };
+                });
+                
+                const estudiantesPromedios = Array.from(compData.estudiantes.entries()).map(([idAlumno, sum]) => {
+                    const estudiante = alumnos.find(a => a.id_alumno === idAlumno);
+                    const estudianteKey = `${compData.competencia.id_indicador}-${idAlumno}`;
+                    const count = estudianteCounts.get(estudianteKey) || 0;
+                    return {
+                        id_alumno: idAlumno,
+                        nombre: estudiante ? `${estudiante.apellidos}, ${estudiante.nombres}` : 'Desconocido',
+                        promedio: count > 0 ? sum / count : 0
+                    };
+                });
+                
+                const promedioGeneral = indicadoresPromedios.length > 0
+                    ? indicadoresPromedios.reduce((sum, ind) => sum + ind.promedio, 0) / indicadoresPromedios.length
+                    : 0;
+                
+                return {
+                    ...compData,
+                    indicadoresPromedios,
+                    estudiantesPromedios,
+                    promedioGeneral
+                };
+            });
+            
+            // Identificar fortalezas y debilidades
+            const fortalezas = competenciasConDatos
+                .filter(c => c.promedioGeneral >= 4)
+                .sort((a, b) => b.promedioGeneral - a.promedioGeneral);
+            
+            const debilidades = competenciasConDatos
+                .filter(c => c.promedioGeneral < 3 && c.promedioGeneral > 0)
+                .sort((a, b) => a.promedioGeneral - b.promedioGeneral);
+            
+            // Crear datos para heatmap (competencia x estudiante)
+            const heatmapData: any[] = [];
+            const estudiantesIds = new Set(allDetalles.map(d => d.id_alumno));
+            
+            competenciasConDatos.forEach(compData => {
+                estudiantesIds.forEach(idAlumno => {
+                    const estudianteData = compData.estudiantesPromedios.find(e => e.id_alumno === idAlumno);
+                    const estudiante = alumnos.find(a => a.id_alumno === idAlumno);
+                    heatmapData.push({
+                        competencia: compData.competencia.descripcion,
+                        estudiante: estudiante ? `${estudiante.apellidos}, ${estudiante.nombres}` : 'Desconocido',
+                        nivel: estudianteData?.promedio || 0
+                    });
+                });
+            });
+            
+            // Progreso por competencia (a lo largo del tiempo)
+            const progresoPorCompetencia: any[] = [];
+            const evaluaciones = ['I Mensual', 'II Mensual', 'III Mensual', 'Seguimiento Pedagógico'];
+            
+            competenciasConDatos.forEach(compData => {
+                const progreso: any[] = [];
+                evaluaciones.forEach(evalType => {
+                    const minutasEval = minutasFiltradas.filter(m => m.evaluacion === evalType);
+                    let promedioEval = 0;
+                    let count = 0;
+                    
+                    minutasEval.forEach(minuta => {
+                        const detallesEval = allDetalles.filter(d => {
+                            const indicador = indicadoresMap.get(d.id_indicador);
+                            return indicador?.id_padre === compData.competencia.id_indicador;
+                        });
+                        detallesEval.forEach(detalle => {
+                            const nivel = typeof detalle.nivel_logro === 'string' 
+                                ? parseFloat(detalle.nivel_logro) 
+                                : (detalle.nivel_logro as any);
+                            if (!isNaN(nivel) && nivel >= 1 && nivel <= 5) {
+                                promedioEval += nivel;
+                                count++;
+                            }
+                        });
+                    });
+                    
+                    if (count > 0) {
+                        progreso.push({
+                            evaluacion: evalType,
+                            promedio: promedioEval / count
+                        });
+                    }
+                });
+                
+                if (progreso.length > 0) {
+                    progresoPorCompetencia.push({
+                        competencia: compData.competencia.descripcion,
+                        progreso
+                    });
+                }
+            });
+            
+            setCompetenciasData({
+                competencias: competenciasConDatos,
+                fortalezas,
+                debilidades,
+                heatmapData,
+                progresoPorCompetencia,
+                totalCompetencias: competenciasConDatos.length,
+                totalIndicadores: indicadores.length
+            });
+        } catch (error) {
+            console.error('Error loading competencias data:', error);
+            setCompetenciasData(null);
+        } finally {
+            setIsLoadingCompetencias(false);
+        }
+    };
+
+    // Cargar datos cuando cambien los filtros
+    useEffect(() => {
+        if (progressFilters.grado && progressFilters.lapso) {
+            loadProgressData();
+            loadRiskData();
+            loadEficaciaData();
+            loadCompetenciasData();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [progressFilters.grado, progressFilters.lapso, progressFilters.ano_escolar, progressFilters.materia]);
+
+    // Preparar datos para gráficos (fuera de la función para poder usar useMemo)
+    const evaluaciones = ['I Mensual', 'II Mensual', 'III Mensual', 'Seguimiento Pedagógico'];
+    
+    // Extraer materias reales de los datos
+    const materiasDisponibles = useMemo(() => {
+        if (!progressData) return [];
+        const materiasSet = new Set<string>();
+        Object.keys(progressData).forEach(evalType => {
+            if (progressData[evalType]) {
+                Object.keys(progressData[evalType]).forEach(materia => {
+                    materiasSet.add(materia);
+                });
+            }
+        });
+        return Array.from(materiasSet).sort();
+    }, [progressData]);
+    
+    // Función para categorizar materias por tipo
+    const categorizarMateria = (materia: string): 'Lengua' | 'Inglés' | 'Matemáticas' | 'Otra' => {
+        const materiaLower = materia.toLowerCase();
+        if (materiaLower.includes('lengua') || materiaLower.includes('lenguaje') || materiaLower.includes('lengua ac')) {
+            return 'Lengua';
+        }
+        if (materiaLower.includes('inglés') || materiaLower.includes('ingles') || materiaLower.includes('use of english')) {
+            return 'Inglés';
+        }
+        if (materiaLower.includes('matemática') || materiaLower.includes('matematicas') || materiaLower.includes('matemáticas ac')) {
+            return 'Matemáticas';
+        }
+        return 'Otra';
+    };
+    
+    const timelineData = useMemo(() => {
+        try {
+            if (!progressData) return [];
+            
+            const data: any[] = [];
+            
+            // Usar las materias reales de los datos
+            materiasDisponibles.forEach(materia => {
+                evaluaciones.forEach(evalType => {
+                    if (progressData[evalType] && progressData[evalType][materia]) {
+                        const info = progressData[evalType][materia];
+                        data.push({
+                            evaluacion: evalType,
+                            materia: materia,
+                            categoria: categorizarMateria(materia),
+                            promedio: info.promedio || 0,
+                            aprobados: info.aprobados || 0,
+                            reprobados: info.reprobados || 0,
+                            totalEstudiantes: info.totalEstudiantes || 0
+                        });
+                    }
+                });
+            });
+            
+            return data;
+        } catch (error) {
+            console.error('Error calculating timelineData:', error);
+            return [];
+        }
+    }, [progressData, materiasDisponibles]);
+    
+    // Calcular KPIs (fuera de la función para poder usar useMemo)
+    const kpis = useMemo(() => {
+        try {
+            if (!progressData) {
+                return {
+                    promedioLapso: 'SE',
+                    promedioLapsoNum: '0.00',
+                    tasaMejora: '0.0',
+                    tasaAprobacion: '0.0',
+                    estudiantesEnRiesgo: 0
+                };
+            }
+            
+            // Si no hay materia seleccionada (o es "all"), calcular promedios generales
+            if (!progressFilters.materia || progressFilters.materia === 'all') {
+                let totalPromedio = 0;
+                let count = 0;
+                let totalAprobados = 0;
+                let totalEstudiantes = 0;
+                
+                materias.forEach(materia => {
+                    evaluaciones.forEach(evalType => {
+                        if (progressData[evalType] && progressData[evalType][materia]) {
+                            const info = progressData[evalType][materia];
+                            totalPromedio += info.promedio || 0;
+                            count++;
+                            totalAprobados += info.aprobados || 0;
+                            totalEstudiantes += info.totalEstudiantes || 0;
+                        }
+                    });
+                });
+                
+                const promedioGeneral = count > 0 ? totalPromedio / count : 0;
+                const tasaAprobacion = totalEstudiantes > 0 
+                    ? (totalAprobados / totalEstudiantes) * 100 
+                    : 0;
+                
+                return {
+                    promedioLapso: convertNumberToLetter(promedioGeneral),
+                    promedioLapsoNum: promedioGeneral.toFixed(2),
+                    tasaMejora: '0.0',
+                    tasaAprobacion: tasaAprobacion.toFixed(1),
+                    estudiantesEnRiesgo: 0
+                };
+            }
+            
+            // Promedio del lapso (última evaluación disponible)
+            let promedioLapso = 0;
+            let primeraEvaluacion = null;
+            let ultimaEvaluacion = null;
+            
+            for (const evalType of [...evaluaciones].reverse()) {
+                if (progressData[evalType] && progressData[evalType][progressFilters.materia]) {
+                    if (!ultimaEvaluacion) {
+                        ultimaEvaluacion = progressData[evalType][progressFilters.materia].promedio;
+                    }
+                }
+            }
+            
+            for (const evalType of evaluaciones) {
+                if (progressData[evalType] && progressData[evalType][progressFilters.materia]) {
+                    if (!primeraEvaluacion) {
+                        primeraEvaluacion = progressData[evalType][progressFilters.materia].promedio;
+                    }
+                }
+            }
+            
+            promedioLapso = ultimaEvaluacion || 0;
+            const tasaMejora = primeraEvaluacion && ultimaEvaluacion 
+                ? ((ultimaEvaluacion - primeraEvaluacion) / primeraEvaluacion) * 100 
+                : 0;
+            
+            // Tasa de aprobación (última evaluación)
+            let totalAprobados = 0;
+            let totalEstudiantes = 0;
+            for (const evalType of evaluaciones) {
+                if (progressData[evalType] && progressData[evalType][progressFilters.materia]) {
+                    totalAprobados += progressData[evalType][progressFilters.materia].aprobados || 0;
+                    totalEstudiantes += progressData[evalType][progressFilters.materia].totalEstudiantes || 0;
+                }
+            }
+            const tasaAprobacion = totalEstudiantes > 0 
+                ? (totalAprobados / totalEstudiantes) * 100 
+                : 0;
+            
+            return {
+                promedioLapso: convertNumberToLetter(promedioLapso),
+                promedioLapsoNum: promedioLapso.toFixed(2),
+                tasaMejora: tasaMejora.toFixed(1),
+                tasaAprobacion: tasaAprobacion.toFixed(1),
+                estudiantesEnRiesgo: riskData?.estudiantesEnRiesgo?.length || 0
+            };
+        } catch (error) {
+            console.error('Error calculating KPIs:', error);
+            return {
+                promedioLapso: 'SE',
+                promedioLapsoNum: '0.00',
+                tasaMejora: '0.0',
+                tasaAprobacion: '0.0',
+                estudiantesEnRiesgo: riskData?.estudiantesEnRiesgo?.length || 0
+            };
+        }
+    }, [progressData, progressFilters.materia, riskData]);
 
     const renderNewMeetingForm = () => {
         const advancedAnalytics = calculateAdvancedAnalytics(Array.from(studentEvals.values()));
@@ -10240,8 +11065,8 @@ const EvaluationView: React.FC<{
                             <div className="mt-8 border-t pt-6">
                                 <h3 className="text-xl font-bold mb-4">Análisis Gráfico Avanzado</h3>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    <PieChart title="Estudiantes por Adaptación" data={advancedAnalytics.adaptationCounts} colors={adaptationColors} />
-                                    <PieChart title="Porcentaje Global de Notas" data={advancedAnalytics.overallGradeCounts} colors={gradeColors} />
+                                    <EnhancedPieChart title="Estudiantes por Adaptación" data={advancedAnalytics.adaptationCounts} colors={adaptationColors} />
+                                    <EnhancedPieChart title="Porcentaje Global de Notas" data={advancedAnalytics.overallGradeCounts} colors={gradeColors} />
                                 </div>
                                 <AdaptationGradeDistributionCharts data={advancedAnalytics.gradeDistributionByAdaptation as any} />
 
@@ -10401,9 +11226,7 @@ const EvaluationView: React.FC<{
                                                     <td className="px-4 py-2 whitespace-nowrap font-medium">{student ? `${student.apellidos}, ${student.nombres}` : 'Alumno no encontrado'}</td>
                                                     <td className="px-4 py-2 text-center">
                                                         {evalData.nota ? (
-                                                            <Badge variant={evalData.nota === 'A' || evalData.nota === 'B' ? 'default' : evalData.nota === 'C' ? 'secondary' : 'destructive'}>
-                                                                {evalData.nota}
-                                                            </Badge>
+                                                            <GradeBadge nota={evalData.nota} />
                                                         ) : '-'}
                                                     </td>
                                                     <td className="px-4 py-2 text-center">
@@ -10422,8 +11245,8 @@ const EvaluationView: React.FC<{
                             <div className="mt-8 border-t pt-6">
                                 <h3 className="text-xl font-bold text-text-main mb-4">Análisis Gráfico Avanzado</h3>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    <PieChart title="Estudiantes por Adaptación" data={advancedAnalytics.adaptationCounts} colors={adaptationColors} />
-                                    <PieChart title="Porcentaje Global de Notas" data={advancedAnalytics.overallGradeCounts} colors={gradeColors} />
+                                    <EnhancedPieChart title="Estudiantes por Adaptación" data={advancedAnalytics.adaptationCounts} colors={adaptationColors} />
+                                    <EnhancedPieChart title="Porcentaje Global de Notas" data={advancedAnalytics.overallGradeCounts} colors={gradeColors} />
                                 </div>
                                 <AdaptationGradeDistributionCharts data={advancedAnalytics.gradeDistributionByAdaptation as any} />
                             </div>
@@ -10514,6 +11337,1780 @@ const EvaluationView: React.FC<{
             </Card>
         );
     };
+    const renderProgressView = () => {
+        try {
+            console.log('🔍 renderProgressView called', {
+                progressFilters,
+                progressData: progressData ? 'exists' : 'null',
+                timelineDataLength: timelineData?.length || 0,
+                isLoadingProgress
+            });
+            
+            // Calcular datos de análisis de tendencias (fuera del JSX)
+            let tendenciasData: any = null;
+            if (progressFilters.materia && progressFilters.materia !== 'all' && timelineData.length > 0) {
+                try {
+                    // Si se selecciona una materia específica, usar esa materia
+                    // Si se selecciona una categoría (Lengua, Inglés, Matemáticas), agrupar todas las materias de esa categoría
+                    let materiaData: any[] = [];
+                    const categoria = categorizarMateria(progressFilters.materia);
+                    
+                    if (categoria !== 'Otra' && progressFilters.materia === categoria) {
+                        // Si se selecciona la categoría completa, agrupar todas las materias de esa categoría
+                        const materiasCategoria = materiasDisponibles.filter(m => categorizarMateria(m) === categoria);
+                        materiaData = timelineData.filter(d => materiasCategoria.includes(d.materia));
+                        // Agrupar por evaluación y calcular promedio
+                        const dataByEval: Record<string, any[]> = {};
+                        materiaData.forEach(d => {
+                            if (!dataByEval[d.evaluacion]) dataByEval[d.evaluacion] = [];
+                            dataByEval[d.evaluacion].push(d);
+                        });
+                        materiaData = Object.keys(dataByEval).map(evalType => {
+                            const datos = dataByEval[evalType];
+                            return {
+                                evaluacion: evalType,
+                                materia: categoria,
+                                promedio: datos.reduce((sum, d) => sum + d.promedio, 0) / datos.length,
+                                aprobados: datos.reduce((sum, d) => sum + d.aprobados, 0),
+                                reprobados: datos.reduce((sum, d) => sum + d.reprobados, 0),
+                                totalEstudiantes: datos.reduce((sum, d) => sum + d.totalEstudiantes, 0)
+                            };
+                        });
+                    } else {
+                        // Materia específica
+                        materiaData = timelineData.filter(d => d.materia === progressFilters.materia);
+                    }
+                    
+                    if (materiaData.length > 0) {
+                        const regressionData = materiaData
+                            .map((d) => ({
+                                x: evaluaciones.indexOf(d.evaluacion) + 1,
+                                y: d.promedio,
+                                evaluacion: d.evaluacion
+                            }))
+                            .filter(d => d.y > 0);
+                        
+                        const regression = regressionData.length >= 2 ? calculateLinearRegression(regressionData) : { slope: 0, intercept: 0, r2: 0 };
+                        
+                        const promedios = materiaData.map(d => d.promedio).filter(p => p > 0);
+                        const primeraNota = promedios[0] || 0;
+                        const ultimaNota = promedios[promedios.length - 1] || 0;
+                        const tasaCambio = primeraNota > 0 ? ((ultimaNota - primeraNota) / primeraNota) * 100 : 0;
+                        const estabilidad = promedios.length > 0 ? calculateStandardDeviation(promedios) : 0;
+                        
+                        const primeraEval = materiaData.find(d => d.evaluacion === 'I Mensual');
+                        const ultimaEval = materiaData.find(d => d.evaluacion === 'III Mensual' || d.evaluacion === 'Seguimiento Pedagógico');
+                        const reprobadosInicial = primeraEval?.reprobados || 0;
+                        const reprobadosFinal = ultimaEval?.reprobados || 0;
+                        const tasaRecuperacion = reprobadosInicial > 0 
+                            ? ((reprobadosInicial - reprobadosFinal) / reprobadosInicial) * 100 
+                            : 0;
+                        
+                        const chartData = materiaData.map(d => ({
+                            evaluacion: d.evaluacion,
+                            promedio: d.promedio,
+                            aprobados: d.aprobados,
+                            reprobados: d.reprobados,
+                            totalEstudiantes: d.totalEstudiantes,
+                            tendencia: regression.intercept + regression.slope * (evaluaciones.indexOf(d.evaluacion) + 1)
+                        }));
+                        
+                        tendenciasData = {
+                            regression,
+                            tasaCambio,
+                            primeraNota,
+                            ultimaNota,
+                            estabilidad,
+                            tasaRecuperacion,
+                            reprobadosInicial,
+                            reprobadosFinal,
+                            chartData
+                        };
+                    }
+                } catch (error) {
+                    console.error('Error calculating tendencias data:', error);
+                }
+            }
+            
+            // Calcular datos de análisis comparativo (fuera del JSX)
+            let comparativoData: any = null;
+            if ((!progressFilters.materia || progressFilters.materia === 'all') && timelineData.length > 0) {
+                try {
+                    // Agrupar materias por categoría y calcular promedios
+                    const materiasLengua = materiasDisponibles.filter(m => categorizarMateria(m) === 'Lengua');
+                    const materiasIngles = materiasDisponibles.filter(m => categorizarMateria(m) === 'Inglés');
+                    const materiasMatematicas = materiasDisponibles.filter(m => categorizarMateria(m) === 'Matemáticas');
+                    
+                    const promediosLengua = evaluaciones.map(e => {
+                        const datosLengua = timelineData.filter(t => t.evaluacion === e && materiasLengua.includes(t.materia));
+                        if (datosLengua.length === 0) return 0;
+                        const suma = datosLengua.reduce((acc, d) => acc + d.promedio, 0);
+                        return suma / datosLengua.length;
+                    }).filter(p => p > 0);
+                    
+                    const promediosIngles = evaluaciones.map(e => {
+                        const datosIngles = timelineData.filter(t => t.evaluacion === e && materiasIngles.includes(t.materia));
+                        if (datosIngles.length === 0) return 0;
+                        const suma = datosIngles.reduce((acc, d) => acc + d.promedio, 0);
+                        return suma / datosIngles.length;
+                    }).filter(p => p > 0);
+                    
+                    const promediosMatematicas = evaluaciones.map(e => {
+                        const datosMatematicas = timelineData.filter(t => t.evaluacion === e && materiasMatematicas.includes(t.materia));
+                        if (datosMatematicas.length === 0) return 0;
+                        const suma = datosMatematicas.reduce((acc, d) => acc + d.promedio, 0);
+                        return suma / datosMatematicas.length;
+                    }).filter(p => p > 0);
+                    
+                    const calcularConsistencia = (notas: number[]) => {
+                        if (notas.length < 2) return 0;
+                        const desvStd = calculateStandardDeviation(notas);
+                        const promedio = notas.reduce((a, b) => a + b, 0) / notas.length;
+                        return promedio > 0 ? (1 - (desvStd / promedio)) * 100 : 0;
+                    };
+                    
+                    const correlacionLenguaIngles = promediosLengua.length > 0 && promediosIngles.length > 0 
+                        ? calculatePearsonCorrelation(promediosLengua, promediosIngles) 
+                        : 0;
+                    const correlacionLenguaMatematicas = promediosLengua.length > 0 && promediosMatematicas.length > 0
+                        ? calculatePearsonCorrelation(promediosLengua, promediosMatematicas)
+                        : 0;
+                    const correlacionInglesMatematicas = promediosIngles.length > 0 && promediosMatematicas.length > 0
+                        ? calculatePearsonCorrelation(promediosIngles, promediosMatematicas)
+                        : 0;
+                    
+                    const consistenciaLengua = calcularConsistencia(promediosLengua);
+                    const consistenciaIngles = calcularConsistencia(promediosIngles);
+                    const consistenciaMatematicas = calcularConsistencia(promediosMatematicas);
+                    
+                    const promedioLengua = promediosLengua.length > 0 ? promediosLengua.reduce((a, b) => a + b, 0) / promediosLengua.length : 0;
+                    const promedioIngles = promediosIngles.length > 0 ? promediosIngles.reduce((a, b) => a + b, 0) / promediosIngles.length : 0;
+                    const promedioMatematicas = promediosMatematicas.length > 0 ? promediosMatematicas.reduce((a, b) => a + b, 0) / promediosMatematicas.length : 0;
+                    
+                    const promedios = [
+                        { materia: 'Lengua', promedio: promedioLengua },
+                        { materia: 'Inglés', promedio: promedioIngles },
+                        { materia: 'Matemáticas', promedio: promedioMatematicas }
+                    ];
+                    
+                    const materiaMasDesafiante = promedios.reduce((min, curr) => 
+                        curr.promedio < min.promedio ? curr : min
+                    );
+                    
+                    const chartData = evaluaciones.map(evalType => {
+                        const datosLengua = timelineData.filter(d => d.evaluacion === evalType && materiasLengua.includes(d.materia));
+                        const datosIngles = timelineData.filter(d => d.evaluacion === evalType && materiasIngles.includes(d.materia));
+                        const datosMatematicas = timelineData.filter(d => d.evaluacion === evalType && materiasMatematicas.includes(d.materia));
+                        
+                        const promedioLengua = datosLengua.length > 0 
+                            ? datosLengua.reduce((acc, d) => acc + d.promedio, 0) / datosLengua.length 
+                            : 0;
+                        const promedioIngles = datosIngles.length > 0 
+                            ? datosIngles.reduce((acc, d) => acc + d.promedio, 0) / datosIngles.length 
+                            : 0;
+                        const promedioMatematicas = datosMatematicas.length > 0 
+                            ? datosMatematicas.reduce((acc, d) => acc + d.promedio, 0) / datosMatematicas.length 
+                            : 0;
+                        
+                        return {
+                            evaluacion: evalType,
+                            Lengua: promedioLengua,
+                            Inglés: promedioIngles,
+                            Matemáticas: promedioMatematicas
+                        };
+                    }).filter(d => d.Lengua > 0 || d.Inglés > 0 || d.Matemáticas > 0);
+                    
+                    comparativoData = {
+                        correlacionLenguaIngles,
+                        correlacionLenguaMatematicas,
+                        correlacionInglesMatematicas,
+                        consistenciaLengua,
+                        consistenciaIngles,
+                        consistenciaMatematicas,
+                        materiaMasDesafiante,
+                        chartData
+                    };
+                } catch (error) {
+                    console.error('Error calculating comparativo data:', error);
+                }
+            }
+            
+            // Calcular datos de cohortes (fuera del JSX)
+            let cohortesData: any = null;
+            if (progressFilters.materia && progressFilters.materia !== 'all' && timelineData.length > 0 && progressData) {
+                try {
+                    const estudiantesMap = new Map<string, {
+                        id: string;
+                        nombre: string;
+                        notas: number[];
+                        primeraNota: number;
+                        ultimaNota: number;
+                        cambio: number;
+                        promedio: number;
+                        estabilidad: number;
+                        tendencia: 'mejora' | 'estable' | 'deterioro';
+                    }>();
+                    
+                    evaluaciones.forEach(evalType => {
+                        if (progressData[evalType] && progressData[evalType][progressFilters.materia]) {
+                            const datos = progressData[evalType][progressFilters.materia].datos || [];
+                            datos.forEach((d: any) => {
+                                if (!estudiantesMap.has(d.id_alumno)) {
+                                    const estudiante = alumnos.find(a => a.id_alumno === d.id_alumno);
+                                    estudiantesMap.set(d.id_alumno, {
+                                        id: d.id_alumno,
+                                        nombre: estudiante ? `${estudiante.apellidos}, ${estudiante.nombres}` : 'Desconocido',
+                                        notas: [],
+                                        primeraNota: 0,
+                                        ultimaNota: 0,
+                                        cambio: 0,
+                                        promedio: 0,
+                                        estabilidad: 0,
+                                        tendencia: 'estable'
+                                    });
+                                }
+                                const estudiante = estudiantesMap.get(d.id_alumno)!;
+                                estudiante.notas.push(d.notaNum);
+                            });
+                        }
+                    });
+                    
+                    estudiantesMap.forEach((estudiante) => {
+                        if (estudiante.notas.length > 0) {
+                            estudiante.primeraNota = estudiante.notas[0];
+                            estudiante.ultimaNota = estudiante.notas[estudiante.notas.length - 1];
+                            estudiante.cambio = estudiante.ultimaNota - estudiante.primeraNota;
+                            estudiante.promedio = estudiante.notas.reduce((a, b) => a + b, 0) / estudiante.notas.length;
+                            estudiante.estabilidad = calculateStandardDeviation(estudiante.notas);
+                            
+                            // Tendencia basada en cambio de 1 punto (una letra de diferencia)
+                            if (estudiante.cambio >= 1) {
+                                estudiante.tendencia = 'mejora';
+                            } else if (estudiante.cambio <= -1) {
+                                estudiante.tendencia = 'deterioro';
+                            } else {
+                                estudiante.tendencia = 'estable';
+                            }
+                        }
+                    });
+                    
+                    // Clasificación de cohortes según nueva lógica:
+                    // - A = 5, B = 4, C = 3, D = 2, E = 1, F/SE = 0
+                    // - Buen rendimiento: A y B (promedio >= 3.5)
+                    // - Bajo rendimiento: C (promedio < 3.5 pero >= 2.5)
+                    // - Alto rendimiento: Mantiene A constantemente (promedio >= 4.5 y todas las notas >= 4.5)
+                    // - Riesgo académico: C o peor (promedio < 3.5)
+                    // - Mejora significativa: Mejora de al menos 1 punto (una letra)
+                    // - Inestabilidad: Alta variabilidad (desviación estándar > 0.5)
+                    
+                    const cohortes = {
+                        // Alto rendimiento: Estudiantes que mantienen A constantemente
+                        altoRendimiento: Array.from(estudiantesMap.values()).filter(e => {
+                            if (e.notas.length === 0) return false;
+                            const promedioAlto = e.promedio >= 4.5; // Promedio de A
+                            const todasNotasA = e.notas.every(nota => nota >= 4.5); // Todas las notas son A
+                            return promedioAlto && todasNotasA && e.estabilidad < 0.5; // Baja variabilidad
+                        }),
+                        // Mejora significativa: Mejora de al menos 1 punto (una letra de diferencia)
+                        mejoraSignificativa: Array.from(estudiantesMap.values()).filter(e => 
+                            e.cambio >= 1 && e.ultimaNota >= 3.5 // Mejora de al menos una letra y última nota es B o mejor
+                        ),
+                        // Riesgo académico: C o peor (promedio < 3.5)
+                        riesgoAcademico: Array.from(estudiantesMap.values()).filter(e => 
+                            e.promedio < 3.5 // Promedio menor a C
+                        ),
+                        // Bajo rendimiento: C (promedio < 3.5 pero >= 2.5)
+                        bajoRendimiento: Array.from(estudiantesMap.values()).filter(e => 
+                            e.promedio >= 2.5 && e.promedio < 3.5 // Promedio es C
+                        ),
+                        // Inestabilidad: Alta variabilidad en las notas
+                        inestabilidad: Array.from(estudiantesMap.values()).filter(e => 
+                            e.estabilidad > 0.5 // Alta desviación estándar
+                        )
+                    };
+                    
+                    const calcularCaracteristicasCohorte = (cohorte: typeof cohortes.altoRendimiento) => {
+                        if (cohorte.length === 0) return null;
+                        return {
+                            tamaño: cohorte.length,
+                            promedioGeneral: cohorte.reduce((sum, e) => sum + e.promedio, 0) / cohorte.length,
+                            cambioPromedio: cohorte.reduce((sum, e) => sum + e.cambio, 0) / cohorte.length,
+                            estabilidadPromedio: cohorte.reduce((sum, e) => sum + e.estabilidad, 0) / cohorte.length
+                        };
+                    };
+                    
+                    const caracteristicas = {
+                        altoRendimiento: calcularCaracteristicasCohorte(cohortes.altoRendimiento),
+                        mejoraSignificativa: calcularCaracteristicasCohorte(cohortes.mejoraSignificativa),
+                        riesgoAcademico: calcularCaracteristicasCohorte(cohortes.riesgoAcademico),
+                        bajoRendimiento: calcularCaracteristicasCohorte(cohortes.bajoRendimiento),
+                        inestabilidad: calcularCaracteristicasCohorte(cohortes.inestabilidad)
+                    };
+                    
+                    cohortesData = { cohortes, caracteristicas };
+                } catch (error) {
+                    console.error('Error calculating cohortes data:', error);
+                }
+            }
+            
+            console.log('✅ renderProgressView returning JSX', {
+                tendenciasData: tendenciasData ? 'exists' : 'null',
+                comparativoData: comparativoData ? 'exists' : 'null',
+                cohortesData: cohortesData ? 'exists' : 'null'
+            });
+            
+            return (
+                <div className="space-y-6">
+                {/* Filtros */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Filtros de Progreso</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <Label>Año Escolar</Label>
+                                <Select
+                                    value={progressFilters.ano_escolar}
+                                    onValueChange={(value) => setProgressFilters({...progressFilters, ano_escolar: value})}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="2025-2026">2025-2026</SelectItem>
+                                        <SelectItem value="2024-2025">2024-2025</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <Label>Lapso</Label>
+                                <Select
+                                    value={progressFilters.lapso}
+                                    onValueChange={(value) => setProgressFilters({...progressFilters, lapso: value})}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="I Lapso">I Lapso</SelectItem>
+                                        <SelectItem value="II Lapso">II Lapso</SelectItem>
+                                        <SelectItem value="III Lapso">III Lapso</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <Label>Grado</Label>
+                                <Select
+                                    value={progressFilters.grado}
+                                    onValueChange={(value) => setProgressFilters({...progressFilters, grado: value})}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Seleccionar grado" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {alumnos && alumnos.length > 0 ? (
+                                            [...new Set(alumnos.map(a => a.salon).filter(Boolean))].map(grado => (
+                                                <SelectItem key={grado} value={grado}>{grado}</SelectItem>
+                                            ))
+                                        ) : (
+                                            <SelectItem value="no-grades" disabled>No hay grados disponibles</SelectItem>
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <Label>Materia (Opcional)</Label>
+                                <Select
+                                    value={progressFilters.materia || 'all'}
+                                    onValueChange={(value) => setProgressFilters({...progressFilters, materia: value === 'all' ? 'all' : value})}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Todas las materias" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Todas las materias</SelectItem>
+                                        {materiasDisponibles.map(materia => (
+                                            <SelectItem key={materia} value={materia}>{materia}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+                
+                {isLoadingProgress ? (
+                    <Card>
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-center">
+                                <Skeleton className="h-8 w-8 rounded-full mr-3" />
+                                <span>Cargando datos de progreso...</span>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : !progressFilters.grado ? (
+                    <Card>
+                        <CardContent className="p-6">
+                            <Alert>
+                                <AlertDescription>
+                                    Por favor selecciona un grado para ver el progreso del lapso.
+                                </AlertDescription>
+                            </Alert>
+                        </CardContent>
+                    </Card>
+                ) : !progressData || Object.keys(progressData).length === 0 ? (
+                    <Card>
+                        <CardContent className="p-6">
+                            <Alert>
+                                <AlertDescription>
+                                    No hay datos disponibles para el grado y lapso seleccionados. Por favor, verifica que existan evaluaciones registradas para este período.
+                                </AlertDescription>
+                            </Alert>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <>
+                        {/* KPIs */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <Card>
+                                <CardContent className="p-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Promedio del Lapso</p>
+                                            <p className="text-3xl font-bold">{kpis.promedioLapso}</p>
+                                        </div>
+                                        <AcademicCapIcon className="h-8 w-8 text-primary opacity-60" />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="p-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Tasa de Mejora</p>
+                                            <p className="text-3xl font-bold">{kpis.tasaMejora}%</p>
+                                        </div>
+                                        <SparklesIcon className="h-8 w-8 text-primary opacity-60" />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="p-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Tasa de Aprobación</p>
+                                            <p className="text-3xl font-bold">{kpis.tasaAprobacion}%</p>
+                                        </div>
+                                        <ClipboardCheckIcon className="h-8 w-8 text-primary opacity-60" />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="p-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Estudiantes en Riesgo</p>
+                                            <p className="text-3xl font-bold">{kpis.estudiantesEnRiesgo}</p>
+                                        </div>
+                                        <BellIcon className="h-8 w-8 text-destructive opacity-60" />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                        
+                        {/* Tabla de Resumen */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Resumen por Evaluación</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-border">
+                                        <thead className="bg-muted">
+                                            <tr>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Evaluación</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Materia</th>
+                                                <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Promedio</th>
+                                                <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Aprobados</th>
+                                                <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Reprobados</th>
+                                                <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-background divide-y divide-border">
+                                            {timelineData.length > 0 ? timelineData.map((row, index) => (
+                                                <tr key={index} className="hover:bg-muted/50">
+                                                    <td className="px-4 py-2 whitespace-nowrap">{row.evaluacion}</td>
+                                                    <td className="px-4 py-2 whitespace-nowrap">{row.materia}</td>
+                                                    <td className="px-4 py-2 text-center font-medium">
+                                                        <span className="text-lg font-bold">{convertNumberToLetter(row.promedio)}</span>
+                                                        <span className="text-xs text-muted-foreground ml-1">({row.promedio.toFixed(2)})</span>
+                                                    </td>
+                                                    <td className="px-4 py-2 text-center">
+                                                        <Badge variant="default">{row.aprobados}</Badge>
+                                                    </td>
+                                                    <td className="px-4 py-2 text-center">
+                                                        <Badge variant="destructive">{row.reprobados}</Badge>
+                                                    </td>
+                                                    <td className="px-4 py-2 text-center">{row.totalEstudiantes}</td>
+                                                </tr>
+                                            )) : (
+                                                <tr>
+                                                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
+                                                        No hay datos disponibles para mostrar
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        
+                        {/* ANÁLISIS DE TENDENCIAS TEMPORALES */}
+                        {tendenciasData && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>📈 Análisis de Tendencias Temporales - {progressFilters.materia}</CardTitle>
+                                    <p className="text-sm text-muted-foreground mt-2">
+                                        Evolución del rendimiento a lo largo del lapso con métricas estadísticas
+                                    </p>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-6">
+                                        {/* Métricas de Tendencia */}
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                            <Card className="bg-blue-50 dark:bg-blue-950">
+                                                <CardContent className="p-4">
+                                                    <p className="text-xs text-muted-foreground mb-1">Tasa de Cambio</p>
+                                                    <p className={`text-2xl font-bold ${tendenciasData.tasaCambio >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {tendenciasData.tasaCambio >= 0 ? '+' : ''}{tendenciasData.tasaCambio.toFixed(1)}%
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        {tendenciasData.primeraNota.toFixed(2)} → {tendenciasData.ultimaNota.toFixed(2)}
+                                                    </p>
+                                                </CardContent>
+                                            </Card>
+                                            <Card className="bg-purple-50 dark:bg-purple-950">
+                                                <CardContent className="p-4">
+                                                    <p className="text-xs text-muted-foreground mb-1">Velocidad de Mejora</p>
+                                                    <p className={`text-2xl font-bold ${tendenciasData.regression.slope >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {tendenciasData.regression.slope >= 0 ? '+' : ''}{tendenciasData.regression.slope.toFixed(2)}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        R² = {tendenciasData.regression.r2.toFixed(3)}
+                                                    </p>
+                                                </CardContent>
+                                            </Card>
+                                            <Card className="bg-orange-50 dark:bg-orange-950">
+                                                <CardContent className="p-4">
+                                                    <p className="text-xs text-muted-foreground mb-1">Estabilidad</p>
+                                                    <p className="text-2xl font-bold">{tendenciasData.estabilidad.toFixed(2)}</p>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        Desv. Estándar (escala 0-5)
+                                                    </p>
+                                                </CardContent>
+                                            </Card>
+                                            <Card className="bg-green-50 dark:bg-green-950">
+                                                <CardContent className="p-4">
+                                                    <p className="text-xs text-muted-foreground mb-1">Tasa de Recuperación</p>
+                                                    <p className="text-2xl font-bold text-green-600">
+                                                        {tendenciasData.tasaRecuperacion.toFixed(1)}%
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        {tendenciasData.reprobadosInicial} → {tendenciasData.reprobadosFinal} reprobados
+                                                    </p>
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+                                        
+                                        {/* Gráfico de Línea con Tendencia */}
+                                        <div>
+                                            <h4 className="text-lg font-semibold mb-4">Evolución de Promedios con Línea de Tendencia</h4>
+                                            <ResponsiveContainer width="100%" height={400}>
+                                                <LineChart data={tendenciasData.chartData}>
+                                                    <CartesianGrid strokeDasharray="3 3" />
+                                                    <XAxis 
+                                                        dataKey="evaluacion" 
+                                                        tick={{ fontSize: 12 }}
+                                                        angle={-45}
+                                                        textAnchor="end"
+                                                        height={80}
+                                                    />
+                                                    <YAxis 
+                                                        domain={[0, 5]}
+                                                        tick={{ fontSize: 12 }}
+                                                        label={{ value: 'Promedio (A=5, B=4, C=3, D=2, E=1, F/SE=0)', angle: -90, position: 'insideLeft' }}
+                                                    />
+                                                    <RechartsTooltip 
+                                                        formatter={(value: any, name: string) => {
+                                                            if (name === 'promedio') {
+                                                                const letter = convertNumberToLetter(value);
+                                                                return [`${letter} (${value.toFixed(2)})`, 'Promedio Real'];
+                                                            }
+                                                            if (name === 'tendencia') {
+                                                                const letter = convertNumberToLetter(value);
+                                                                return [`${letter} (${value.toFixed(2)})`, 'Tendencia (Regresión)'];
+                                                            }
+                                                            return [value, name];
+                                                        }}
+                                                    />
+                                                        <Line 
+                                                            type="monotone" 
+                                                            dataKey="promedio"
+                                                        stroke="#007AFF" 
+                                                        strokeWidth={3}
+                                                        dot={{ r: 6 }}
+                                                        name="Promedio Real"
+                                                    />
+                                                    <Line 
+                                                        type="linear" 
+                                                        dataKey="tendencia" 
+                                                        stroke="#FF3B30" 
+                                                        strokeWidth={2}
+                                                        strokeDasharray="5 5"
+                                                        dot={false}
+                                                        name="Tendencia (Regresión)"
+                                                    />
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                        
+                        {/* ANÁLISIS COMPARATIVO ENTRE MATERIAS */}
+                        {comparativoData && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>📊 Análisis Comparativo entre Materias</CardTitle>
+                                        <p className="text-sm text-muted-foreground mt-2">
+                                            Correlaciones, consistencia y rendimiento relativo entre Lengua, Inglés y Matemáticas
+                                        </p>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-6">
+                                            {/* Métricas de Correlación */}
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                <Card className="bg-blue-50 dark:bg-blue-950">
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">Correlación Lengua-Inglés</p>
+                                                        <p className="text-2xl font-bold">{comparativoData.correlacionLenguaIngles.toFixed(3)}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            {comparativoData.correlacionLenguaIngles > 0.7 ? 'Fuerte' : 
+                                                             comparativoData.correlacionLenguaIngles > 0.4 ? 'Moderada' : 'Débil'}
+                                                        </p>
+                                                    </CardContent>
+                                                </Card>
+                                                <Card className="bg-green-50 dark:bg-green-950">
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">Correlación Lengua-Matemáticas</p>
+                                                        <p className="text-2xl font-bold">{comparativoData.correlacionLenguaMatematicas.toFixed(3)}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            {comparativoData.correlacionLenguaMatematicas > 0.7 ? 'Fuerte' : 
+                                                             comparativoData.correlacionLenguaMatematicas > 0.4 ? 'Moderada' : 'Débil'}
+                                                        </p>
+                                                    </CardContent>
+                                                </Card>
+                                                <Card className="bg-purple-50 dark:bg-purple-950">
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">Correlación Inglés-Matemáticas</p>
+                                                        <p className="text-2xl font-bold">{comparativoData.correlacionInglesMatematicas.toFixed(3)}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            {comparativoData.correlacionInglesMatematicas > 0.7 ? 'Fuerte' : 
+                                                             comparativoData.correlacionInglesMatematicas > 0.4 ? 'Moderada' : 'Débil'}
+                                                        </p>
+                                                    </CardContent>
+                                                </Card>
+                                                <Card className="bg-red-50 dark:bg-red-950">
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">Materia Más Desafiante</p>
+                                                        <p className="text-2xl font-bold">{comparativoData.materiaMasDesafiante.materia}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            Promedio: {convertNumberToLetter(comparativoData.materiaMasDesafiante.promedio)} ({comparativoData.materiaMasDesafiante.promedio.toFixed(2)})
+                                                        </p>
+                                                    </CardContent>
+                                                </Card>
+                                            </div>
+                                            
+                                            {/* Matriz de Correlación */}
+                                            <div>
+                                                <h4 className="text-lg font-semibold mb-4">Matriz de Correlación entre Materias</h4>
+                                                <div className="grid grid-cols-4 gap-2 max-w-md">
+                                                    <div className="font-semibold text-sm"></div>
+                                                    <div className="font-semibold text-sm text-center">Lengua</div>
+                                                    <div className="font-semibold text-sm text-center">Inglés</div>
+                                                    <div className="font-semibold text-sm text-center">Matemáticas</div>
+                                                    
+                                                    <div className="font-semibold text-sm">Lengua</div>
+                                                    <div className="bg-blue-500 text-white text-center py-2 rounded font-bold">1.000</div>
+                                                    <div className={`text-white text-center py-2 rounded font-bold ${comparativoData.correlacionLenguaIngles >= 0 ? 'bg-green-500' : 'bg-red-500'}`}>
+                                                        {comparativoData.correlacionLenguaIngles.toFixed(3)}
+                                                    </div>
+                                                    <div className={`text-white text-center py-2 rounded font-bold ${comparativoData.correlacionLenguaMatematicas >= 0 ? 'bg-green-500' : 'bg-red-500'}`}>
+                                                        {comparativoData.correlacionLenguaMatematicas.toFixed(3)}
+                                                    </div>
+                                                    
+                                                    <div className="font-semibold text-sm">Inglés</div>
+                                                    <div className={`text-white text-center py-2 rounded font-bold ${comparativoData.correlacionLenguaIngles >= 0 ? 'bg-green-500' : 'bg-red-500'}`}>
+                                                        {comparativoData.correlacionLenguaIngles.toFixed(3)}
+                                                    </div>
+                                                    <div className="bg-blue-500 text-white text-center py-2 rounded font-bold">1.000</div>
+                                                    <div className={`text-white text-center py-2 rounded font-bold ${comparativoData.correlacionInglesMatematicas >= 0 ? 'bg-green-500' : 'bg-red-500'}`}>
+                                                        {comparativoData.correlacionInglesMatematicas.toFixed(3)}
+                                                    </div>
+                                                    
+                                                    <div className="font-semibold text-sm">Matemáticas</div>
+                                                    <div className={`text-white text-center py-2 rounded font-bold ${comparativoData.correlacionLenguaMatematicas >= 0 ? 'bg-green-500' : 'bg-red-500'}`}>
+                                                        {comparativoData.correlacionLenguaMatematicas.toFixed(3)}
+                                                    </div>
+                                                    <div className={`text-white text-center py-2 rounded font-bold ${comparativoData.correlacionInglesMatematicas >= 0 ? 'bg-green-500' : 'bg-red-500'}`}>
+                                                        {comparativoData.correlacionInglesMatematicas.toFixed(3)}
+                                                    </div>
+                                                    <div className="bg-blue-500 text-white text-center py-2 rounded font-bold">1.000</div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Gráfico de Barras Agrupadas */}
+                                            <div>
+                                                <h4 className="text-lg font-semibold mb-4">Comparación de Promedios por Evaluación</h4>
+                                                <ResponsiveContainer width="100%" height={400}>
+                                                    <BarChart data={comparativoData.chartData}>
+                                                        <CartesianGrid strokeDasharray="3 3" />
+                                                        <XAxis 
+                                                            dataKey="evaluacion" 
+                                                            tick={{ fontSize: 12 }}
+                                                            angle={-45}
+                                                            textAnchor="end"
+                                                            height={80}
+                                                        />
+                                                        <YAxis 
+                                                            domain={[0, 5]}
+                                                            tick={{ fontSize: 12 }}
+                                                            label={{ value: 'Promedio (A=5, B=4, C=3, D=2, E=1)', angle: -90, position: 'insideLeft' }}
+                                                        />
+                                                        <RechartsTooltip />
+                                                        <Bar dataKey="Lengua" fill="#007AFF" radius={[4, 4, 0, 0]} />
+                                                        <Bar dataKey="Inglés" fill="#FADB16" radius={[4, 4, 0, 0]} />
+                                                        <Bar dataKey="Matemáticas" fill="#FF3B30" radius={[4, 4, 0, 0]} />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                        )}
+                        
+                        {/* ANÁLISIS DE COHORTES Y SEGMENTACIÓN */}
+                        {cohortesData && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>👥 Análisis de Cohortes y Segmentación</CardTitle>
+                                        <p className="text-sm text-muted-foreground mt-2">
+                                            Identificación de grupos de estudiantes con características similares y análisis de transiciones.
+                                            <br />
+                                            <span className="font-semibold">Criterios:</span> Buen rendimiento (A y B), Bajo rendimiento (C), Alto rendimiento (mantiene A constantemente), Riesgo académico (C o peor).
+                                        </p>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-6">
+                                            {/* Resumen de Cohortes */}
+                                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                                                {[
+                                                    { nombre: 'Alto Rendimiento', datos: cohortesData.caracteristicas.altoRendimiento, color: 'bg-green-500' },
+                                                    { nombre: 'Mejora Significativa', datos: cohortesData.caracteristicas.mejoraSignificativa, color: 'bg-blue-500' },
+                                                    { nombre: 'Riesgo Académico', datos: cohortesData.caracteristicas.riesgoAcademico, color: 'bg-red-500' },
+                                                    { nombre: 'Bajo Rendimiento', datos: cohortesData.caracteristicas.bajoRendimiento, color: 'bg-orange-500' },
+                                                    { nombre: 'Inestabilidad', datos: cohortesData.caracteristicas.inestabilidad, color: 'bg-purple-500' }
+                                                ].map((cohorte, idx) => (
+                                                    <Card key={idx} className={cohorte.color + ' text-white'}>
+                                                        <CardContent className="p-4">
+                                                            <p className="text-xs opacity-90 mb-1">{cohorte.nombre}</p>
+                                                            <p className="text-3xl font-bold">{cohorte.datos?.tamaño || 0}</p>
+                                                            <p className="text-xs opacity-90 mt-1">
+                                                                {cohorte.datos ? `Prom: ${convertNumberToLetter(cohorte.datos.promedioGeneral)} (${cohorte.datos.promedioGeneral.toFixed(1)})` : 'Sin datos'}
+                                                            </p>
+                                                        </CardContent>
+                                                    </Card>
+                                                ))}
+                                            </div>
+                                            
+                                            {/* Perfil de Cohortes */}
+                                            <div>
+                                                <h4 className="text-lg font-semibold mb-4">Perfil Promedio por Cohorte</h4>
+                                                <ResponsiveContainer width="100%" height={400}>
+                                                    <BarChart data={[
+                                                        {
+                                                            name: 'Promedio',
+                                                            'Alto Rendimiento': cohortesData.caracteristicas.altoRendimiento?.promedioGeneral || 0,
+                                                            'Mejora Significativa': cohortesData.caracteristicas.mejoraSignificativa?.promedioGeneral || 0,
+                                                            'Riesgo Académico': cohortesData.caracteristicas.riesgoAcademico?.promedioGeneral || 0,
+                                                            'Bajo Rendimiento': cohortesData.caracteristicas.bajoRendimiento?.promedioGeneral || 0,
+                                                            'Inestabilidad': cohortesData.caracteristicas.inestabilidad?.promedioGeneral || 0
+                                                        },
+                                                        {
+                                                            name: 'Cambio',
+                                                            'Alto Rendimiento': cohortesData.caracteristicas.altoRendimiento?.cambioPromedio || 0,
+                                                            'Mejora Significativa': cohortesData.caracteristicas.mejoraSignificativa?.cambioPromedio || 0,
+                                                            'Riesgo Académico': cohortesData.caracteristicas.riesgoAcademico?.cambioPromedio || 0,
+                                                            'Bajo Rendimiento': cohortesData.caracteristicas.bajoRendimiento?.cambioPromedio || 0,
+                                                            'Inestabilidad': cohortesData.caracteristicas.inestabilidad?.cambioPromedio || 0
+                                                        }
+                                                    ]}>
+                                                        <CartesianGrid strokeDasharray="3 3" />
+                                                        <XAxis dataKey="name" />
+                                                        <YAxis />
+                                                        <RechartsTooltip />
+                                                        <Bar dataKey="Alto Rendimiento" fill="#34C759" />
+                                                        <Bar dataKey="Mejora Significativa" fill="#007AFF" />
+                                                        <Bar dataKey="Riesgo Académico" fill="#FF3B30" />
+                                                        <Bar dataKey="Bajo Rendimiento" fill="#FF9500" />
+                                                        <Bar dataKey="Inestabilidad" fill="#AF52DE" />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                            
+                                            {/* Tabla de Estudiantes por Cohorte */}
+                                            <div>
+                                                <h4 className="text-lg font-semibold mb-4">Estudiantes por Cohorte</h4>
+                                                <div className="space-y-4">
+                                                    {[
+                                                        { 
+                                                            nombre: 'Alto Rendimiento', 
+                                                            descripcion: 'Estudiantes que mantienen A constantemente',
+                                                            estudiantes: cohortesData.cohortes.altoRendimiento, 
+                                                            color: 'border-green-500' 
+                                                        },
+                                                        { 
+                                                            nombre: 'Mejora Significativa', 
+                                                            descripcion: 'Estudiantes que mejoran al menos una letra (A, B, C, D, E)',
+                                                            estudiantes: cohortesData.cohortes.mejoraSignificativa, 
+                                                            color: 'border-blue-500' 
+                                                        },
+                                                        { 
+                                                            nombre: 'Riesgo Académico', 
+                                                            descripcion: 'Estudiantes con C o peor (promedio < 3.5)',
+                                                            estudiantes: cohortesData.cohortes.riesgoAcademico, 
+                                                            color: 'border-red-500' 
+                                                        },
+                                                        { 
+                                                            nombre: 'Bajo Rendimiento', 
+                                                            descripcion: 'Estudiantes con C (promedio entre 2.5 y 3.5)',
+                                                            estudiantes: cohortesData.cohortes.bajoRendimiento, 
+                                                            color: 'border-orange-500' 
+                                                        },
+                                                        { 
+                                                            nombre: 'Inestabilidad', 
+                                                            descripcion: 'Estudiantes con alta variabilidad en sus notas',
+                                                            estudiantes: cohortesData.cohortes.inestabilidad, 
+                                                            color: 'border-purple-500' 
+                                                        }
+                                                    ].map((cohorte, idx) => (
+                                                        <Card key={idx} className={`border-2 ${cohorte.color}`}>
+                                                            <CardHeader>
+                                                                <CardTitle className="text-lg">{cohorte.nombre} ({cohorte.estudiantes.length} estudiantes)</CardTitle>
+                                                                <p className="text-sm text-muted-foreground mt-1">{cohorte.descripcion}</p>
+                                                            </CardHeader>
+                                                            <CardContent>
+                                                                <div className="overflow-x-auto">
+                                                                    <table className="min-w-full divide-y divide-border">
+                                                                        <thead className="bg-muted">
+                                                                            <tr>
+                                                                                <th className="px-4 py-2 text-left text-xs font-medium">Estudiante</th>
+                                                                                <th className="px-4 py-2 text-center text-xs font-medium">Promedio</th>
+                                                                                <th className="px-4 py-2 text-center text-xs font-medium">Cambio</th>
+                                                                                <th className="px-4 py-2 text-center text-xs font-medium">Estabilidad</th>
+                                                                                <th className="px-4 py-2 text-center text-xs font-medium">Tendencia</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-border">
+                                                                            {cohorte.estudiantes.slice(0, 10).map((est, estIdx) => (
+                                                                                <tr key={estIdx} className="hover:bg-muted/50">
+                                                                                    <td className="px-4 py-2 text-sm">{est.nombre}</td>
+                                                                                    <td className="px-4 py-2 text-center font-medium">
+                                                                                        <span className="text-lg font-bold">{convertNumberToLetter(est.promedio)}</span>
+                                                                                        <span className="text-xs text-muted-foreground ml-1">({est.promedio.toFixed(2)})</span>
+                                                                                    </td>
+                                                                                    <td className="px-4 py-2 text-center">
+                                                                                        <Badge variant={est.cambio >= 0 ? 'default' : 'destructive'}>
+                                                                                            {est.cambio >= 0 ? '+' : ''}{est.cambio.toFixed(2)}
+                                                                                        </Badge>
+                                                                                    </td>
+                                                                                    <td className="px-4 py-2 text-center">{est.estabilidad.toFixed(2)}</td>
+                                                                                    <td className="px-4 py-2 text-center">
+                                                                                        <Badge variant={
+                                                                                            est.tendencia === 'mejora' ? 'default' :
+                                                                                            est.tendencia === 'estable' ? 'secondary' : 'destructive'
+                                                                                        }>
+                                                                                            {est.tendencia === 'mejora' ? 'Mejora' :
+                                                                                             est.tendencia === 'estable' ? 'Estable' : 'Deterioro'}
+                                                                                        </Badge>
+                                                                                    </td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                                {cohorte.estudiantes.length > 10 && (
+                                                                    <p className="text-sm text-muted-foreground mt-2 text-center">
+                                                                        Mostrando 10 de {cohorte.estudiantes.length} estudiantes
+                                                                    </p>
+                                                                )}
+                                                            </CardContent>
+                                                        </Card>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                        )}
+                        
+                        {/* ANÁLISIS DE RIESGO Y PREDICCIÓN */}
+                        {riskData && progressFilters.grado && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>⚠️ Análisis de Riesgo y Predicción</CardTitle>
+                                    <p className="text-sm text-muted-foreground mt-2">
+                                        Identificación proactiva de estudiantes en riesgo académico basado en múltiples factores
+                                    </p>
+                                </CardHeader>
+                                <CardContent>
+                                    {isLoadingRisk ? (
+                                        <div className="flex items-center justify-center p-6">
+                                            <Skeleton className="h-8 w-8 rounded-full mr-3" />
+                                            <span>Cargando datos de riesgo...</span>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-6">
+                                            {/* Métricas de Riesgo */}
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                <Card className="bg-green-50 dark:bg-green-950">
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">Riesgo Bajo</p>
+                                                        <p className="text-2xl font-bold text-green-600">{riskData.distribution.bajo}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            Score &lt; 30
+                                                        </p>
+                                                    </CardContent>
+                                                </Card>
+                                                <Card className="bg-yellow-50 dark:bg-yellow-950">
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">Riesgo Medio</p>
+                                                        <p className="text-2xl font-bold text-yellow-600">{riskData.distribution.medio}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            Score 30-59
+                                                        </p>
+                                                    </CardContent>
+                                                </Card>
+                                                <Card className="bg-orange-50 dark:bg-orange-950">
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">Riesgo Alto</p>
+                                                        <p className="text-2xl font-bold text-orange-600">{riskData.distribution.alto}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            Score 60-79
+                                                        </p>
+                                                    </CardContent>
+                                                </Card>
+                                                <Card className="bg-red-50 dark:bg-red-950">
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">Riesgo Crítico</p>
+                                                        <p className="text-2xl font-bold text-red-600">{riskData.distribution.critico}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            Score ≥ 80
+                                                        </p>
+                                                    </CardContent>
+                                                </Card>
+                                            </div>
+                                            
+                                            {/* Distribución de Risk Scores */}
+                                            <div>
+                                                <h4 className="text-lg font-semibold mb-4">Distribución de Risk Scores</h4>
+                                                <ResponsiveContainer width="100%" height={300}>
+                                                    <BarChart data={riskData.histogramData}>
+                                                        <CartesianGrid strokeDasharray="3 3" />
+                                                        <XAxis 
+                                                            dataKey="label" 
+                                                            tick={{ fontSize: 12 }}
+                                                        />
+                                                        <YAxis 
+                                                            tick={{ fontSize: 12 }}
+                                                            label={{ value: 'Cantidad de Estudiantes', angle: -90, position: 'insideLeft' }}
+                                                        />
+                                                        <RechartsTooltip />
+                                                        <Bar 
+                                                            dataKey="count" 
+                                                            fill="#8884d8"
+                                                            radius={[4, 4, 0, 0]}
+                                                        >
+                                                            {riskData.histogramData.map((entry: any, index: number) => (
+                                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                                            ))}
+                                                        </Bar>
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                                <div className="mt-4 text-center">
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Promedio de Risk Score: <span className="font-bold">{riskData.promedioRiskScore.toFixed(1)}</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Factores de Riesgo */}
+                                            <div>
+                                                <h4 className="text-lg font-semibold mb-4">Factores de Riesgo Identificados</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                    <Card>
+                                                        <CardContent className="p-4">
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <p className="text-sm font-medium">Promedio Bajo</p>
+                                                                    <p className="text-2xl font-bold">{riskData.factoresAnalisis.promedio_bajo}</p>
+                                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                                        {riskData.totalEstudiantes > 0 ? ((riskData.factoresAnalisis.promedio_bajo / riskData.totalEstudiantes) * 100).toFixed(1) : 0}% de estudiantes
+                                                                    </p>
+                                                                </div>
+                                                                <AlertTriangle className="h-8 w-8 text-orange-500 opacity-60" />
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                    <Card>
+                                                        <CardContent className="p-4">
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <p className="text-sm font-medium">Asistencia Crítica</p>
+                                                                    <p className="text-2xl font-bold">{riskData.factoresAnalisis.asistencia_critica}</p>
+                                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                                        {riskData.totalEstudiantes > 0 ? ((riskData.factoresAnalisis.asistencia_critica / riskData.totalEstudiantes) * 100).toFixed(1) : 0}% de estudiantes
+                                                                    </p>
+                                                                </div>
+                                                                <AlertCircle className="h-8 w-8 text-red-500 opacity-60" />
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                    <Card>
+                                                        <CardContent className="p-4">
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <p className="text-sm font-medium">Evaluaciones Reprobadas</p>
+                                                                    <p className="text-2xl font-bold">{riskData.factoresAnalisis.evaluaciones_reprobadas}</p>
+                                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                                        {riskData.totalEstudiantes > 0 ? ((riskData.factoresAnalisis.evaluaciones_reprobadas / riskData.totalEstudiantes) * 100).toFixed(1) : 0}% de estudiantes
+                                                                    </p>
+                                                                </div>
+                                                                <XCircle className="h-8 w-8 text-destructive opacity-60" />
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                    <Card>
+                                                        <CardContent className="p-4">
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <p className="text-sm font-medium">Asistencia Baja</p>
+                                                                    <p className="text-2xl font-bold">{riskData.factoresAnalisis.asistencia_baja}</p>
+                                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                                        {riskData.totalEstudiantes > 0 ? ((riskData.factoresAnalisis.asistencia_baja / riskData.totalEstudiantes) * 100).toFixed(1) : 0}% de estudiantes
+                                                                    </p>
+                                                                </div>
+                                                                <AlertCircle className="h-8 w-8 text-yellow-500 opacity-60" />
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                    <Card>
+                                                        <CardContent className="p-4">
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <p className="text-sm font-medium">Estados Emocionales Negativos</p>
+                                                                    <p className="text-2xl font-bold">{riskData.factoresAnalisis.estados_negativos}</p>
+                                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                                        {riskData.totalEstudiantes > 0 ? ((riskData.factoresAnalisis.estados_negativos / riskData.totalEstudiantes) * 100).toFixed(1) : 0}% de estudiantes
+                                                                    </p>
+                                                                </div>
+                                                                <Heart className="h-8 w-8 text-purple-500 opacity-60" />
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                    <Card>
+                                                        <CardContent className="p-4">
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <p className="text-sm font-medium">Baja Independencia</p>
+                                                                    <p className="text-2xl font-bold">{riskData.factoresAnalisis.baja_independencia}</p>
+                                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                                        {riskData.totalEstudiantes > 0 ? ((riskData.factoresAnalisis.baja_independencia / riskData.totalEstudiantes) * 100).toFixed(1) : 0}% de estudiantes
+                                                                    </p>
+                                                                </div>
+                                                                <UserMinus className="h-8 w-8 text-blue-500 opacity-60" />
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Estudiantes en Riesgo */}
+                                            <div>
+                                                <h4 className="text-lg font-semibold mb-4">
+                                                    Estudiantes en Riesgo (Score ≥ 60) - {riskData.estudiantesEnRiesgo.length} estudiantes
+                                                </h4>
+                                                {riskData.estudiantesEnRiesgo.length > 0 ? (
+                                                    <div className="overflow-x-auto border rounded-lg">
+                                                        <table className="min-w-full divide-y divide-border">
+                                                            <thead className="bg-muted">
+                                                                <tr>
+                                                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Estudiante</th>
+                                                                    <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Risk Score</th>
+                                                                    <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Nivel de Riesgo</th>
+                                                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Factores Identificados</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="bg-background divide-y divide-border">
+                                                                {riskData.estudiantesEnRiesgo.map((est: any, idx: number) => {
+                                                                    const getRiskColor = (score: number) => {
+                                                                        if (score >= 80) return 'bg-red-500';
+                                                                        if (score >= 60) return 'bg-orange-500';
+                                                                        return 'bg-yellow-500';
+                                                                    };
+                                                                    
+                                                                    const factoresList = Object.entries(est.factores || {})
+                                                                        .filter(([key, value]) => {
+                                                                            if (key === 'promedio_bajo' || key === 'asistencia_critica' || 
+                                                                                key === 'asistencia_baja' || key === 'estados_negativos' || 
+                                                                                key === 'baja_independencia') {
+                                                                                return value === true;
+                                                                            }
+                                                                            if (key === 'evaluaciones_reprobadas') {
+                                                                                return (value as number) > 0;
+                                                                            }
+                                                                            return false;
+                                                                        })
+                                                                        .map(([key]) => {
+                                                                            const nombres: Record<string, string> = {
+                                                                                promedio_bajo: 'Promedio Bajo',
+                                                                                asistencia_critica: 'Asistencia Crítica',
+                                                                                asistencia_baja: 'Asistencia Baja',
+                                                                                evaluaciones_reprobadas: 'Evaluaciones Reprobadas',
+                                                                                estados_negativos: 'Estados Emocionales Negativos',
+                                                                                baja_independencia: 'Baja Independencia'
+                                                                            };
+                                                                            return nombres[key] || key;
+                                                                        });
+                                                                    
+                                                                    return (
+                                                                        <tr key={idx} className="hover:bg-muted/50">
+                                                                            <td className="px-4 py-2 text-sm font-medium">{est.nombre}</td>
+                                                                            <td className="px-4 py-2 text-center">
+                                                                                <Badge 
+                                                                                    variant="destructive" 
+                                                                                    className={getRiskColor(est.riskScore)}
+                                                                                >
+                                                                                    {est.riskScore.toFixed(1)}
+                                                                                </Badge>
+                                                                            </td>
+                                                                            <td className="px-4 py-2 text-center">
+                                                                                <Badge variant="outline">{est.riskLevel}</Badge>
+                                                                            </td>
+                                                                            <td className="px-4 py-2">
+                                                                                <div className="flex flex-wrap gap-1">
+                                                                                    {factoresList.map((factor, fIdx) => (
+                                                                                        <Badge key={fIdx} variant="secondary" className="text-xs">
+                                                                                            {factor}
+                                                                                        </Badge>
+                                                                                    ))}
+                                                                                    {factoresList.length === 0 && (
+                                                                                        <span className="text-xs text-muted-foreground">Sin factores específicos</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                ) : (
+                                                    <Alert>
+                                                        <AlertDescription>
+                                                            No se identificaron estudiantes en riesgo para este grado y lapso.
+                                                        </AlertDescription>
+                                                    </Alert>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+                        
+                        {/* EFICACIA PEDAGÓGICA */}
+                        {eficaciaData && progressFilters.grado && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>📊 Eficacia Pedagógica</CardTitle>
+                                    <p className="text-sm text-muted-foreground mt-2">
+                                        Análisis del impacto y retorno de inversión de las intervenciones pedagógicas realizadas
+                                    </p>
+                                </CardHeader>
+                                <CardContent>
+                                    {isLoadingEficacia ? (
+                                        <div className="flex items-center justify-center p-6">
+                                            <Skeleton className="h-8 w-8 rounded-full mr-3" />
+                                            <span>Cargando datos de eficacia...</span>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-6">
+                                            {/* Métricas de Eficacia */}
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                <Card className="bg-green-50 dark:bg-green-950">
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">Tasa de Éxito</p>
+                                                        <p className="text-2xl font-bold text-green-600">{eficaciaData.tasaExito}%</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            {eficaciaData.intervencionesResueltas} de {eficaciaData.totalIntervenciones} resueltas
+                                                        </p>
+                                                    </CardContent>
+                                                </Card>
+                                                <Card className="bg-blue-50 dark:bg-blue-950">
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">En Proceso</p>
+                                                        <p className="text-2xl font-bold text-blue-600">{eficaciaData.intervencionesEnProceso}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            Intervenciones activas
+                                                        </p>
+                                                    </CardContent>
+                                                </Card>
+                                                <Card className="bg-orange-50 dark:bg-orange-950">
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">Ineficaces</p>
+                                                        <p className="text-2xl font-bold text-orange-600">{eficaciaData.intervencionesIneficaces}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            Requieren revisión
+                                                        </p>
+                                                    </CardContent>
+                                                </Card>
+                                                <Card className="bg-purple-50 dark:bg-purple-950">
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">ROI Pedagógico</p>
+                                                        <p className="text-2xl font-bold text-purple-600">{eficaciaData.roi}%</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            Retorno por intervención
+                                                        </p>
+                                                    </CardContent>
+                                                </Card>
+                                            </div>
+                                            
+                                            {/* Tasa de Éxito de Intervenciones */}
+                                            <div>
+                                                <h4 className="text-lg font-semibold mb-4">Tasa de Éxito de Intervenciones</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <Card>
+                                                        <CardContent className="p-6">
+                                                            <ResponsiveContainer width="100%" height={250}>
+                                                                <BarChart data={[
+                                                                    { name: 'Resueltas', value: eficaciaData.intervencionesResueltas, color: '#22c55e' },
+                                                                    { name: 'En Proceso', value: eficaciaData.intervencionesEnProceso, color: '#3b82f6' },
+                                                                    { name: 'Ineficaces', value: eficaciaData.intervencionesIneficaces, color: '#f97316' }
+                                                                ]}>
+                                                                    <CartesianGrid strokeDasharray="3 3" />
+                                                                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                                                                    <YAxis tick={{ fontSize: 12 }} />
+                                                                    <RechartsTooltip />
+                                                                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                                                        {[
+                                                                            { name: 'Resueltas', value: eficaciaData.intervencionesResueltas, color: '#22c55e' },
+                                                                            { name: 'En Proceso', value: eficaciaData.intervencionesEnProceso, color: '#3b82f6' },
+                                                                            { name: 'Ineficaces', value: eficaciaData.intervencionesIneficaces, color: '#f97316' }
+                                                                        ].map((entry, index) => (
+                                                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                                                        ))}
+                                                                    </Bar>
+                                                                </BarChart>
+                                                            </ResponsiveContainer>
+                                                        </CardContent>
+                                                    </Card>
+                                                    <Card>
+                                                        <CardContent className="p-6">
+                                                            <div className="space-y-4">
+                                                                <div>
+                                                                    <div className="flex justify-between items-center mb-2">
+                                                                        <span className="text-sm font-medium">Resueltas</span>
+                                                                        <span className="text-sm font-bold text-green-600">
+                                                                            {eficaciaData.intervencionesResueltas} ({eficaciaData.totalIntervenciones > 0 ? ((eficaciaData.intervencionesResueltas / eficaciaData.totalIntervenciones) * 100).toFixed(1) : 0}%)
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="w-full bg-muted rounded-full h-2">
+                                                                        <div 
+                                                                            className="bg-green-500 h-2 rounded-full" 
+                                                                            style={{ width: `${eficaciaData.totalIntervenciones > 0 ? (eficaciaData.intervencionesResueltas / eficaciaData.totalIntervenciones) * 100 : 0}%` }}
+                                                                        ></div>
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex justify-between items-center mb-2">
+                                                                        <span className="text-sm font-medium">En Proceso</span>
+                                                                        <span className="text-sm font-bold text-blue-600">
+                                                                            {eficaciaData.intervencionesEnProceso} ({eficaciaData.totalIntervenciones > 0 ? ((eficaciaData.intervencionesEnProceso / eficaciaData.totalIntervenciones) * 100).toFixed(1) : 0}%)
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="w-full bg-muted rounded-full h-2">
+                                                                        <div 
+                                                                            className="bg-blue-500 h-2 rounded-full" 
+                                                                            style={{ width: `${eficaciaData.totalIntervenciones > 0 ? (eficaciaData.intervencionesEnProceso / eficaciaData.totalIntervenciones) * 100 : 0}%` }}
+                                                                        ></div>
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex justify-between items-center mb-2">
+                                                                        <span className="text-sm font-medium">Ineficaces</span>
+                                                                        <span className="text-sm font-bold text-orange-600">
+                                                                            {eficaciaData.intervencionesIneficaces} ({eficaciaData.totalIntervenciones > 0 ? ((eficaciaData.intervencionesIneficaces / eficaciaData.totalIntervenciones) * 100).toFixed(1) : 0}%)
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="w-full bg-muted rounded-full h-2">
+                                                                        <div 
+                                                                            className="bg-orange-500 h-2 rounded-full" 
+                                                                            style={{ width: `${eficaciaData.totalIntervenciones > 0 ? (eficaciaData.intervencionesIneficaces / eficaciaData.totalIntervenciones) * 100 : 0}%` }}
+                                                                        ></div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Timeline de Acciones */}
+                                            <div>
+                                                <h4 className="text-lg font-semibold mb-4">Timeline de Acciones Pedagógicas</h4>
+                                                {eficaciaData.timelineAcciones.length > 0 ? (
+                                                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                                                        {eficaciaData.timelineAcciones.map((accion: any, idx: number) => (
+                                                            <Card key={idx} className="border-l-4 border-l-blue-500">
+                                                                <CardContent className="p-4">
+                                                                    <div className="flex justify-between items-start mb-2">
+                                                                        <div>
+                                                                            <p className="font-semibold text-sm">{accion.evaluacion} - {accion.materia}</p>
+                                                                            <p className="text-xs text-muted-foreground">
+                                                                                {accion.fecha.toLocaleDateString('es-ES', { 
+                                                                                    year: 'numeric', 
+                                                                                    month: 'short', 
+                                                                                    day: 'numeric',
+                                                                                    hour: '2-digit',
+                                                                                    minute: '2-digit'
+                                                                                })}
+                                                                            </p>
+                                                                        </div>
+                                                                        <Badge variant="outline">{accion.totalEstudiantes} estudiantes</Badge>
+                                                                    </div>
+                                                                    <div className="mt-2">
+                                                                        <p className="text-sm font-medium mb-1">Acciones Sugeridas:</p>
+                                                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{accion.accionesSugeridas}</p>
+                                                                    </div>
+                                                                </CardContent>
+                                                            </Card>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <Alert>
+                                                        <AlertDescription>
+                                                            No se encontraron acciones pedagógicas registradas para este período.
+                                                        </AlertDescription>
+                                                    </Alert>
+                                                )}
+                                            </div>
+                                            
+                                            {/* ROI Pedagógico */}
+                                            <div>
+                                                <h4 className="text-lg font-semibold mb-4">ROI Pedagógico (Retorno de Inversión)</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                    <Card>
+                                                        <CardContent className="p-4">
+                                                            <p className="text-xs text-muted-foreground mb-1">Inversión Total</p>
+                                                            <p className="text-2xl font-bold">{eficaciaData.totalInversion}</p>
+                                                            <p className="text-xs text-muted-foreground mt-1">Intervenciones realizadas</p>
+                                                        </CardContent>
+                                                    </Card>
+                                                    <Card>
+                                                        <CardContent className="p-4">
+                                                            <p className="text-xs text-muted-foreground mb-1">Retorno Total</p>
+                                                            <p className="text-2xl font-bold text-green-600">+{eficaciaData.totalMejora}</p>
+                                                            <p className="text-xs text-muted-foreground mt-1">
+                                                                Mejora promedio: {eficaciaData.promedioMejora} puntos
+                                                            </p>
+                                                        </CardContent>
+                                                    </Card>
+                                                    <Card>
+                                                        <CardContent className="p-4">
+                                                            <p className="text-xs text-muted-foreground mb-1">Estudiantes con Mejora</p>
+                                                            <p className="text-2xl font-bold text-blue-600">{eficaciaData.estudiantesConMejora}</p>
+                                                            <p className="text-xs text-muted-foreground mt-1">
+                                                                De {eficaciaData.intervencionesPorEstudiante.length} estudiantes
+                                                            </p>
+                                                        </CardContent>
+                                                    </Card>
+                                                </div>
+                                                
+                                                {/* Tabla de Estudiantes con Intervenciones */}
+                                                {eficaciaData.intervencionesPorEstudiante.length > 0 && (
+                                                    <div className="mt-4">
+                                                        <h5 className="text-md font-semibold mb-3">Impacto por Estudiante</h5>
+                                                        <div className="overflow-x-auto border rounded-lg">
+                                                            <table className="min-w-full divide-y divide-border">
+                                                                <thead className="bg-muted">
+                                                                    <tr>
+                                                                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Estudiante</th>
+                                                                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Intervenciones</th>
+                                                                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Resueltas</th>
+                                                                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">En Proceso</th>
+                                                                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Ineficaces</th>
+                                                                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Mejora</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="bg-background divide-y divide-border">
+                                                                    {eficaciaData.intervencionesPorEstudiante
+                                                                        .sort((a, b) => b.mejoras - a.mejoras)
+                                                                        .slice(0, 10)
+                                                                        .map((est: any, idx: number) => (
+                                                                        <tr key={idx} className="hover:bg-muted/50">
+                                                                            <td className="px-4 py-2 text-sm font-medium">{est.estudiante}</td>
+                                                                            <td className="px-4 py-2 text-center">{est.intervenciones}</td>
+                                                                            <td className="px-4 py-2 text-center">
+                                                                                <Badge variant="default" className="bg-green-500">{est.resueltas}</Badge>
+                                                                            </td>
+                                                                            <td className="px-4 py-2 text-center">
+                                                                                <Badge variant="default" className="bg-blue-500">{est.enProceso}</Badge>
+                                                                            </td>
+                                                                            <td className="px-4 py-2 text-center">
+                                                                                <Badge variant="destructive">{est.ineficaces}</Badge>
+                                                                            </td>
+                                                                            <td className="px-4 py-2 text-center">
+                                                                                <Badge variant={est.mejoras > 0 ? 'default' : est.mejoras < 0 ? 'destructive' : 'secondary'}>
+                                                                                    {est.mejoras > 0 ? '+' : ''}{est.mejoras.toFixed(2)}
+                                                                                </Badge>
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                        {eficaciaData.intervencionesPorEstudiante.length > 10 && (
+                                                            <p className="text-sm text-muted-foreground mt-2 text-center">
+                                                                Mostrando 10 de {eficaciaData.intervencionesPorEstudiante.length} estudiantes
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+                        
+                        {/* COMPETENCIAS E INDICADORES */}
+                        {competenciasData && progressFilters.grado && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>🎯 Competencias e Indicadores</CardTitle>
+                                    <p className="text-sm text-muted-foreground mt-2">
+                                        Análisis detallado del desempeño por competencias e indicadores de logro
+                                    </p>
+                                </CardHeader>
+                                <CardContent>
+                                    {isLoadingCompetencias ? (
+                                        <div className="flex items-center justify-center p-6">
+                                            <Skeleton className="h-8 w-8 rounded-full mr-3" />
+                                            <span>Cargando datos de competencias...</span>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-6">
+                                            {/* Resumen */}
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <Card>
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">Total Competencias</p>
+                                                        <p className="text-2xl font-bold">{competenciasData.totalCompetencias}</p>
+                                                    </CardContent>
+                                                </Card>
+                                                <Card>
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">Total Indicadores</p>
+                                                        <p className="text-2xl font-bold">{competenciasData.totalIndicadores}</p>
+                                                    </CardContent>
+                                                </Card>
+                                                <Card>
+                                                    <CardContent className="p-4">
+                                                        <p className="text-xs text-muted-foreground mb-1">Fortalezas Identificadas</p>
+                                                        <p className="text-2xl font-bold text-green-600">{competenciasData.fortalezas.length}</p>
+                                                    </CardContent>
+                                                </Card>
+                                            </div>
+                                            
+                                            {/* Fortalezas y Debilidades */}
+                                            <div>
+                                                <h4 className="text-lg font-semibold mb-4">Fortalezas y Debilidades</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {/* Fortalezas */}
+                                                    <Card className="border-green-500 border-2">
+                                                        <CardHeader>
+                                                            <CardTitle className="text-green-600">✅ Fortalezas</CardTitle>
+                                                            <p className="text-sm text-muted-foreground">Competencias con promedio ≥ 4.0</p>
+                                                        </CardHeader>
+                                                        <CardContent>
+                                                            {competenciasData.fortalezas.length > 0 ? (
+                                                                <div className="space-y-3">
+                                                                    {competenciasData.fortalezas.slice(0, 5).map((fortaleza: any, idx: number) => (
+                                                                        <div key={idx} className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+                                                                            <div className="flex-1">
+                                                                                <p className="font-medium text-sm">{fortaleza.competencia.descripcion}</p>
+                                                                                <p className="text-xs text-muted-foreground">
+                                                                                    {fortaleza.indicadores.length} indicadores
+                                                                                </p>
+                                                                            </div>
+                                                                            <Badge variant="default" className="bg-green-500">
+                                                                                {fortaleza.promedioGeneral.toFixed(2)}
+                                                                            </Badge>
+                                                                        </div>
+                                                                    ))}
+                                                                    {competenciasData.fortalezas.length > 5 && (
+                                                                        <p className="text-xs text-muted-foreground text-center">
+                                                                            Y {competenciasData.fortalezas.length - 5} más...
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <Alert>
+                                                                    <AlertDescription>
+                                                                        No se identificaron fortalezas en este período.
+                                                                    </AlertDescription>
+                                                                </Alert>
+                                                            )}
+                                                        </CardContent>
+                                                    </Card>
+                                                    
+                                                    {/* Debilidades */}
+                                                    <Card className="border-red-500 border-2">
+                                                        <CardHeader>
+                                                            <CardTitle className="text-red-600">⚠️ Debilidades</CardTitle>
+                                                            <p className="text-sm text-muted-foreground">Competencias con promedio &lt; 3.0</p>
+                                                        </CardHeader>
+                                                        <CardContent>
+                                                            {competenciasData.debilidades.length > 0 ? (
+                                                                <div className="space-y-3">
+                                                                    {competenciasData.debilidades.slice(0, 5).map((debilidad: any, idx: number) => (
+                                                                        <div key={idx} className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+                                                                            <div className="flex-1">
+                                                                                <p className="font-medium text-sm">{debilidad.competencia.descripcion}</p>
+                                                                                <p className="text-xs text-muted-foreground">
+                                                                                    {debilidad.indicadores.length} indicadores
+                                                                                </p>
+                                                                            </div>
+                                                                            <Badge variant="destructive">
+                                                                                {debilidad.promedioGeneral.toFixed(2)}
+                                                                            </Badge>
+                                                                        </div>
+                                                                    ))}
+                                                                    {competenciasData.debilidades.length > 5 && (
+                                                                        <p className="text-xs text-muted-foreground text-center">
+                                                                            Y {competenciasData.debilidades.length - 5} más...
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <Alert>
+                                                                    <AlertDescription>
+                                                                        No se identificaron debilidades críticas en este período.
+                                                                    </AlertDescription>
+                                                                </Alert>
+                                                            )}
+                                                        </CardContent>
+                                                    </Card>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Heatmap de Competencias */}
+                                            <div>
+                                                <h4 className="text-lg font-semibold mb-4">Heatmap de Competencias</h4>
+                                                {competenciasData.heatmapData.length > 0 ? (
+                                                    <div className="overflow-x-auto border rounded-lg">
+                                                        <table className="min-w-full">
+                                                            <thead className="bg-muted">
+                                                                <tr>
+                                                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase sticky left-0 bg-muted z-10">
+                                                                        Competencia
+                                                                    </th>
+                                                                    {Array.from(new Set(competenciasData.heatmapData.map((h: any) => h.estudiante)))
+                                                                        .slice(0, 10)
+                                                                        .map((estudiante: string) => (
+                                                                            <th key={estudiante} className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase min-w-[100px]">
+                                                                                {estudiante.split(',')[0]}
+                                                                            </th>
+                                                                        ))}
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="bg-background">
+                                                                {Array.from(new Set(competenciasData.heatmapData.map((h: any) => h.competencia)))
+                                                                    .map((competencia: string) => {
+                                                                        const estudiantes = Array.from(new Set(competenciasData.heatmapData.map((h: any) => h.estudiante))).slice(0, 10);
+                                                                        return (
+                                                                            <tr key={competencia} className="border-t">
+                                                                                <td className="px-4 py-2 text-sm font-medium sticky left-0 bg-background z-10">
+                                                                                    {competencia.length > 40 ? competencia.substring(0, 40) + '...' : competencia}
+                                                                                </td>
+                                                                                {estudiantes.map((estudiante: string) => {
+                                                                                    const data = competenciasData.heatmapData.find((h: any) => 
+                                                                                        h.competencia === competencia && h.estudiante === estudiante
+                                                                                    );
+                                                                                    const nivel = data?.nivel || 0;
+                                                                                    const getColor = (nivel: number) => {
+                                                                                        if (nivel >= 4.5) return 'bg-green-600';
+                                                                                        if (nivel >= 3.5) return 'bg-green-400';
+                                                                                        if (nivel >= 2.5) return 'bg-yellow-400';
+                                                                                        if (nivel >= 1.5) return 'bg-orange-400';
+                                                                                        if (nivel > 0) return 'bg-red-400';
+                                                                                        return 'bg-gray-200';
+                                                                                    };
+                                                                                    return (
+                                                                                        <td key={estudiante} className="px-2 py-2 text-center">
+                                                                                            <div 
+                                                                                                className={`w-full h-8 rounded ${getColor(nivel)} flex items-center justify-center text-white text-xs font-bold`}
+                                                                                                title={`${competencia} - ${estudiante}: ${nivel.toFixed(2)}`}
+                                                                                            >
+                                                                                                {nivel > 0 ? nivel.toFixed(1) : '-'}
+                                                                                            </div>
+                                                                                        </td>
+                                                                                    );
+                                                                                })}
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                            </tbody>
+                                                        </table>
+                                                        <div className="p-4 bg-muted">
+                                                            <div className="flex items-center justify-between text-xs">
+                                                                <span className="font-medium">Leyenda:</span>
+                                                                <div className="flex gap-2">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <div className="w-4 h-4 bg-green-600 rounded"></div>
+                                                                        <span>4.5-5.0</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <div className="w-4 h-4 bg-green-400 rounded"></div>
+                                                                        <span>3.5-4.4</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <div className="w-4 h-4 bg-yellow-400 rounded"></div>
+                                                                        <span>2.5-3.4</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <div className="w-4 h-4 bg-orange-400 rounded"></div>
+                                                                        <span>1.5-2.4</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <div className="w-4 h-4 bg-red-400 rounded"></div>
+                                                                        <span>1.0-1.4</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                                                                        <span>Sin datos</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <Alert>
+                                                        <AlertDescription>
+                                                            No hay datos de competencias disponibles para generar el heatmap.
+                                                        </AlertDescription>
+                                                    </Alert>
+                                                )}
+                                            </div>
+                                            
+                                            {/* Progreso por Competencia */}
+                                            <div>
+                                                <h4 className="text-lg font-semibold mb-4">Progreso por Competencia</h4>
+                                                {competenciasData.progresoPorCompetencia.length > 0 ? (
+                                                    <div className="space-y-4">
+                                                        {competenciasData.progresoPorCompetencia.slice(0, 5).map((comp: any, idx: number) => (
+                                                            <Card key={idx}>
+                                                                <CardHeader>
+                                                                    <CardTitle className="text-sm">{comp.competencia}</CardTitle>
+                                                                </CardHeader>
+                                                                <CardContent>
+                                                                    <ResponsiveContainer width="100%" height={200}>
+                                                                        <LineChart data={comp.progreso}>
+                                                                            <CartesianGrid strokeDasharray="3 3" />
+                                                                            <XAxis 
+                                                                                dataKey="evaluacion" 
+                                                                                tick={{ fontSize: 10 }}
+                                                                                angle={-45}
+                                                                                textAnchor="end"
+                                                                                height={60}
+                                                                            />
+                                                                            <YAxis 
+                                                                                domain={[0, 5]}
+                                                                                tick={{ fontSize: 10 }}
+                                                                                label={{ value: 'Nivel de Logro', angle: -90, position: 'insideLeft' }}
+                                                                            />
+                                                                            <RechartsTooltip />
+                                                                            <Line 
+                                                                                type="monotone" 
+                                                                                dataKey="promedio" 
+                                                                                stroke="#3b82f6" 
+                                                                                strokeWidth={2}
+                                                                                dot={{ r: 4 }}
+                                                                                name="Promedio"
+                                                                            />
+                                                                        </LineChart>
+                                                                    </ResponsiveContainer>
+                                                                </CardContent>
+                                                            </Card>
+                                                        ))}
+                                                        {competenciasData.progresoPorCompetencia.length > 5 && (
+                                                            <p className="text-sm text-muted-foreground text-center">
+                                                                Mostrando 5 de {competenciasData.progresoPorCompetencia.length} competencias
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <Alert>
+                                                        <AlertDescription>
+                                                            No hay datos suficientes para mostrar el progreso por competencia.
+                                                        </AlertDescription>
+                                                    </Alert>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+                    </>
+                )}
+            </div>
+        );
+        } catch (error) {
+            console.error('❌ Error in renderProgressView:', error);
+            console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+            return (
+                <Card>
+                    <CardContent className="p-6">
+                        <Alert variant="destructive">
+                            <AlertTitle>Error al cargar el dashboard de progreso</AlertTitle>
+                            <AlertDescription>
+                                Ocurrió un error al renderizar el dashboard. Por favor, recarga la página o contacta al administrador.
+                                <br />
+                                <span className="text-xs mt-2 block">Error: {error instanceof Error ? error.message : String(error)}</span>
+                                <br />
+                                <span className="text-xs mt-2 block">Abre la consola del navegador (F12) para ver más detalles.</span>
+                            </AlertDescription>
+                        </Alert>
+                    </CardContent>
+                </Card>
+            );
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -10532,8 +13129,17 @@ const EvaluationView: React.FC<{
                 >
                     Historial de Reuniones
                 </Button>
+                <Button
+                    variant={viewMode === 'progress' ? 'default' : 'ghost'}
+                    onClick={() => { setViewMode('progress'); setSelectedMinuta(null); }}
+                    className={`rounded-none border-b-2 ${viewMode === 'progress' ? 'border-primary' : 'border-transparent'}`}
+                >
+                    Progreso del Lapso
+                </Button>
             </div>
-            {viewMode === 'new' ? renderNewMeetingForm() : renderHistoryView()}
+            {viewMode === 'new' ? renderNewMeetingForm() : 
+             viewMode === 'history' ? renderHistoryView() : 
+             renderProgressView()}
         </div>
     );
 };
@@ -10542,6 +13148,8 @@ const EvaluationView: React.FC<{
 // --- MAIN APP COMPONENT ---
 
 const App: React.FC = () => {
+    const { showToast } = useToast();
+    
     // Usuario por defecto sin requerir login
     const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
     const [showLogin, setShowLogin] = useState(true);
@@ -10580,7 +13188,19 @@ const App: React.FC = () => {
     const [isStudentModalOpen, setStudentModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState<Alumno | null>(null);
     const [navParams, setNavParams] = useState<any>(null);
-
+    
+    // Estados para confirmaciones
+    const [confirmDeleteStudent, setConfirmDeleteStudent] = useState<{ open: boolean; studentId: string | null }>({ open: false, studentId: null });
+    
+    // Estado para ayuda de atajos de teclado
+    const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+    
+    // Estado para paleta de comandos (Cmd+K)
+    const [showCommandPalette, setShowCommandPalette] = useState(false);
+    
+    // Estado para preferencias de usuario
+    const [showPreferences, setShowPreferences] = useState(false);
+    
     // Helper function to convert DB types to App types
     const convertAlumno = (db: AlumnoDB): Alumno => {
         const { created_at, updated_at, ...alumno } = db;
@@ -11071,6 +13691,28 @@ const App: React.FC = () => {
         setActiveView(view);
         setNavParams(params);
     };
+    
+    // Atajos de teclado globales
+    useGlobalShortcuts(handleNavigate);
+    
+    // Atajo para mostrar ayuda (Shift + ?)
+    useKeyboardShortcuts(
+        [
+            {
+                key: '?',
+                shift: true,
+                action: () => setShowShortcutsHelp(true),
+                description: 'Mostrar ayuda de atajos',
+            },
+            {
+                key: 'k',
+                ctrl: true,
+                action: () => setShowCommandPalette(true),
+                description: 'Abrir búsqueda global',
+            },
+        ],
+        true
+    );
 
     const handleNotificationClick = async (notification: Notification) => {
         try {
@@ -11102,29 +13744,60 @@ const App: React.FC = () => {
                 const dbData = convertAlumnoToDB(studentData);
                 const updated = await alumnosService.update(studentData.id_alumno, dbData);
                 setAlumnos(prev => prev.map(s => s.id_alumno === updated.id_alumno ? convertAlumno(updated) : s));
+                showToast({
+                    type: 'success',
+                    title: 'Alumno actualizado',
+                    message: `${studentData.nombres} ${studentData.apellidos} ha sido actualizado correctamente`,
+                });
             } else {
                 // Create new student
                 const { id_alumno, ...newStudent } = studentData;
                 const dbData = convertAlumnoToDB(newStudent as Alumno);
                 const created = await alumnosService.create(dbData);
                 setAlumnos(prev => [...prev, convertAlumno(created)]);
+                showToast({
+                    type: 'success',
+                    title: 'Alumno creado',
+                    message: `${studentData.nombres} ${studentData.apellidos} ha sido agregado correctamente`,
+                });
             }
             handleCloseStudentModal();
         } catch (error: any) {
             console.error('Error saving student:', error);
-            alert('Error al guardar el alumno: ' + (error.message || 'Error desconocido'));
+            showToast({
+                type: 'error',
+                title: 'Error al guardar',
+                message: error.message || 'No se pudo guardar el alumno. Por favor, inténtalo de nuevo.',
+            });
         }
     };
 
     const handleDeleteStudent = async (studentId: string) => {
-        if (window.confirm('¿Está seguro de que desea eliminar a este alumno?')) {
-            try {
-                await alumnosService.delete(studentId);
-                setAlumnos(prev => prev.filter(s => s.id_alumno !== studentId));
-            } catch (error: any) {
-                console.error('Error deleting student:', error);
-                alert('Error al eliminar el alumno: ' + (error.message || 'Error desconocido'));
-            }
+        setConfirmDeleteStudent({ open: true, studentId });
+    };
+
+    const confirmDeleteStudentAction = async () => {
+        if (!confirmDeleteStudent.studentId) return;
+        
+        const student = alumnos.find(s => s.id_alumno === confirmDeleteStudent.studentId);
+        const studentName = student ? `${student.nombres} ${student.apellidos}` : 'este alumno';
+        
+        try {
+            await alumnosService.delete(confirmDeleteStudent.studentId);
+            setAlumnos(prev => prev.filter(s => s.id_alumno !== confirmDeleteStudent.studentId));
+            setConfirmDeleteStudent({ open: false, studentId: null });
+            showToast({
+                type: 'success',
+                title: 'Alumno eliminado',
+                message: `${studentName} ha sido eliminado correctamente`,
+            });
+        } catch (error: any) {
+            console.error('Error deleting student:', error);
+            showToast({
+                type: 'error',
+                title: 'Error al eliminar',
+                message: error.message || 'No se pudo eliminar el alumno. Por favor, inténtalo de nuevo.',
+            });
         }
     };
 
@@ -11186,15 +13859,6 @@ const App: React.FC = () => {
                 );
             case 'lapsos-admin':
                 return <LapsosAdminView currentUser={currentUser!} />;
-            case 'intelligence':
-                return (
-                    <IntelligenceDashboard
-                        availableGrados={GRADOS}
-                        availableMaterias={Object.values(ASIGNATURAS_POR_NIVEL).flat()}
-                        currentAnoEscolar="2024-2025"
-                        currentLapso="I Lapso"
-                    />
-                );
             default:
                 return <div className="bg-white p-6 rounded-lg shadow-md"><h2>Vista no implementada</h2><p>La funcionalidad para "{activeView}" estará disponible próximamente.</p></div>;
         }
@@ -11212,15 +13876,40 @@ const App: React.FC = () => {
         evaluation: 'Seguimiento Pedagógico',
         'authorized-users': 'Gestión de Usuarios',
         'lapsos-admin': 'Gestión de Lapsos',
-        intelligence: 'Intelligence Suite',
+    };
+
+    const getBreadcrumbs = () => {
+        const items = [
+            { label: 'Inicio', onClick: () => handleNavigate('dashboard'), icon: Home },
+        ];
+
+        if (activeView !== 'dashboard') {
+            if (activeView === 'students' && selectedStudent) {
+                items.push(
+                    { label: 'Alumnos', onClick: () => { handleNavigate('students'); setSelectedStudent(null); } },
+                    { label: selectedStudent.nombres }
+                );
+            } else {
+                items.push({ label: viewTitles[activeView] || activeView });
+            }
+        }
+
+        return items;
     };
 
     // Show login screen if no user is logged in
     if (!currentUser || showLogin) {
         return (
             <Suspense fallback={
-                <div className="flex h-screen bg-background items-center justify-center">
-                    <Skeleton className="h-12 w-12 mx-auto rounded-full" />
+                <div className="flex h-screen bg-gradient-to-br from-manglar-orange-light via-background to-manglar-green-light items-center justify-center">
+                    <div className="text-center space-y-4">
+                        <div className="flex justify-center">
+                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-manglar-orange to-manglar-green flex items-center justify-center shadow-lg animate-pulse">
+                                <span className="text-white font-bold text-2xl">M</span>
+                            </div>
+                        </div>
+                        <LoadingSpinner size="md" />
+                    </div>
                 </div>
             }>
                 <LoginScreen onLoginSuccess={handleLoginSuccess} />
@@ -11230,11 +13919,22 @@ const App: React.FC = () => {
 
     if (isLoadingData) {
         return (
-            <div className="flex h-screen bg-background items-center justify-center">
-                <div className="text-center space-y-4 w-full max-w-md px-4">
-                    <Skeleton className="h-12 w-12 mx-auto rounded-full" />
-                    <Skeleton className="h-4 w-32 mx-auto" />
-                    <Skeleton className="h-4 w-48 mx-auto" />
+            <div className="flex h-screen bg-gradient-to-br from-manglar-orange-light via-background to-manglar-green-light items-center justify-center">
+                <div className="text-center space-y-6 w-full max-w-md px-4">
+                    <div className="flex justify-center">
+                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-manglar-orange to-manglar-green flex items-center justify-center shadow-lg">
+                            <span className="text-white font-bold text-3xl">M</span>
+                        </div>
+                    </div>
+                    <div className="space-y-3">
+                        <div className="flex justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-manglar-orange border-t-transparent"></div>
+                        </div>
+                        <div className="space-y-2">
+                            <Skeleton className="h-5 w-48 mx-auto" />
+                            <Skeleton className="h-4 w-64 mx-auto" />
+                        </div>
+                    </div>
                 </div>
             </div>
         );
@@ -11277,9 +13977,32 @@ const App: React.FC = () => {
                     onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 />
                 <div className="p-3 sm:p-4 lg:p-6 flex-1 overflow-y-auto">
+                    {/* Breadcrumbs */}
+                    {(activeView !== 'dashboard' || selectedStudent) && (
+                        <div className="mb-4 animate-slide-up">
+                            <Breadcrumbs items={getBreadcrumbs()} />
+                        </div>
+                    )}
                     {renderView()}
                 </div>
             </main>
+            
+            {/* Confirmación de eliminación de estudiante */}
+            <ConfirmDialog
+                open={confirmDeleteStudent.open}
+                onOpenChange={(open) => setConfirmDeleteStudent({ open, studentId: open ? confirmDeleteStudent.studentId : null })}
+                onConfirm={confirmDeleteStudentAction}
+                title="Eliminar Alumno"
+                description={
+                    confirmDeleteStudent.studentId
+                        ? `¿Está seguro de que desea eliminar a ${alumnos.find(s => s.id_alumno === confirmDeleteStudent.studentId)?.nombres} ${alumnos.find(s => s.id_alumno === confirmDeleteStudent.studentId)?.apellidos}? Esta acción no se puede deshacer.`
+                        : ''
+                }
+                confirmText="Eliminar"
+                cancelText="Cancelar"
+                variant="destructive"
+            />
+            
             {isStudentModalOpen && (
                 <StudentFormModal
                     student={editingStudent}
@@ -11303,6 +14026,107 @@ const App: React.FC = () => {
                     />
                 </>
             )}
+            
+            {/* Onboarding Tour */}
+            {currentUser && (
+                <OnboardingTour
+                    steps={[
+                        {
+                            id: 'welcome',
+                            title: '¡Bienvenido a ManglarNet!',
+                            description: 'Te guiaremos por las características principales de la plataforma para que puedas aprovecharla al máximo.',
+                        },
+                        {
+                            id: 'navigation',
+                            title: 'Navegación Rápida',
+                            description: (
+                                <div className="space-y-2">
+                                    <p>Usa el menú lateral para navegar entre las diferentes secciones.</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        💡 <strong>Tip:</strong> Presiona <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">Ctrl/Cmd + K</kbd> para búsqueda rápida
+                                    </p>
+                                </div>
+                            ),
+                        },
+                        {
+                            id: 'search',
+                            title: 'Búsqueda Global',
+                            description: 'Presiona Ctrl/Cmd + K para buscar estudiantes, docentes o navegar rápidamente a cualquier sección.',
+                        },
+                        {
+                            id: 'theme',
+                            title: 'Personalización',
+                            description: 'Puedes cambiar entre modo claro y oscuro usando el botón en el header. Tus preferencias se guardan automáticamente.',
+                        },
+                        {
+                            id: 'shortcuts',
+                            title: 'Atajos de Teclado',
+                            description: (
+                                <div className="space-y-2">
+                                    <p>Usa atajos de teclado para ser más productivo:</p>
+                                    <ul className="text-xs space-y-1 list-disc list-inside text-muted-foreground">
+                                        <li><kbd className="px-1 py-0.5 bg-muted rounded">Ctrl/Cmd + K</kbd> - Búsqueda global</li>
+                                        <li><kbd className="px-1 py-0.5 bg-muted rounded">Shift + ?</kbd> - Ver todos los atajos</li>
+                                        <li><kbd className="px-1 py-0.5 bg-muted rounded">/</kbd> - Buscar en vista actual</li>
+                                    </ul>
+                                </div>
+                            ),
+                        },
+                    ]}
+                    onComplete={() => {
+                        if (currentUser) {
+                            localStorage.setItem(`manglar-onboarding-${currentUser.id}`, 'true');
+                        }
+                    }}
+                    onSkip={() => {
+                        if (currentUser) {
+                            localStorage.setItem(`manglar-onboarding-${currentUser.id}`, 'true');
+                        }
+                    }}
+                    storageKey={`manglar-onboarding-${currentUser?.id || 'guest'}`}
+                />
+            )}
+            
+            {/* Diálogo de preferencias de usuario */}
+            {currentUser && (
+                <UserPreferencesDialog
+                    open={showPreferences}
+                    onOpenChange={setShowPreferences}
+                    userId={currentUser.id}
+                />
+            )}
+            
+            {/* Paleta de comandos (Cmd/Ctrl + K) */}
+            <CommandPalette
+                open={showCommandPalette}
+                onOpenChange={setShowCommandPalette}
+                onNavigate={handleNavigate}
+                students={alumnos.map(a => ({
+                    id_alumno: a.id_alumno,
+                    nombres: a.nombres,
+                    apellidos: a.apellidos,
+                    salon: a.salon,
+                }))}
+                teachers={docentes.map(d => ({
+                    id_docente: d.id_docente,
+                    nombres: d.nombres,
+                    apellidos: d.apellidos,
+                }))}
+                currentView={activeView}
+            />
+            
+            {/* Diálogo de ayuda de atajos de teclado */}
+            <KeyboardShortcutsHelp
+                open={showShortcutsHelp}
+                onOpenChange={setShowShortcutsHelp}
+                shortcuts={[
+                    { keys: ['Ctrl', 'K'], description: 'Abrir búsqueda global', category: 'Navegación' },
+                    { keys: ['Ctrl', 'N'], description: 'Ir al Dashboard', category: 'Navegación' },
+                    { keys: ['/'], description: 'Buscar en vista actual', category: 'Navegación' },
+                    { keys: ['Shift', '?'], description: 'Mostrar esta ayuda', category: 'General' },
+                    { keys: ['Esc'], description: 'Cerrar diálogos', category: 'General' },
+                ]}
+            />
         </div>
     );
 };

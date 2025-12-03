@@ -2146,3 +2146,273 @@ export const analyticsService = {
     return data[0];
   },
 };
+
+// ============================================
+// REUNIONES REPRESENTANTES (Parent Meetings)
+// ============================================
+
+export interface ReunionRepresentante {
+  id_reunion: string;
+  id_alumno: string;
+  fecha: string;
+  grado: string;
+  asistentes: string[];
+  motivo?: string;
+  inquietudes?: string;
+  acuerdos?: string;
+  creado_por?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SeguimientoAcuerdo {
+  id_seguimiento: string;
+  id_reunion: string;
+  id_alumno: string;
+  acuerdo_descripcion: string;
+  estado_cumplimiento: 'Pendiente' | 'En Proceso' | 'Cumplido' | 'No Cumplido' | 'Cancelado';
+  fecha_limite?: string;
+  fecha_cumplimiento?: string;
+  notas_seguimiento?: string;
+  creado_por?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FrecuenciaReuniones {
+  total_reuniones: number;
+  frecuencia_mensual: number;
+  dias_ultima_reunion: number;
+  tendencia: string;
+}
+
+export interface AnalisisSentimiento {
+  sentimiento: string;
+  palabras_clave: string[];
+  urgencia: string;
+}
+
+export interface TemaInquietud {
+  tema: string;
+  frecuencia: number;
+  porcentaje: number;
+}
+
+export const reunionesService = {
+  async getAll(): Promise<ReunionRepresentante[]> {
+    const { data, error } = await supabase
+      .from('reuniones_representantes')
+      .select('*')
+      .order('fecha', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getById(id: string): Promise<ReunionRepresentante | null> {
+    const { data, error } = await supabase
+      .from('reuniones_representantes')
+      .select('*')
+      .eq('id_reunion', id)
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async getByAlumno(idAlumno: string): Promise<ReunionRepresentante[]> {
+    const { data, error } = await supabase
+      .from('reuniones_representantes')
+      .select('*')
+      .eq('id_alumno', idAlumno)
+      .order('fecha', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByGrado(grado: string): Promise<ReunionRepresentante[]> {
+    const { data, error } = await supabase
+      .from('reuniones_representantes')
+      .select('*')
+      .eq('grado', grado)
+      .order('fecha', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByDateRange(fechaInicio: string, fechaFin: string): Promise<ReunionRepresentante[]> {
+    const { data, error } = await supabase
+      .from('reuniones_representantes')
+      .select('*')
+      .gte('fecha', fechaInicio)
+      .lte('fecha', fechaFin)
+      .order('fecha', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(reunion: Omit<ReunionRepresentante, 'id_reunion' | 'created_at' | 'updated_at'>): Promise<ReunionRepresentante> {
+    const { data, error } = await supabase
+      .from('reuniones_representantes')
+      .insert([reunion])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, updates: Partial<ReunionRepresentante>): Promise<ReunionRepresentante> {
+    const { data, error } = await supabase
+      .from('reuniones_representantes')
+      .update(updates)
+      .eq('id_reunion', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('reuniones_representantes')
+      .delete()
+      .eq('id_reunion', id);
+
+    if (error) throw error;
+  },
+
+  // Analytics Functions
+  async getFrecuenciaReuniones(
+    idAlumno: string,
+    diasPeriodo: number = 90
+  ): Promise<FrecuenciaReuniones> {
+    const { data, error } = await supabase.rpc('calcular_frecuencia_reuniones', {
+      p_id_alumno: idAlumno,
+      p_dias_periodo: diasPeriodo,
+    });
+
+    if (error) throw error;
+    return data[0] || {
+      total_reuniones: 0,
+      frecuencia_mensual: 0,
+      dias_ultima_reunion: 999,
+      tendencia: 'Sin reuniones',
+    };
+  },
+
+  async getAnalisisSentimiento(idReunion: string): Promise<AnalisisSentimiento> {
+    const { data, error } = await supabase.rpc('analizar_sentimiento_inquietudes', {
+      p_id_reunion: idReunion,
+    });
+
+    if (error) throw error;
+    return data[0] || {
+      sentimiento: 'Sin datos',
+      palabras_clave: [],
+      urgencia: 'Baja',
+    };
+  },
+
+  async getTemasInquietudes(idAlumno: string, limit: number = 10): Promise<TemaInquietud[]> {
+    const { data, error } = await supabase.rpc('extraer_temas_inquietudes', {
+      p_id_alumno: idAlumno,
+      p_limit: limit,
+    });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getMetricasAlumno(idAlumno: string): Promise<any> {
+    const { data, error } = await supabase
+      .from('vista_metricas_reuniones_alumno')
+      .select('*')
+      .eq('id_alumno', idAlumno)
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return data || null;
+  },
+};
+
+// ============================================
+// SEGUIMIENTO ACUERDOS (Agreement Follow-up)
+// ============================================
+
+export const seguimientoAcuerdosService = {
+  async getByReunion(idReunion: string): Promise<SeguimientoAcuerdo[]> {
+    const { data, error } = await supabase
+      .from('seguimiento_acuerdos')
+      .select('*')
+      .eq('id_reunion', idReunion)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByAlumno(idAlumno: string): Promise<SeguimientoAcuerdo[]> {
+    const { data, error } = await supabase
+      .from('seguimiento_acuerdos')
+      .select('*')
+      .eq('id_alumno', idAlumno)
+      .order('fecha_limite', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getPendientes(idAlumno?: string): Promise<SeguimientoAcuerdo[]> {
+    let query = supabase
+      .from('seguimiento_acuerdos')
+      .select('*')
+      .in('estado_cumplimiento', ['Pendiente', 'En Proceso'])
+      .order('fecha_limite', { ascending: true });
+
+    if (idAlumno) {
+      query = query.eq('id_alumno', idAlumno);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(seguimiento: Omit<SeguimientoAcuerdo, 'id_seguimiento' | 'created_at' | 'updated_at'>): Promise<SeguimientoAcuerdo> {
+    const { data, error } = await supabase
+      .from('seguimiento_acuerdos')
+      .insert([seguimiento])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, updates: Partial<SeguimientoAcuerdo>): Promise<SeguimientoAcuerdo> {
+    const { data, error } = await supabase
+      .from('seguimiento_acuerdos')
+      .update(updates)
+      .eq('id_seguimiento', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('seguimiento_acuerdos')
+      .delete()
+      .eq('id_seguimiento', id);
+
+    if (error) throw error;
+  },
+};

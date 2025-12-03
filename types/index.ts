@@ -146,3 +146,74 @@ export interface Notification {
   };
 }
 
+// ============================================
+// REUNIONES CON REPRESENTANTES
+// ============================================
+
+export interface ReunionRepresentante {
+  id_reunion: string;
+  id_alumno: string;
+  fecha: string; // DATE
+  grado: string;
+  asistentes: string[]; // Array of attendee names/roles
+  motivo?: string;
+  inquietudes?: string;
+  acuerdos?: string;
+  creado_por?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SeguimientoAcuerdo {
+  id_seguimiento: string;
+  id_reunion: string;
+  id_alumno: string;
+  acuerdo_descripcion: string;
+  estado_cumplimiento: 'Pendiente' | 'En Proceso' | 'Cumplido' | 'No Cumplido' | 'Cancelado';
+  fecha_limite?: string;
+  fecha_cumplimiento?: string;
+  notas_seguimiento?: string;
+  creado_por?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Analytics Types for Reuniones
+export interface FrecuenciaReuniones {
+  total_reuniones: number;
+  frecuencia_mensual: number;
+  dias_ultima_reunion: number;
+  tendencia: 'Sin reuniones' | 'Alta frecuencia' | 'Frecuencia moderada' | 'Baja frecuencia' | 'Inactivo';
+}
+
+export interface AnalisisSentimiento {
+  sentimiento: 'Positivo' | 'Negativo' | 'Neutro' | 'Sin datos';
+  palabras_clave: string[];
+  urgencia: 'Alta' | 'Media' | 'Baja';
+}
+
+export interface TemaInquietud {
+  tema: string;
+  frecuencia: number;
+  porcentaje: number;
+}
+
+export interface MetricasReunionesAlumno {
+  id_alumno: string;
+  total_reuniones: number;
+  meses_con_reuniones: number;
+  primera_reunion: string;
+  ultima_reunion: string;
+  dias_promedio_entre_reuniones: number;
+  reuniones_con_motivo: number;
+  reuniones_con_inquietudes: number;
+  reuniones_con_acuerdos: number;
+  motivos_unicos: string[];
+}
+
+export interface ReunionConAnalisis extends ReunionRepresentante {
+  analisis_sentimiento?: AnalisisSentimiento;
+  temas_inquietudes?: TemaInquietud[];
+  frecuencia?: FrecuenciaReuniones;
+}
+

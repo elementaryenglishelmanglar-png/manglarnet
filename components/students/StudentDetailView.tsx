@@ -1,7 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { ArrowLeftIcon, IdentificationIcon, CakeIcon, LocationMarkerIcon, AcademicCapIcon, UsersIcon, SparklesIcon, MailIcon, PhoneIcon, UserCircleIcon } from '@/components/Icons';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Alumno } from '@/types';
+
+// Import components directly (not lazy) to avoid loading issues
+import ReunionesListView from './ReunionesListView';
+import ReunionesAnalyticsDashboard from './ReunionesAnalyticsDashboard';
 
 interface StudentDetailViewProps {
   student: Alumno;
@@ -25,6 +31,17 @@ const InfoItem: React.FC<{
 );
 
 export default function StudentDetailView({ student, onBack }: StudentDetailViewProps) {
+  const [activeTab, setActiveTab] = useState('info');
+  const [showReuniones] = useState(() => {
+    try {
+      // Check if we're in browser and can safely load reuniones
+      return typeof window !== 'undefined';
+    } catch (err) {
+      console.warn('Reuniones feature not available:', err);
+      return false;
+    }
+  });
+
   return (
     <div className="mb-8">
       <button 
@@ -34,7 +51,8 @@ export default function StudentDetailView({ student, onBack }: StudentDetailView
         <ArrowLeftIcon />
         Volver a la Lista
       </button>
-      <div className="flex flex-col md:flex-row gap-12">
+      
+      <div className="flex flex-col md:flex-row gap-12 mb-8">
         <div className="flex-shrink-0 text-center">
           <UserCircleIcon className="h-32 w-32 text-apple-gray mx-auto opacity-40" />
           <h2 className="text-3xl font-bold mt-6 text-apple-gray-dark tracking-tight">
@@ -85,6 +103,35 @@ export default function StudentDetailView({ student, onBack }: StudentDetailView
           </div>
         </div>
       </div>
+
+      {/* Tabs for Reuniones - Only show if feature is enabled */}
+      {showReuniones ? (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="info">Información</TabsTrigger>
+            <TabsTrigger value="reuniones">Reuniones</TabsTrigger>
+            <TabsTrigger value="analytics">Análisis</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="info" className="mt-6">
+            <div className="text-center text-apple-gray py-8">
+              La información del estudiante se muestra arriba
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="reuniones" className="mt-6">
+            <ReunionesListView student={student} />
+          </TabsContent>
+          
+          <TabsContent value="analytics" className="mt-6">
+            <ReunionesAnalyticsDashboard student={student} />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+          <p className="text-sm">La funcionalidad de reuniones se está cargando...</p>
+        </div>
+      )}
     </div>
   );
 }

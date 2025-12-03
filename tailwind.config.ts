@@ -45,10 +45,19 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        // Colores de marca del Colegio El Manglar
+        'manglar': {
+          'orange': 'hsl(var(--manglar-orange))', // #FF6B35 - Principal
+          'green': 'hsl(var(--manglar-green))', // #78AC40 - Secundario
+          'yellow': 'hsl(var(--manglar-yellow))', // #FADB16 - Acento
+          'orange-light': 'hsl(var(--manglar-orange-light))',
+          'green-light': 'hsl(var(--manglar-green-light))',
+          'yellow-light': 'hsl(var(--manglar-yellow-light))',
+        },
         // Colores funcionales (mantener para grados y asignaturas)
-        'brand-primary': '#78AC40',
-        'brand-secondary': '#FADB16',
-        // Paleta monocromática Apple (compatibilidad)
+        'brand-primary': '#78AC40', // Verde (compatibilidad)
+        'brand-secondary': '#FADB16', // Amarillo (compatibilidad)
+        // Paleta monocromática (compatibilidad)
         'apple-white': '#FFFFFF',
         'apple-gray-light': '#F5F5F7',
         'apple-gray': '#86868B',

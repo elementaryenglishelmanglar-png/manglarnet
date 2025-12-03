@@ -141,7 +141,10 @@ export function IntelligentNotifications({ filters }: IntelligentNotificationsPr
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                <div className="flex flex-col items-center space-y-3">
+                    <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-manglar-orange border-t-transparent"></div>
+                    <p className="text-sm text-muted-foreground font-medium">Cargando alertas...</p>
+                </div>
             </div>
         );
     }

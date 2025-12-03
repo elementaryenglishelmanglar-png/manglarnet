@@ -64,37 +64,52 @@ export default function Header({
   };
 
   return (
-    <header className="bg-white p-4 flex justify-between items-center sticky top-0 z-30 border-b border-apple-gray-light">
+    <header className="bg-white p-4 flex justify-between items-center sticky top-0 z-30 border-b border-apple-gray-light shadow-sm">
       <div className="flex items-center gap-3">
         {onMenuToggle && (
           <button
             onClick={onMenuToggle}
-            className="lg:hidden p-2 text-apple-gray hover:text-apple-gray-dark hover:bg-apple-gray-light rounded-lg transition-apple"
+            className="lg:hidden p-2 text-apple-gray hover:text-manglar-orange hover:bg-manglar-orange-light rounded-lg transition-apple"
             aria-label="Toggle menu"
           >
             <MenuIcon className="h-6 w-6" />
           </button>
         )}
-        <h1 className="text-2xl sm:text-3xl font-bold text-apple-gray-dark truncate tracking-tight">
-          {title}
-        </h1>
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex w-8 h-8 rounded-lg bg-gradient-to-br from-manglar-orange to-manglar-orange/80 items-center justify-center">
+            <span className="text-white font-bold text-sm">M</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-apple-gray-dark truncate tracking-tight">
+            {title}
+          </h1>
+        </div>
       </div>
       <div className="flex items-center gap-2 sm:gap-4">
         {currentUser.role === 'docente' && (
           <div className="relative">
             <button
               onClick={() => setNotificationsOpen(!isNotificationsOpen)}
-              className="relative text-apple-gray hover:text-apple-gray-dark transition-apple"
+              className="relative text-apple-gray hover:text-manglar-orange transition-apple focus-ring rounded-lg p-1"
+              aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ''}`}
+              aria-expanded={isNotificationsOpen}
             >
               <BellIcon className="h-6 w-6" />
               {unreadCount > 0 && (
-                <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+                <span 
+                  className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-manglar-orange ring-2 ring-white animate-pulse-gentle"
+                  aria-hidden="true"
+                />
               )}
             </button>
             {isNotificationsOpen && (
-              <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-xl shadow-lg z-20 border border-apple-gray-light bg-white animate-fade-in">
+              <div 
+                className="origin-top-right absolute right-0 mt-2 w-80 rounded-xl shadow-lg z-20 border border-apple-gray-light bg-white animate-fade-in"
+                role="dialog"
+                aria-label="Panel de notificaciones"
+                aria-modal="false"
+              >
                 <div className="p-2 border-b">
-                  <h3 className="font-semibold text-apple-gray-dark">Notificaciones</h3>
+                  <h3 className="font-semibold text-apple-gray-dark" id="notifications-heading">Notificaciones</h3>
                 </div>
                 <div className="py-1 max-h-96 overflow-y-auto">
                   {notifications.filter((n) => n.recipientId === currentUser.docenteId).length >
@@ -109,9 +124,11 @@ export default function Header({
                         <button
                           key={n.id}
                           onClick={() => handleNotificationClick(n)}
-                          className={`block w-full text-left px-4 py-3 text-sm text-apple-gray-dark hover:bg-apple-gray-light transition-apple ${
-                            !n.isRead ? 'bg-blue-50' : ''
+                          className={`block w-full text-left px-4 py-3 text-sm text-apple-gray-dark hover:bg-manglar-orange-light transition-apple focus-ring rounded ${
+                            !n.isRead ? 'bg-manglar-orange-light border-l-4 border-manglar-orange' : ''
                           }`}
+                          aria-label={`${n.title}. ${n.message}`}
+                          role="menuitem"
                         >
                           <p className="font-bold">{n.title}</p>
                           <p className="text-apple-gray text-xs font-light">{n.message}</p>
@@ -133,7 +150,10 @@ export default function Header({
         <div className="relative">
           <button
             onClick={() => setMenuOpen(!isMenuOpen)}
-            className="flex items-center gap-2 text-left"
+            className="flex items-center gap-2 text-left focus-ring rounded-lg p-1"
+            aria-label="Menú de usuario"
+            aria-expanded={isMenuOpen}
+            aria-haspopup="true"
           >
             <div className="hidden sm:block">
               <p className="font-semibold text-apple-gray-dark text-sm sm:text-base">
@@ -149,12 +169,17 @@ export default function Header({
             <ChevronDownIcon className="hidden sm:block" />
           </button>
           {isMenuOpen && (
-            <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-xl shadow-lg z-10 border border-apple-gray-light bg-white animate-fade-in">
-              <div className="py-1" role="menu" aria-orientation="vertical">
+            <div 
+              className="origin-top-right absolute right-0 mt-2 w-48 rounded-xl shadow-lg z-10 border border-apple-gray-light bg-white animate-fade-in"
+              role="menu"
+              aria-label="Menú de usuario"
+            >
+              <div className="py-1" role="group">
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-apple-gray-dark hover:bg-apple-gray-light transition-apple w-full text-left"
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-apple-gray-dark hover:bg-manglar-orange-light transition-apple w-full text-left focus-ring rounded"
                   role="menuitem"
+                  aria-label="Cerrar sesión"
                 >
                   <LogoutIcon />
                   Cerrar Sesión

@@ -1,5 +1,5 @@
 /* ============================================
-   MANGULARNET - FILOSOFÍA DE DISEÑO APPLE
+   MANGULARNET - DISEÑO CON IDENTIDAD COLEGIO EL MANGLAR
    CON SHADCN/UI
    ============================================ */
 
@@ -8,12 +8,12 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 2. Capa base de Apple (Filosofía Apple) */
+/* 2. Capa base con identidad del Colegio El Manglar */
 @layer base {
   :root {
-    /* 3. Paleta Monocromática (para shadcn/ui) */
-    --background: 240 5% 96%; /* #f5f5f7 (Gris Apple) */
-    --foreground: 240 6% 12%; /* #1d1d1f (Gris oscuro Apple) */
+    /* 3. Paleta base (Grises neutros) */
+    --background: 240 5% 96%; /* #f5f5f7 (Gris claro) */
+    --foreground: 240 6% 12%; /* #1d1d1f (Gris oscuro) */
     
     --card: 240 10% 100%; /* Blanco */
     --card-foreground: 240 6% 12%;
@@ -21,26 +21,77 @@
     --popover: 240 10% 100%;
     --popover-foreground: 240 6% 12%;
     
-    --primary: 217 91% 60%; /* #007AFF (Azul Apple para acciones) */
-    --primary-foreground: 210 40% 98%;
+    /* 4. Colores de marca del Colegio El Manglar */
+    /* Naranja principal (#FF6B35) - Color principal del colegio */
+    --primary: 12 100% 60%; /* #FF6B35 (Naranja Manglar) */
+    --primary-foreground: 0 0% 100%; /* Blanco para contraste */
     
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 12%;
+    /* Verde secundario (#78AC40) - Color institucional */
+    --secondary: 88 45% 45%; /* #78AC40 (Verde Manglar) */
+    --secondary-foreground: 0 0% 100%;
+    
+    /* Amarillo de acento (#FADB16) */
+    --accent: 52 95% 53%; /* #FADB16 (Amarillo Manglar) */
+    --accent-foreground: 240 6% 12%;
     
     --muted: 240 5% 96%;
     --muted-foreground: 240 4% 46%;
-    
-    --accent: 240 5% 96%;
-    --accent-foreground: 240 6% 12%;
     
     --destructive: 0 84% 60%; /* Rojo para peligro */
     --destructive-foreground: 210 40% 98%;
     
     --border: 240 6% 90%;
     --input: 240 6% 90%;
-    --ring: 217 91% 60%;
+    --ring: 12 100% 60%; /* Naranja para focus rings */
     
     --radius: 0.5rem;
+    
+    /* Variables adicionales para colores del colegio */
+    --manglar-orange: 12 100% 60%; /* #FF6B35 */
+    --manglar-green: 88 45% 45%; /* #78AC40 */
+    --manglar-yellow: 52 95% 53%; /* #FADB16 */
+    --manglar-orange-light: 12 100% 95%; /* Versión clara para fondos */
+    --manglar-green-light: 88 45% 95%;
+    --manglar-yellow-light: 52 95% 95%;
+  }
+
+  /* Dark mode variables */
+  .dark {
+    --background: 240 6% 10%; /* Gris muy oscuro */
+    --foreground: 240 5% 96%; /* Casi blanco */
+    
+    --card: 240 6% 12%;
+    --card-foreground: 240 5% 96%;
+    
+    --popover: 240 6% 12%;
+    --popover-foreground: 240 5% 96%;
+    
+    --primary: 12 100% 60%; /* Naranja Manglar - más vibrante en oscuro */
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 88 45% 45%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --accent: 52 95% 53%;
+    --accent-foreground: 240 6% 10%;
+    
+    --muted: 240 6% 15%;
+    --muted-foreground: 240 4% 65%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --border: 240 6% 20%;
+    --input: 240 6% 20%;
+    --ring: 12 100% 60%;
+    
+    /* Colores del colegio ajustados para modo oscuro */
+    --manglar-orange: 12 100% 60%;
+    --manglar-green: 88 50% 50%; /* Ligeramente más claro para contraste */
+    --manglar-yellow: 52 95% 58%; /* Ligeramente más claro */
+    --manglar-orange-light: 12 100% 15%; /* Versión oscura para fondos */
+    --manglar-green-light: 88 40% 15%;
+    --manglar-yellow-light: 52 90% 15%;
   }
 
   * {
@@ -156,6 +207,182 @@
 
 .transition-smooth-slow {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================
+   MICROINTERACCIONES Y FEEDBACK TÁCTIL
+   ============================================ */
+
+/* Hover effects mejorados */
+.hover-lift-smooth {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
+}
+
+.hover-lift-smooth:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.hover-scale-smooth {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-scale-smooth:hover {
+  transform: scale(1.02);
+}
+
+.hover-scale-smooth:active {
+  transform: scale(0.98);
+}
+
+/* Ripple effect para botones */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.ripple-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-effect::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  width: 100px;
+  height: 100px;
+  margin-top: -50px;
+  margin-left: -50px;
+  top: 50%;
+  left: 50%;
+  transform: scale(0);
+  animation: ripple 0.6s;
+  pointer-events: none;
+}
+
+/* Pulse animation para elementos importantes */
+@keyframes pulse-gentle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.animate-pulse-gentle {
+  animation: pulse-gentle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Shake animation para errores */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+/* Slide in desde abajo */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Focus visible mejorado */
+.focus-ring {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid hsl(var(--manglar-orange));
+  outline-offset: 2px;
+}
+
+/* Touch feedback mejorado para móviles */
+@media (max-width: 640px) {
+  button:active,
+  a:active {
+    transform: scale(0.97);
+    transition: transform 0.1s ease;
+  }
+
+  /* Mejorar área táctil */
+  button,
+  a,
+  input[type="button"],
+  input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+    -webkit-tap-highlight-color: rgba(255, 107, 53, 0.2);
+  }
+}
+
+/* ============================================
+   PREFERENCIAS DE USUARIO
+   ============================================ */
+
+/* Densidad de información */
+[data-density="compact"] {
+  --spacing-unit: 0.5rem;
+  --card-padding: 0.75rem;
+  --input-height: 2rem;
+}
+
+[data-density="comfortable"] {
+  --spacing-unit: 1rem;
+  --card-padding: 1rem;
+  --input-height: 2.5rem;
+}
+
+[data-density="spacious"] {
+  --spacing-unit: 1.5rem;
+  --card-padding: 1.5rem;
+  --input-height: 3rem;
+}
+
+/* Alto contraste */
+.high-contrast {
+  --foreground: 0 0% 0%;
+  --background: 0 0% 100%;
+  --border: 0 0% 20%;
+}
+
+.dark.high-contrast {
+  --foreground: 0 0% 100%;
+  --background: 0 0% 0%;
+  --border: 0 0% 80%;
+}
+
+/* Reducir movimiento */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* ============================================
