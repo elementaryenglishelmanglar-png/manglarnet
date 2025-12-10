@@ -44,34 +44,41 @@ export const EvolutionChart: React.FC = () => {
     const loadTeachers = async () => {
         setLoading(true);
         try {
-            // Obtener docentes que tienen evaluaciones
-            const { data, error } = await supabase
+            // Obtener IDs únicos de docentes evaluados
+            const { data: assignmentsData, error: assignmentsError } = await supabase
                 .from('rrhh_assignments')
-                .select(`
-                    evaluatee_id,
-                    evaluatee:usuarios!rrhh_assignments_evaluatee_id_fkey(nombre, apellido)
-                `)
+                .select('evaluatee_id')
                 .eq('status', 'completed');
 
-            if (error) throw error;
+            if (assignmentsError) throw assignmentsError;
 
-            // Obtener docentes únicos
-            const uniqueTeachers = Array.from(
-                new Map(
-                    (data || []).map(item => [
-                        item.evaluatee_id,
-                        {
-                            id: item.evaluatee_id,
-                            name: `${item.evaluatee.nombre} ${item.evaluatee.apellido}`
-                        }
-                    ])
-                ).values()
-            );
+            // Obtener IDs únicos
+            const uniqueIds = [...new Set((assignmentsData || []).map(a => a.evaluatee_id))];
 
-            setTeachers(uniqueTeachers);
-        } catch (error) {
+            if (uniqueIds.length === 0) {
+                setTeachers([]);
+                setLoading(false);
+                return;
+            }
+
+            // Cargar datos de usuarios
+            const { data: usersData, error: usersError } = await supabase
+                .from('usuarios')
+                .select('id, nombre, apellido')
+                .in('id', uniqueIds);
+
+            if (usersError) throw usersError;
+
+            const teachersList = (usersData || []).map(user => ({
+                id: user.id,
+                name: `${user.nombre || ''} ${user.apellido || ''}`.trim() || 'Sin nombre'
+            }));
+
+            setTeachers(teachersList);
+        } catch (error: any) {
             console.error('Error loading teachers:', error);
-            showToast({ type: 'error', title: 'Error al cargar docentes' });
+            showToast({ type: 'error', title: `Error al cargar docentes: ${error.message}` });
+            setTeachers([]);
         } finally {
             setLoading(false);
         }
