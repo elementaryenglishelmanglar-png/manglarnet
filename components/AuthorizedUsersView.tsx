@@ -17,6 +17,8 @@ type UserRole = 'docente' | 'coordinador' | 'directivo';
 interface Usuario {
   id: string;
   username: string;
+  nombre: string | null;
+  apellido: string | null;
   email: string | null;
   role: UserRole;
   is_active: boolean;
@@ -34,7 +36,14 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Usuario | null>(null);
-  const [formData, setFormData] = useState({ username: '', email: '', password: '', role: 'docente' as UserRole });
+  const [formData, setFormData] = useState({
+    username: '',
+    nombre: '',
+    apellido: '',
+    email: '',
+    password: '',
+    role: 'docente' as UserRole
+  });
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -63,10 +72,24 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
   const handleOpenModal = (user?: Usuario) => {
     if (user) {
       setEditingUser(user);
-      setFormData({ username: user.username, email: user.email || '', password: '', role: user.role });
+      setFormData({
+        username: user.username,
+        nombre: user.nombre || '',
+        apellido: user.apellido || '',
+        email: user.email || '',
+        password: '',
+        role: user.role
+      });
     } else {
       setEditingUser(null);
-      setFormData({ username: '', email: '', password: '', role: 'docente' });
+      setFormData({
+        username: '',
+        nombre: '',
+        apellido: '',
+        email: '',
+        password: '',
+        role: 'docente'
+      });
     }
     setIsModalOpen(true);
     setError(null);
@@ -75,7 +98,14 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingUser(null);
-    setFormData({ username: '', email: '', password: '', role: 'docente' });
+    setFormData({
+      username: '',
+      nombre: '',
+      apellido: '',
+      email: '',
+      password: '',
+      role: 'docente'
+    });
     setError(null);
   };
 
@@ -85,12 +115,22 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
       return;
     }
 
-    if (!formData.password.trim()) {
+    if (!formData.nombre.trim()) {
+      setError('El nombre es requerido');
+      return;
+    }
+
+    if (!formData.apellido.trim()) {
+      setError('El apellido es requerido');
+      return;
+    }
+
+    if (!editingUser && !formData.password.trim()) {
       setError('La contraseña es requerida para nuevos usuarios');
       return;
     }
 
-    if (formData.password.length < 6) {
+    if (formData.password && formData.password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
@@ -98,12 +138,16 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
     try {
       setError(null);
       const username = formData.username.toLowerCase().trim();
+      const nombre = formData.nombre.trim();
+      const apellido = formData.apellido.trim();
       const email = formData.email.trim() || null;
 
       if (editingUser) {
         // Update existing user
         const updateData: any = {
           username,
+          nombre,
+          apellido,
           email,
           role: formData.role,
         };
@@ -131,8 +175,8 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
           username,
           email: authEmail,
           password: formData.password,
-          nombres: username, // Use username as nombres for now
-          apellidos: '', // Empty apellidos for now
+          nombres: nombre,
+          apellidos: apellido,
           role: formData.role,
         };
 
@@ -299,7 +343,10 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
                   <CardContent className="p-4">
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex-1">
-                        <p className="font-semibold text-foreground text-sm">{user.username}</p>
+                        <p className="font-semibold text-foreground text-sm">
+                          {user.nombre} {user.apellido}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">@{user.username}</p>
                         {user.email && (
                           <p className="text-xs text-muted-foreground mt-1">{user.email}</p>
                         )}
@@ -365,7 +412,10 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
                 ) : (
                   filteredUsers.map((user) => (
                     <tr key={user.id} className="border-b hover:bg-accent/50 transition-colors">
-                      <td className="py-3 px-4 text-foreground font-medium">{user.username}</td>
+                      <td className="py-3 px-4">
+                        <div className="font-medium text-foreground">{user.nombre} {user.apellido}</div>
+                        <div className="text-xs text-muted-foreground">@{user.username}</div>
+                      </td>
                       <td className="py-3 px-4 text-muted-foreground">{user.email || '-'}</td>
                       <td className="py-3 px-4">
                         <Badge variant={getRoleBadgeVariant(user.role)}>
@@ -443,6 +493,32 @@ export const AuthorizedUsersView: React.FC<AuthorizedUsersViewProps> = ({ curren
               {editingUser && (
                 <p className="text-xs text-muted-foreground">El nombre de usuario no puede ser modificado</p>
               )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="nombre">Nombre *</Label>
+                <Input
+                  id="nombre"
+                  type="text"
+                  value={formData.nombre}
+                  onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                  placeholder="Juan"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="apellido">Apellido *</Label>
+                <Input
+                  id="apellido"
+                  type="text"
+                  value={formData.apellido}
+                  onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
+                  placeholder="Pérez"
+                  required
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
