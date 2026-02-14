@@ -40,7 +40,7 @@ export default function StudentFormModal({ student, onClose, onSave }: StudentFo
 
   const [hermanosStr, setHermanosStr] = useState(student?.hermanos?.join(', ') || '');
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<any>) => {
     const { name, value } = e.target;
 
     if (name.includes('.')) {

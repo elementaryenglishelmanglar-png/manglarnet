@@ -45,6 +45,8 @@ export interface Docente {
   email: string;
   telefono: string;
   especialidad: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Clase {
@@ -93,6 +95,8 @@ export interface Planificacion {
   observaciones?: string;
   nombres_docente?: string;
   apellidos_docente?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Horario {

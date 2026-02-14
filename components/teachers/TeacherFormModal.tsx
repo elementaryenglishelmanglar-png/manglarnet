@@ -26,8 +26,8 @@ interface TeacherFormModalProps {
 // Helper functions for English logic
 const esInglesPrimaria = (subject: string): boolean => {
   const lowerSubject = subject.toLowerCase();
-  return lowerSubject.includes('inglés') || lowerSubject.includes('ingles') || 
-         lowerSubject.includes('english');
+  return lowerSubject.includes('inglés') || lowerSubject.includes('ingles') ||
+    lowerSubject.includes('english');
 };
 
 const esGradoAlto = (grade: string): boolean => {
@@ -43,13 +43,13 @@ const ASIGNATURAS_POR_NIVEL: { [key: string]: string[] } = {
   ]
 };
 
-export default function TeacherFormModal({ 
-  teacher, 
-  clases, 
-  alumnos, 
-  aulas, 
-  onClose, 
-  onSave 
+export default function TeacherFormModal({
+  teacher,
+  clases,
+  alumnos,
+  aulas,
+  onClose,
+  onSave
 }: TeacherFormModalProps) {
   const [formData, setFormData] = useState<Omit<Docente, 'id_docente' | 'id_usuario'>>({
     nombres: teacher?.nombres || '',
@@ -58,7 +58,7 @@ export default function TeacherFormModal({
     telefono: teacher?.telefono || '',
     especialidad: teacher?.especialidad || '',
   });
-  
+
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(false);
   const [currentSubject, setCurrentSubject] = useState('');
@@ -105,15 +105,15 @@ export default function TeacherFormModal({
 
   const getAvailableSubjects = useMemo(() => {
     const especialidad = formData.especialidad;
-    
+
     if (especialidad === 'Teacher') {
       return ['Inglés'];
     }
-    
+
     if (especialidad === 'Docente Guía' || especialidad === 'Integralidad' || especialidad === 'Especialista') {
       return ASIGNATURAS_POR_NIVEL['Nivel Primaria'] || [];
     }
-    
+
     return [];
   }, [formData.especialidad]);
 
@@ -121,17 +121,17 @@ export default function TeacherFormModal({
     return esInglesPrimaria(subject) && esGradoAlto(grade);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<any>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
+
     if (name === 'especialidad') {
       setCurrentSubject('');
       setCurrentGrade('');
       setCurrentNivelIngles('');
       setCurrentAula('');
     }
-    
+
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -180,15 +180,15 @@ export default function TeacherFormModal({
     }
 
     const exists = requiereNivelIngles(currentSubject, currentGrade)
-      ? assignments.some(a => 
-          a.subject === currentSubject && 
-          a.grade === currentGrade && 
-          a.nivel_ingles === currentNivelIngles
-        )
-      : assignments.some(a => 
-          a.subject === currentSubject && 
-          a.grade === currentGrade
-        );
+      ? assignments.some(a =>
+        a.subject === currentSubject &&
+        a.grade === currentGrade &&
+        a.nivel_ingles === currentNivelIngles
+      )
+      : assignments.some(a =>
+        a.subject === currentSubject &&
+        a.grade === currentGrade
+      );
 
     if (exists) {
       setErrors(prev => ({
@@ -198,11 +198,11 @@ export default function TeacherFormModal({
       return;
     }
 
-    setAssignments(prev => [...prev, { 
-      subject: currentSubject.trim(), 
+    setAssignments(prev => [...prev, {
+      subject: currentSubject.trim(),
       grade: currentGrade.trim(),
-      nivel_ingles: requiereNivelIngles(currentSubject, currentGrade) 
-        ? currentNivelIngles 
+      nivel_ingles: requiereNivelIngles(currentSubject, currentGrade)
+        ? currentNivelIngles
         : undefined,
       id_aula: currentAula || undefined
     }]);
@@ -217,14 +217,14 @@ export default function TeacherFormModal({
       return newErrors;
     });
   };
-  
+
   const handleRemoveAssignment = (index: number) => {
     setAssignments(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -259,8 +259,8 @@ export default function TeacherFormModal({
           <h2 className="text-2xl sm:text-3xl font-bold text-apple-gray-dark tracking-tight">
             {teacher ? 'Editar Docente' : 'Añadir Docente'}
           </h2>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="text-apple-gray hover:text-apple-gray-dark transition-apple p-2 rounded-lg hover:bg-apple-gray-light"
             disabled={isSubmitting}
           >
@@ -275,55 +275,55 @@ export default function TeacherFormModal({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <InputField 
-                  label="Nombres" 
-                  name="nombres" 
-                  value={formData.nombres} 
-                  onChange={handleChange} 
-                  required 
+                <InputField
+                  label="Nombres"
+                  name="nombres"
+                  value={formData.nombres}
+                  onChange={handleChange}
+                  required
                 />
                 {errors.nombres && (
                   <p className="mt-1 text-sm text-red-600">{errors.nombres}</p>
                 )}
               </div>
               <div>
-                <InputField 
-                  label="Apellidos" 
-                  name="apellidos" 
-                  value={formData.apellidos} 
-                  onChange={handleChange} 
-                  required 
+                <InputField
+                  label="Apellidos"
+                  name="apellidos"
+                  value={formData.apellidos}
+                  onChange={handleChange}
+                  required
                 />
                 {errors.apellidos && (
                   <p className="mt-1 text-sm text-red-600">{errors.apellidos}</p>
                 )}
               </div>
               <div>
-                <InputField 
-                  label="Email" 
-                  name="email" 
-                  type="email" 
-                  value={formData.email} 
-                  onChange={handleChange} 
-                  required 
+                <InputField
+                  label="Email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
                 />
                 {errors.email && (
                   <p className="mt-1 text-sm text-red-600">{errors.email}</p>
                 )}
               </div>
               <div>
-                <InputField 
-                  label="Teléfono" 
-                  name="telefono" 
-                  value={formData.telefono} 
-                  onChange={handleChange} 
+                <InputField
+                  label="Teléfono"
+                  name="telefono"
+                  value={formData.telefono}
+                  onChange={handleChange}
                 />
               </div>
               <div className="md:col-span-2">
-                <InputField 
-                  label="Especialidad" 
-                  name="especialidad" 
-                  value={formData.especialidad} 
+                <InputField
+                  label="Especialidad"
+                  name="especialidad"
+                  value={formData.especialidad}
                   onChange={handleChange}
                   as="select"
                 >
@@ -336,7 +336,7 @@ export default function TeacherFormModal({
               </div>
             </div>
           </div>
-          
+
           {/* Assignments */}
           <div className="border-t pt-6">
             <h3 className="text-xl font-semibold mb-6 text-apple-gray-dark tracking-tight">
@@ -353,22 +353,21 @@ export default function TeacherFormModal({
                   <label className="block text-sm font-medium text-apple-gray-dark mb-2">
                     Asignatura <span className="text-red-500">*</span>
                   </label>
-                  <select 
-                    value={currentSubject} 
+                  <select
+                    value={currentSubject}
                     onChange={e => {
                       setCurrentSubject(e.target.value);
                       if (!esGradoAlto(currentGrade) || !esInglesPrimaria(e.target.value)) {
                         setCurrentNivelIngles('');
                       }
                     }}
-                    className={`mt-1 block w-full p-2 border rounded-md ${
-                      errors.assignment ? 'border-apple-red' : 'border-apple-gray'
-                    } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    className={`mt-1 block w-full p-2 border rounded-md ${errors.assignment ? 'border-apple-red' : 'border-apple-gray'
+                      } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     disabled={isSubmitting || !formData.especialidad}
                   >
                     <option value="">
-                      {!formData.especialidad 
-                        ? 'Seleccione primero una especialidad' 
+                      {!formData.especialidad
+                        ? 'Seleccione primero una especialidad'
                         : 'Seleccione una asignatura'}
                     </option>
                     {getAvailableSubjects.map(subj => (
@@ -380,17 +379,16 @@ export default function TeacherFormModal({
                   <label className="block text-sm font-medium text-apple-gray-dark mb-2">
                     Grado <span className="text-red-500">*</span>
                   </label>
-                  <select 
-                    value={currentGrade} 
+                  <select
+                    value={currentGrade}
                     onChange={e => {
                       setCurrentGrade(e.target.value);
                       if (!esGradoAlto(e.target.value) || !esInglesPrimaria(currentSubject)) {
                         setCurrentNivelIngles('');
                       }
                     }}
-                    className={`mt-1 block w-full p-2 border rounded-md ${
-                      errors.assignment ? 'border-apple-red' : 'border-apple-gray'
-                    } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    className={`mt-1 block w-full p-2 border rounded-md ${errors.assignment ? 'border-apple-red' : 'border-apple-gray'
+                      } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     disabled={isSubmitting}
                   >
                     <option value="">Seleccione un grado</option>
@@ -404,8 +402,8 @@ export default function TeacherFormModal({
                     <label className="block text-sm font-medium text-apple-gray-dark mb-2">
                       Nivel de Inglés <span className="text-red-500">*</span>
                     </label>
-                    <select 
-                      value={currentNivelIngles} 
+                    <select
+                      value={currentNivelIngles}
                       onChange={e => setCurrentNivelIngles(e.target.value)}
                       className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       disabled={isSubmitting}
@@ -433,9 +431,9 @@ export default function TeacherFormModal({
                     ))}
                   </select>
                 </div>
-                <button 
-                  type="button" 
-                  onClick={handleAddAssignment} 
+                <button
+                  type="button"
+                  onClick={handleAddAssignment}
                   className="bg-apple-blue text-white px-6 py-3 rounded-lg hover:opacity-90 transition-apple disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                   disabled={isSubmitting}
                 >
@@ -448,8 +446,8 @@ export default function TeacherFormModal({
               {assignments.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {assignments.map((a, index) => (
-                    <span 
-                      key={index} 
+                    <span
+                      key={index}
                       className="flex items-center gap-2 bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1.5 rounded-full border border-blue-200"
                     >
                       <span className="font-semibold">{a.subject}</span>
@@ -461,9 +459,9 @@ export default function TeacherFormModal({
                         <span className="text-blue-600"> - {(aulas.find((aula: any) => aula.id_aula === a.id_aula)?.nombre || aulas.find((aula: any) => aula.id_aula === a.id_aula)?.nombre_aula || 'Aula')}</span>
                       )}
                       <span className="text-blue-600">)</span>
-                      <button 
-                        type="button" 
-                        onClick={() => handleRemoveAssignment(index)} 
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAssignment(index)}
                         className="text-blue-600 hover:text-blue-800 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
                         disabled={isSubmitting}
                         title="Eliminar"
@@ -483,16 +481,16 @@ export default function TeacherFormModal({
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row justify-end gap-4 mt-8 pt-6 border-t border-apple-gray-light flex-shrink-0">
-            <button 
-              type="button" 
-              onClick={onClose} 
+            <button
+              type="button"
+              onClick={onClose}
               className="w-full sm:w-auto px-6 py-3 border border-apple-gray text-apple-gray-dark rounded-lg hover:bg-apple-gray-light transition-apple disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
               disabled={isSubmitting}
             >
               Cancelar
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="w-full sm:w-auto px-6 py-3 bg-apple-blue text-white rounded-lg hover:opacity-90 transition-apple disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
               disabled={isSubmitting}
             >

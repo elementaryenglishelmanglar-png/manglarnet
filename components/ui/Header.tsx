@@ -1,7 +1,4 @@
-'use client';
-
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
   MenuIcon,
@@ -18,6 +15,8 @@ interface HeaderProps {
   notifications?: Notification[];
   onNotificationClick?: (notification: Notification) => void;
   onMenuToggle?: () => void;
+  onLogout: () => void;
+  setShowPreferences?: (show: boolean) => void;
 }
 
 export default function Header({
@@ -26,10 +25,11 @@ export default function Header({
   notifications = [],
   onNotificationClick,
   onMenuToggle,
+  onLogout,
+  setShowPreferences,
 }: HeaderProps) {
   const [isMenuOpen, setMenuOpen] = useState(false);
   const [isNotificationsOpen, setNotificationsOpen] = useState(false);
-  const router = useRouter();
   const supabase = createClient();
 
   const unreadCount = notifications.filter(
@@ -52,8 +52,7 @@ export default function Header({
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
+    onLogout();
   };
 
   const handleNotificationClick = (notification: Notification) => {
@@ -95,14 +94,14 @@ export default function Header({
             >
               <BellIcon className="h-6 w-6" />
               {unreadCount > 0 && (
-                <span 
+                <span
                   className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-manglar-orange ring-2 ring-white animate-pulse-gentle"
                   aria-hidden="true"
                 />
               )}
             </button>
             {isNotificationsOpen && (
-              <div 
+              <div
                 className="origin-top-right absolute right-0 mt-2 w-80 rounded-xl shadow-lg z-20 border border-apple-gray-light bg-white animate-fade-in"
                 role="dialog"
                 aria-label="Panel de notificaciones"
@@ -113,7 +112,7 @@ export default function Header({
                 </div>
                 <div className="py-1 max-h-96 overflow-y-auto">
                   {notifications.filter((n) => n.recipientId === currentUser.docenteId).length >
-                  0 ? (
+                    0 ? (
                     notifications
                       .filter((n) => n.recipientId === currentUser.docenteId)
                       .sort(
@@ -124,9 +123,8 @@ export default function Header({
                         <button
                           key={n.id}
                           onClick={() => handleNotificationClick(n)}
-                          className={`block w-full text-left px-4 py-3 text-sm text-apple-gray-dark hover:bg-manglar-orange-light transition-apple focus-ring rounded ${
-                            !n.isRead ? 'bg-manglar-orange-light border-l-4 border-manglar-orange' : ''
-                          }`}
+                          className={`block w-full text-left px-4 py-3 text-sm text-apple-gray-dark hover:bg-manglar-orange-light transition-apple focus-ring rounded ${!n.isRead ? 'bg-manglar-orange-light border-l-4 border-manglar-orange' : ''
+                            }`}
                           aria-label={`${n.title}. ${n.message}`}
                           role="menuitem"
                         >
@@ -169,7 +167,7 @@ export default function Header({
             <ChevronDownIcon className="hidden sm:block" />
           </button>
           {isMenuOpen && (
-            <div 
+            <div
               className="origin-top-right absolute right-0 mt-2 w-48 rounded-xl shadow-lg z-10 border border-apple-gray-light bg-white animate-fade-in"
               role="menu"
               aria-label="Menú de usuario"
